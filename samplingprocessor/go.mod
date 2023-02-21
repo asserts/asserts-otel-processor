@@ -1,4 +1,4 @@
-module github.com/asserts/asserts-otel-processor/samplingprocesor
+module github.com/asserts/asserts-otel-processor/samplingprocessor
 
 go 1.18
 

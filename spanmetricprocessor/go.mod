@@ -1,4 +1,4 @@
-module github.com/asserts/asserts-otel-processor/assertsotelprocessor
+module github.com/asserts/asserts-otel-processor/spanmetricprocessor
 
 go 1.18
 
