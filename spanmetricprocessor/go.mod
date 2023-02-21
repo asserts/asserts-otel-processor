@@ -1,4 +1,4 @@
-module assertsotelprocessor
+module github.com/asserts/asserts-otel-processor/assertsotelprocessor
 
 go 1.18
 
