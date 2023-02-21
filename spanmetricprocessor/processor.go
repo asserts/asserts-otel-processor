@@ -24,7 +24,7 @@ import (
 	"time"
 	"unicode"
 
-	"internal/cache"
+	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/cache"
 
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"

@@ -17,7 +17,7 @@ package tailsamplingprocessor
 import (
 	"context"
 	"fmt"
-	"internal/timeutils"
+	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/timeutils"
 	"runtime"
 	"sync"
 	"time"
@@ -32,8 +32,8 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 
-	"internal/idbatcher"
-	"internal/sampling"
+	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/idbatcher"
+	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
 // policy combines a sampling policy evaluator with the destinations to be
