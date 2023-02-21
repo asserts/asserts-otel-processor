@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"internal/sampling"
+	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
 func TestAndHelper(t *testing.T) {

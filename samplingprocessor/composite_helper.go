@@ -17,7 +17,7 @@ package tailsamplingprocessor
 import (
 	"go.uber.org/zap"
 
-	"internal/sampling"
+	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
 func getNewCompositePolicy(logger *zap.Logger, config *CompositeCfg) (sampling.PolicyEvaluator, error) {

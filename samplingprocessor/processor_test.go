@@ -18,7 +18,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"internal/timeutils"
+	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/timeutils"
 	"sort"
 	"sync"
 	"testing"
@@ -32,8 +32,8 @@ import (
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 
-	"internal/idbatcher"
-	"internal/sampling"
+	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/idbatcher"
+	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/sampling"
 )
 
 const (

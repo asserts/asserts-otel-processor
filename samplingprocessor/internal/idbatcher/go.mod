@@ -1,4 +1,4 @@
-module idbatcher
+module github.com/asserts/asserts-otel-processor/samplingprocessor/internal/idbatcher
 
 go 1.19
 

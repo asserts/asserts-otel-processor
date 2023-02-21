@@ -17,7 +17,7 @@ package tailsamplingprocessor
 import (
 	"go.uber.org/zap"
 
-	"internal/sampling"
+	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
 func getNewAndPolicy(logger *zap.Logger, config *AndCfg) (sampling.PolicyEvaluator, error) {

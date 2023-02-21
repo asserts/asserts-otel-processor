@@ -15,11 +15,11 @@
 package assertsotelprocessor
 
 import (
-	"assertsotelprocessor/mocks"
 	"bytes"
 	"context"
 	"fmt"
-	"internal/cache"
+	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/cache"
+	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/mocks"
 	"sync"
 	"testing"
 	"time"

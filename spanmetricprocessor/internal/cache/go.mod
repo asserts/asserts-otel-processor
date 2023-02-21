@@ -1,4 +1,4 @@
-module cache
+module github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/cache
 
 go 1.19
 
