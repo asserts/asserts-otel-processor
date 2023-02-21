@@ -1,4 +1,4 @@
-module sampling
+module github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling
 
 go 1.19
 
