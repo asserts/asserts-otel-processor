@@ -351,6 +351,9 @@ github.com/open-telemetry/opentelemetry-collector-contrib/exporter/jaegerexporte
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/jaegerexporter v0.71.0/go.mod h1:WfRs/ToLSjthdWMbH3/SgapqPFReIo7H8RAHS+A4Noc=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.71.0 h1:P9UO+0OOVtuI/30tYob9hmG5IZoh6jKCKXzc2dcU4mQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusexporter v0.71.0/go.mod h1:UStrcDHkBWXBe92zXFNKsR7tltKWTjwj0EBOS1vJq7I=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/common v0.71.0 h1:80WGBl1Z3DN2cwfgs527mXv9Xfo/Jk9gYut8RxWN3Uk=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.71.0 h1:v4I84/Ek2uu5zQyghQuLavc12c5zYsETdfWj0BiF99s=
+github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.71.0/go.mod h1:NCc8DESPhS1Cny3bkSI+2DSRuKGfusJZ1DHMvYHEiJU=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.71.0 h1:E2BfofDZtV7Mm5SXN/AqWAD0Xrke29+/lCqVwPLPgOc=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.71.0 h1:JheZXuJ/cxmHuwTeFAohTxi8UzP5tRaGHFrmHu4BMVU=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.71.0/go.mod h1:06Rb5/zuzn4xH/RTzyE4xG8IAv6II2bkYfRRExlv2Dc=

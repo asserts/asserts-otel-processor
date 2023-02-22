@@ -1,4 +1,4 @@
-package assertsotelprocessor
+package spanmetricprocessor
 
 import (
 	"context"
