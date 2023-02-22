@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/timeutils"
 	"sort"
 	"sync"
 	"testing"
@@ -31,9 +30,6 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
-
-	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/idbatcher"
-	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/sampling"
 )
 
 const (
@@ -65,7 +61,7 @@ func TestSequentialTraceArrival(t *testing.T) {
 	for i := range traceIds {
 		d, ok := tsp.idToTrace.Load(traceIds[i])
 		require.True(t, ok, "Missing expected traceId")
-		v := d.(*sampling.TraceData)
+		v := d.(*TraceData)
 		require.Equal(t, int64(i+1), v.SpanCount.Load(), "Incorrect number of spans for entry %d", i)
 	}
 }
@@ -107,7 +103,7 @@ func TestConcurrentTraceArrival(t *testing.T) {
 	for i := range traceIds {
 		d, ok := tsp.idToTrace.Load(traceIds[i])
 		require.True(t, ok, "Missing expected traceId")
-		v := d.(*sampling.TraceData)
+		v := d.(*TraceData)
 		require.Equal(t, int64(i+1)*2, v.SpanCount.Load(), "Incorrect number of spans for entry %d", i)
 	}
 }
@@ -222,7 +218,7 @@ func TestSamplingPolicyTypicalPath(t *testing.T) {
 	}
 
 	// Now the first batch that waited the decision period.
-	mpe.NextDecision = sampling.Sampled
+	mpe.NextDecision = Sampled
 	tsp.samplingPolicyOnTick()
 	require.False(
 		t,
@@ -283,7 +279,7 @@ func TestSamplingPolicyInvertSampled(t *testing.T) {
 	}
 
 	// Now the first batch that waited the decision period.
-	mpe.NextDecision = sampling.InvertSampled
+	mpe.NextDecision = InvertSampled
 	tsp.samplingPolicyOnTick()
 	require.False(
 		t,
@@ -351,8 +347,8 @@ func TestSamplingMultiplePolicies(t *testing.T) {
 	}
 
 	// Both policies will decide to sample
-	mpe1.NextDecision = sampling.Sampled
-	mpe2.NextDecision = sampling.Sampled
+	mpe1.NextDecision = Sampled
+	mpe2.NextDecision = Sampled
 	tsp.samplingPolicyOnTick()
 	require.False(
 		t,
@@ -414,7 +410,7 @@ func TestSamplingPolicyDecisionNotSampled(t *testing.T) {
 	}
 
 	// Now the first batch that waited the decision period.
-	mpe.NextDecision = sampling.NotSampled
+	mpe.NextDecision = NotSampled
 	tsp.samplingPolicyOnTick()
 	require.EqualValues(t, 0, msp.SpanCount(), "exporter should have received zero spans")
 	require.EqualValues(t, 4, mpe.EvaluationCount, "policy should have been evaluated 4 times")
@@ -423,7 +419,7 @@ func TestSamplingPolicyDecisionNotSampled(t *testing.T) {
 	require.NoError(t, tsp.ConsumeTraces(context.Background(), batches[0]))
 	require.Equal(t, 0, msp.SpanCount())
 
-	mpe.NextDecision = sampling.Unspecified
+	mpe.NextDecision = Unspecified
 	mpe.NextError = errors.New("mock policy error")
 	tsp.samplingPolicyOnTick()
 	require.EqualValues(t, 0, msp.SpanCount(), "exporter should have received zero spans")
@@ -477,7 +473,7 @@ func TestSamplingPolicyDecisionInvertNotSampled(t *testing.T) {
 	}
 
 	// Now the first batch that waited the decision period.
-	mpe.NextDecision = sampling.InvertNotSampled
+	mpe.NextDecision = InvertNotSampled
 	tsp.samplingPolicyOnTick()
 	require.EqualValues(t, 0, msp.SpanCount(), "exporter should have received zero spans")
 	require.EqualValues(t, 4, mpe.EvaluationCount, "policy should have been evaluated 4 times")
@@ -486,7 +482,7 @@ func TestSamplingPolicyDecisionInvertNotSampled(t *testing.T) {
 	require.NoError(t, tsp.ConsumeTraces(context.Background(), batches[0]))
 	require.Equal(t, 0, msp.SpanCount())
 
-	mpe.NextDecision = sampling.Unspecified
+	mpe.NextDecision = Unspecified
 	mpe.NextError = errors.New("mock policy error")
 	tsp.samplingPolicyOnTick()
 	require.EqualValues(t, 0, msp.SpanCount(), "exporter should have received zero spans")
@@ -526,8 +522,8 @@ func TestLateArrivingSpansAssignedOriginalDecision(t *testing.T) {
 	traceID := uInt64ToTraceID(1)
 
 	// The combined decision from the policies is NotSampled
-	mpe1.NextDecision = sampling.InvertSampled
-	mpe2.NextDecision = sampling.NotSampled
+	mpe1.NextDecision = InvertSampled
+	mpe2.NextDecision = NotSampled
 
 	// A function that return a ptrace.Traces containing a single span for the single trace we are using.
 	spanIndexToTraces := func(spanIndex uint64) ptrace.Traces {
@@ -589,7 +585,7 @@ func TestMultipleBatchesAreCombinedIntoOne(t *testing.T) {
 		require.NoError(t, tsp.Shutdown(context.Background()))
 	}()
 
-	mpe.NextDecision = sampling.Sampled
+	mpe.NextDecision = Sampled
 
 	traceIds, batches := generateIdsAndBatches(3)
 	for _, batch := range batches {
@@ -702,14 +698,14 @@ func uInt64ToSpanID(id uint64) pcommon.SpanID {
 }
 
 type mockPolicyEvaluator struct {
-	NextDecision    sampling.Decision
+	NextDecision    Decision
 	NextError       error
 	EvaluationCount int
 }
 
-var _ sampling.PolicyEvaluator = (*mockPolicyEvaluator)(nil)
+var _ PolicyEvaluator = (*mockPolicyEvaluator)(nil)
 
-func (m *mockPolicyEvaluator) Evaluate(pcommon.TraceID, *sampling.TraceData) (sampling.Decision, error) {
+func (m *mockPolicyEvaluator) Evaluate(pcommon.TraceID, *TraceData) (Decision, error) {
 	m.EvaluationCount++
 	return m.NextDecision, m.NextError
 }
@@ -718,7 +714,7 @@ type manualTTicker struct {
 	Started bool
 }
 
-var _ timeutils.TTicker = (*manualTTicker)(nil)
+var _ TTicker = (*manualTTicker)(nil)
 
 func (t *manualTTicker) Start(time.Duration) {
 	t.Started = true
@@ -732,14 +728,14 @@ func (t *manualTTicker) Stop() {
 
 type syncIDBatcher struct {
 	sync.Mutex
-	openBatch idbatcher.Batch
-	batchPipe chan idbatcher.Batch
+	openBatch Batch
+	batchPipe chan Batch
 }
 
-var _ idbatcher.Batcher = (*syncIDBatcher)(nil)
+var _ Batcher = (*syncIDBatcher)(nil)
 
-func newSyncIDBatcher(numBatches uint64) idbatcher.Batcher {
-	batches := make(chan idbatcher.Batch, numBatches)
+func newSyncIDBatcher(numBatches uint64) Batcher {
+	batches := make(chan Batch, numBatches)
 	for i := uint64(0); i < numBatches; i++ {
 		batches <- nil
 	}
@@ -754,7 +750,7 @@ func (s *syncIDBatcher) AddToCurrentBatch(id pcommon.TraceID) {
 	s.Unlock()
 }
 
-func (s *syncIDBatcher) CloseCurrentAndTakeFirstBatch() (idbatcher.Batch, bool) {
+func (s *syncIDBatcher) CloseCurrentAndTakeFirstBatch() (Batch, bool) {
 	s.Lock()
 	defer s.Unlock()
 	firstBatch := <-s.batchPipe
