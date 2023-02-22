@@ -20,8 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-
-	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
 func TestCompositeHelper(t *testing.T) {
@@ -58,16 +56,16 @@ func TestCompositeHelper(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		expected := sampling.NewComposite(zap.NewNop(), 1000, []sampling.SubPolicyEvalParams{
+		expected := NewComposite(zap.NewNop(), 1000, []SubPolicyEvalParams{
 			{
-				Evaluator:         sampling.NewLatency(zap.NewNop(), 100),
+				Evaluator:         NewLatency(zap.NewNop(), 100),
 				MaxSpansPerSecond: 250,
 			},
 			{
-				Evaluator:         sampling.NewLatency(zap.NewNop(), 200),
+				Evaluator:         NewLatency(zap.NewNop(), 200),
 				MaxSpansPerSecond: 500,
 			},
-		}, sampling.MonotonicClock{})
+		}, MonotonicClock{})
 		assert.Equal(t, expected, actual)
 	})
 

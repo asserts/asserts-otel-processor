@@ -38,9 +38,9 @@ const (
 	StringAttribute PolicyType = "string_attribute"
 	// RateLimiting allows all traces until the specified limits are satisfied.
 	RateLimiting PolicyType = "rate_limiting"
-	// Composite allows defining a composite policy, combining the other policies in one
+	// CompositeEvaluator allows defining a composite policy, combining the other policies in one
 	Composite PolicyType = "composite"
-	// And allows defining a And policy, combining the other policies in one
+	// AndEvaluator allows defining a AndEvaluator policy, combining the other policies in one
 	And PolicyType = "and"
 	// SpanCount sample traces that are have more spans per Trace than a given threshold.
 	SpanCount PolicyType = "span_count"

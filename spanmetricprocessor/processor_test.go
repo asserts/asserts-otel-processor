@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/cache"
 	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/mocks"
 	"sync"
 	"testing"
@@ -454,7 +453,7 @@ func BenchmarkProcessorConsumeTraces(b *testing.B) {
 func newProcessorImp(mexp *mocks.MetricsExporter, tcon *mocks.TracesConsumer, defaultNullValue *pcommon.Value, temporality string, logger *zap.Logger, ticker *clock.Ticker) *processorImp {
 	defaultNotInSpanAttrVal := pcommon.NewValueStr("defaultNotInSpanAttrVal")
 	// use size 2 for LRU cache for testing purpose
-	metricKeyToDimensions, err := cache.NewCache[metricKey, pcommon.Map](DimensionsCacheSize)
+	metricKeyToDimensions, err := NewCache[metricKey, pcommon.Map](DimensionsCacheSize)
 	if err != nil {
 		panic(err)
 	}

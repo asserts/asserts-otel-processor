@@ -20,8 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-
-	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
 func TestAndHelper(t *testing.T) {
@@ -39,8 +37,8 @@ func TestAndHelper(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		expected := sampling.NewAnd(zap.NewNop(), []sampling.PolicyEvaluator{
-			sampling.NewLatency(zap.NewNop(), 100),
+		expected := NewAnd(zap.NewNop(), []PolicyEvaluator{
+			NewLatency(zap.NewNop(), 100),
 		})
 		assert.Equal(t, expected, actual)
 	})

@@ -15,23 +15,17 @@
 package tailsamplingprocessor
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.uber.org/zap"
 )
 
-func getNewAndPolicy(logger *zap.Logger, config *AndCfg) (PolicyEvaluator, error) {
-	var subPolicyEvaluators []PolicyEvaluator
-	for i := range config.SubPolicyCfg {
-		policyCfg := &config.SubPolicyCfg[i]
-		policy, err := getAndSubPolicyEvaluator(logger, policyCfg)
-		if err != nil {
-			return nil, err
-		}
-		subPolicyEvaluators = append(subPolicyEvaluators, policy)
-	}
-	return NewAnd(logger, subPolicyEvaluators), nil
-}
-
-// Return instance of and sub-policy
-func getAndSubPolicyEvaluator(logger *zap.Logger, cfg *AndSubPolicyCfg) (PolicyEvaluator, error) {
-	return getSharedPolicyEvaluator(logger, &cfg.sharedPolicyCfg)
+func TestEvaluate_AlwaysSample(t *testing.T) {
+	filter := NewAlwaysSample(zap.NewNop())
+	decision, err := filter.Evaluate(pcommon.TraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+		16}), newTraceStringAttrs(nil, "example", "value"))
+	assert.Nil(t, err)
+	assert.Equal(t, decision, Sampled)
 }

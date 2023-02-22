@@ -24,8 +24,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/asserts/asserts-otel-processor/spanmetricprocessor/internal/cache"
-
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -81,7 +79,7 @@ type processorImp struct {
 
 	// An LRU cache of dimension key-value maps keyed by a unique identifier formed by a concatenation of its values:
 	// e.g. { "foo/barOK": { "serviceName": "foo", "operation": "/bar", "status_code": "OK" }}
-	metricKeyToDimensions *cache.Cache[metricKey, pcommon.Map]
+	metricKeyToDimensions *Cache[metricKey, pcommon.Map]
 
 	ticker  *clock.Ticker
 	done    chan struct{}
@@ -136,7 +134,7 @@ func newProcessor(logger *zap.Logger, config component.Config, nextConsumer cons
 			pConfig.DimensionsCacheSize,
 		)
 	}
-	metricKeyToDimensionsCache, err := cache.NewCache[metricKey, pcommon.Map](pConfig.DimensionsCacheSize)
+	metricKeyToDimensionsCache, err := NewCache[metricKey, pcommon.Map](pConfig.DimensionsCacheSize)
 	if err != nil {
 		return nil, err
 	}

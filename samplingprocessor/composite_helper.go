@@ -16,12 +16,10 @@ package tailsamplingprocessor
 
 import (
 	"go.uber.org/zap"
-
-	"github.com/asserts/asserts-otel-processor/samplingprocessor/internal/sampling"
 )
 
-func getNewCompositePolicy(logger *zap.Logger, config *CompositeCfg) (sampling.PolicyEvaluator, error) {
-	var subPolicyEvalParams []sampling.SubPolicyEvalParams
+func getNewCompositePolicy(logger *zap.Logger, config *CompositeCfg) (PolicyEvaluator, error) {
+	var subPolicyEvalParams []SubPolicyEvalParams
 	rateAllocationsMap := getRateAllocationMap(config)
 	for i := range config.SubPolicyCfg {
 		policyCfg := &config.SubPolicyCfg[i]
@@ -30,13 +28,13 @@ func getNewCompositePolicy(logger *zap.Logger, config *CompositeCfg) (sampling.P
 			return nil, err
 		}
 
-		evalParams := sampling.SubPolicyEvalParams{
+		evalParams := SubPolicyEvalParams{
 			Evaluator:         policy,
 			MaxSpansPerSecond: int64(rateAllocationsMap[policyCfg.Name]),
 		}
 		subPolicyEvalParams = append(subPolicyEvalParams, evalParams)
 	}
-	return sampling.NewComposite(logger, config.MaxTotalSpansPerSecond, subPolicyEvalParams, sampling.MonotonicClock{}), nil
+	return NewComposite(logger, config.MaxTotalSpansPerSecond, subPolicyEvalParams, MonotonicClock{}), nil
 }
 
 // Apply rate allocations to the sub-policies
@@ -56,7 +54,7 @@ func getRateAllocationMap(config *CompositeCfg) map[string]float64 {
 }
 
 // Return instance of composite sub-policy
-func getCompositeSubPolicyEvaluator(logger *zap.Logger, cfg *CompositeSubPolicyCfg) (sampling.PolicyEvaluator, error) {
+func getCompositeSubPolicyEvaluator(logger *zap.Logger, cfg *CompositeSubPolicyCfg) (PolicyEvaluator, error) {
 	switch cfg.Type {
 	case And:
 		return getNewAndPolicy(logger, &cfg.AndCfg)

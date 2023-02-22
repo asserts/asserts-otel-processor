@@ -15,23 +15,12 @@
 package tailsamplingprocessor
 
 import (
-	"go.uber.org/zap"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func getNewAndPolicy(logger *zap.Logger, config *AndCfg) (PolicyEvaluator, error) {
-	var subPolicyEvaluators []PolicyEvaluator
-	for i := range config.SubPolicyCfg {
-		policyCfg := &config.SubPolicyCfg[i]
-		policy, err := getAndSubPolicyEvaluator(logger, policyCfg)
-		if err != nil {
-			return nil, err
-		}
-		subPolicyEvaluators = append(subPolicyEvaluators, policy)
-	}
-	return NewAnd(logger, subPolicyEvaluators), nil
-}
-
-// Return instance of and sub-policy
-func getAndSubPolicyEvaluator(logger *zap.Logger, cfg *AndSubPolicyCfg) (PolicyEvaluator, error) {
-	return getSharedPolicyEvaluator(logger, &cfg.sharedPolicyCfg)
+func TestTimeProvider(t *testing.T) {
+	clock := MonotonicClock{}
+	assert.Greater(t, clock.getCurSecond(), int64(0))
 }
