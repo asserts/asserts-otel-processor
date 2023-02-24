@@ -9,7 +9,7 @@ import (
 
 const (
 	// The value of "type" key in configuration.
-	typeStr = "assertsotelprocessor"
+	typeStr = "assertsprocessor"
 	// The stability level of the processor.
 	stability = component.StabilityLevelDevelopment
 )
