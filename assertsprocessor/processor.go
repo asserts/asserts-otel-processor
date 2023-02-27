@@ -54,7 +54,6 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 // Samples the trace if the latency threshold exceeds for any of the spans of interest.
 // Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	p.logger.Info("consumer.ConsumeTraces")
 	sampleTrace := false
 	var traceId string
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
@@ -82,9 +81,11 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 				if traceId == "" {
 					traceId = span.TraceID().String()
 				}
+				if span.SpanID().IsEmpty() {
+					sampleTrace = p.shouldCaptureTrace(traceId, span)
+				}
 				if p.spanOfInterest(span) {
 					p.captureMetrics(namespace, serviceName, span)
-					sampleTrace = sampleTrace || p.shouldCaptureTrace(span)
 				}
 			}
 		}
@@ -151,11 +152,15 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 		}
 	}
 
+	// Recording latency metric
+
 	p.latencyHistogram.With(labels).Observe(float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9)
 }
 
-func (p *assertsProcessorImpl) shouldCaptureTrace(span ptrace.Span) bool {
-	return float64(span.EndTimestamp()-span.StartTimestamp()) > p.config.DefaultLatencyThreshold*1e9
+func (p *assertsProcessorImpl) shouldCaptureTrace(traceId string, rootSpan ptrace.Span) bool {
+	spanDuration := float64(rootSpan.EndTimestamp() - rootSpan.StartTimestamp())
+	p.logger.Info("Root Span Duration ", zap.String("Trace Id", traceId), zap.Duration("Duration", time.Duration(spanDuration)))
+	return spanDuration > p.config.DefaultLatencyThreshold*1e9
 }
 
 func newProcessor(logger *zap.Logger, config component.Config, nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
@@ -171,20 +176,24 @@ func newProcessor(logger *zap.Logger, config component.Config, nextConsumer cons
 		allowedLabels = append((*pConfig).CaptureAttributesInMetric)
 	}
 
+	histogramVec := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "otel",
+		Subsystem: "span",
+		Name:      "latency_seconds",
+	}, allowedLabels)
+
 	p := &assertsProcessorImpl{
 		logger:                logger,
 		config:                *pConfig,
 		nextConsumer:          nextConsumer,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
-		latencyHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: "otel",
-			Subsystem: "span",
-			Name:      "latency_seconds",
-		}, allowedLabels),
+		latencyHistogram:      histogramVec,
 	}
 
 	// Start the prometheus server on port 9465
 	p.prometheusRegistry = prometheus.NewRegistry()
+	p.prometheusRegistry.Register(histogramVec)
+
 	go startExporter(p.prometheusRegistry)
 
 	return p, nil
