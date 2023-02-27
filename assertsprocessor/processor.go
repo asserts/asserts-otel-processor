@@ -100,15 +100,19 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 }
 
 func (p *assertsProcessorImpl) buildCompiledRegexps() error {
-	p.logger.Info("consumer.Start compiling regexps")
-	for attName, matchExpString := range *p.config.AttributeExps {
-		compile, err := regexp.Compile(matchExpString)
-		if err != nil {
-			return err
+	if len(*p.config.AttributeExps) > 0 {
+		p.logger.Info("consumer.Start compiling regexps")
+		for attName, matchExpString := range *p.config.AttributeExps {
+			compile, err := regexp.Compile(matchExpString)
+			if err != nil {
+				return err
+			}
+			(*p.attributeValueRegExps)[attName] = *compile
 		}
-		(*p.attributeValueRegExps)[attName] = *compile
+		p.logger.Info("consumer.Start compiled regexps successfully")
+	} else {
+		p.logger.Info("consumer.Start Span attribute match conditions not specified. All traces will be dropped")
 	}
-	p.logger.Info("consumer.Start compiled regexps successfully")
 	return nil
 }
 
@@ -118,6 +122,10 @@ func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := span.Attributes().Get(attName)
 			if !found || !matchExp.MatchString(value.AsString()) {
+				p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
+					zap.String("attribute", attName),
+					zap.String("value", value.AsString()),
+				)
 				return false
 			}
 		}
