@@ -3,32 +3,30 @@ package assertsprocessor
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
-	"net/http"
 	"regexp"
-	"strings"
+	"sync"
 	"time"
 )
+
+// The methods from a Span that we care for to enable easy mocking
 
 type assertsProcessorImpl struct {
 	logger                *zap.Logger
 	config                Config
 	attributeValueRegExps *map[string]regexp.Regexp
 	nextConsumer          consumer.Traces
-	latencyBounds         *map[string]map[string]LatencyBound
+	latencyBounds         sync.Map
 	latencyHistogram      *prometheus.HistogramVec
 	prometheusRegistry    *prometheus.Registry
-}
-
-type LatencyBound struct {
-	Lower float64
-	Upper float64
+	thresholdSyncTicker   *clock.Ticker
+	entityKeys            sync.Map
+	done                  chan bool
 }
 
 // Capabilities implements the consumer interface.
@@ -40,7 +38,15 @@ func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 // Start implements the consumer interface.
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
 	p.logger.Info("consumer.Start callback")
-	return p.buildCompiledRegexps()
+	err := p.buildCompiledRegexps()
+	if err == nil {
+		if p.config.AssertsServer != "" {
+			go p.fetchThresholds()
+		} else {
+			p.logger.Info("Asserts Server not specified. No dynamic thresholds")
+		}
+	}
+	return err
 }
 
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
@@ -49,7 +55,7 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 }
 
 // ConsumeTraces implements the consumer.Traces interface.
-// Samples the trace if the latency threshold exceeds for any of the spans of interest.
+// Samples the trace if the latency threshold exceeds for the root spans.
 // Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
 	sampleTrace := false
@@ -58,18 +64,17 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 		resourceSpans := traces.ResourceSpans().At(i)
 		resourceAttributes := resourceSpans.Resource().Attributes()
 
+		var namespace string
 		namespaceAttr, found := resourceAttributes.Get(conventions.AttributeServiceNamespace)
-		if !found {
-			continue
+		if found {
+			namespace = namespaceAttr.Str()
 		}
 
 		serviceAttr, found := resourceAttributes.Get(conventions.AttributeServiceName)
 		if !found {
 			continue
 		}
-
 		serviceName := serviceAttr.Str()
-		namespace := namespaceAttr.Str()
 		ilsSlice := resourceSpans.ScopeSpans()
 		for j := 0; j < ilsSlice.Len(); j++ {
 			ils := ilsSlice.At(j)
@@ -80,7 +85,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 					traceId = span.TraceID().String()
 				}
 				if span.ParentSpanID().IsEmpty() {
-					sampleTrace = p.shouldCaptureTrace(traceId, span)
+					sampleTrace = p.shouldCaptureTrace(namespace, serviceName, traceId, span)
 				}
 				if p.shouldCaptureMetrics(span) {
 					p.captureMetrics(namespace, serviceName, span)
@@ -97,19 +102,15 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 }
 
 func (p *assertsProcessorImpl) buildCompiledRegexps() error {
-	if len(*p.config.AttributeExps) > 0 {
-		p.logger.Info("consumer.Start compiling regexps")
-		for attName, matchExpString := range *p.config.AttributeExps {
-			compile, err := regexp.Compile(matchExpString)
-			if err != nil {
-				return err
-			}
-			(*p.attributeValueRegExps)[attName] = *compile
+	p.logger.Info("consumer.Start compiling regexps")
+	for attName, matchExpString := range *p.config.AttributeExps {
+		compile, err := regexp.Compile(matchExpString)
+		if err != nil {
+			return err
 		}
-		p.logger.Info("consumer.Start compiled regexps successfully")
-	} else {
-		p.logger.Info("consumer.Start Span attribute match conditions not specified. All traces will be dropped")
+		(*p.attributeValueRegExps)[attName] = *compile
 	}
+	p.logger.Debug("consumer.Start compiled regexps successfully")
 	return nil
 }
 
@@ -135,8 +136,17 @@ func (p *assertsProcessorImpl) shouldCaptureMetrics(span ptrace.Span) bool {
 }
 
 func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, span ptrace.Span) {
+	labels := p.buildLabels(namespace, service, span)
+	latencySeconds := p.computeLatency(span)
+	p.recordLatency(labels, latencySeconds)
+}
+
+func (p *assertsProcessorImpl) computeLatency(span ptrace.Span) float64 {
+	return float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9
+}
+
+func (p *assertsProcessorImpl) buildLabels(namespace string, service string, span ptrace.Span) prometheus.Labels {
 	p.logger.Info("consumer.ConsumeTraces Capturing span duration metric for",
-		zap.String("spanKind", span.Kind().String()),
 		zap.String("spanId", span.SpanID().String()),
 	)
 
@@ -155,94 +165,43 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 			labels[applyPromConventions(labelName)] = ""
 		}
 	}
-	p.latencyHistogram.With(labels).Observe(float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9)
+	return labels
 }
 
-func applyPromConventions(text string) string {
-	replacer := strings.NewReplacer(
-		" ", "_",
-		",", "_",
-		"\t", "_",
-		"/", "_",
-		"\\", "_",
-		".", "_",
-		"-", "_",
-		":", "_",
-		"=", "_",
-		"“", "_",
-		"@", "_",
-		"<", "_",
-		">", "_",
-		"%", "_percent",
-	)
-	return strings.ToLower(replacer.Replace(text))
+func (p *assertsProcessorImpl) recordLatency(labels prometheus.Labels, latencySeconds float64) {
+	p.latencyHistogram.With(labels).Observe(latencySeconds)
 }
 
-func (p *assertsProcessorImpl) shouldCaptureTrace(traceId string, rootSpan ptrace.Span) bool {
-	spanDuration := float64(rootSpan.EndTimestamp() - rootSpan.StartTimestamp())
-	p.logger.Info("Root Span Duration ", zap.String("Trace Id", traceId), zap.Duration("Duration", time.Duration(spanDuration)))
-	return spanDuration > p.config.DefaultLatencyThreshold*1e9
-}
+func (p *assertsProcessorImpl) shouldCaptureTrace(namespace string, serviceName string, traceId string, rootSpan ptrace.Span) bool {
+	spanDuration := p.computeLatency(rootSpan)
+	p.logger.Info("Sampling based on Root Span Duration",
+		zap.String("Trace Id", traceId),
+		zap.Duration("Duration", time.Duration(spanDuration)))
 
-func newProcessor(logger *zap.Logger, config component.Config, nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
-	logger.Info("Creating assertsotelprocessor")
-	pConfig := config.(*Config)
-
-	var allowedLabels []string
-	allowedLabels = append(allowedLabels, "asserts_env")
-	allowedLabels = append(allowedLabels, "asserts_site")
-	allowedLabels = append(allowedLabels, "namespace")
-	allowedLabels = append(allowedLabels, "service")
-	if pConfig.CaptureAttributesInMetric != nil {
-		for _, name := range (*pConfig).CaptureAttributesInMetric {
-			allowedLabels = append(allowedLabels, applyPromConventions(name))
+	var entityKey = EntityKeyDto{
+		EntityType: "Service",
+		Name:       serviceName,
+		Scope: map[string]string{
+			"asserts_env": p.config.Env, "asserts_site": p.config.Site, "namespace": namespace,
+		},
+	}
+	load, found := p.latencyBounds.Load(entityKey.AsString())
+	if !found {
+		p.logger.Info("Threshold not found. Will use default",
+			zap.String("Entity", entityKey.AsString()),
+			zap.Float64("Default Duration", p.config.DefaultLatencyThreshold))
+		// Use default threshold the first time. The entity thresholds will be updated
+		// in the map every minute in async
+		p.entityKeys.Store(entityKey.AsString(), entityKey)
+		return spanDuration > p.config.DefaultLatencyThreshold
+	} else {
+		var contextMap, _ = load.(sync.Map)
+		var data, ok = contextMap.Load(rootSpan.Name())
+		if !ok {
+			return spanDuration > p.config.DefaultLatencyThreshold
+		} else {
+			var latencyBound = data.(LatencyBound)
+			return spanDuration > latencyBound.Upper
 		}
-	}
-
-	histogramVec := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "otel",
-		Subsystem: "span",
-		Name:      "latency_seconds",
-	}, allowedLabels)
-
-	p := &assertsProcessorImpl{
-		logger:                logger,
-		config:                *pConfig,
-		nextConsumer:          nextConsumer,
-		attributeValueRegExps: &map[string]regexp.Regexp{},
-		latencyHistogram:      histogramVec,
-	}
-
-	// Start the prometheus server on port 9465
-	p.prometheusRegistry = prometheus.NewRegistry()
-
-	// Add Go module build info.
-	p.prometheusRegistry.MustRegister(collectors.NewBuildInfoCollector())
-	p.prometheusRegistry.MustRegister(collectors.NewGoCollector(
-		collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
-	))
-	err := p.prometheusRegistry.Register(histogramVec)
-	go p.startExporter()
-	return p, err
-}
-
-func (p *assertsProcessorImpl) startExporter() {
-	s := &http.Server{
-		Addr:           ":9465",
-		ReadTimeout:    30 * time.Second,
-		WriteTimeout:   30 * time.Second,
-		MaxHeaderBytes: 1 << 20,
-	}
-
-	// Expose the registered metrics via HTTP.
-	http.Handle("/metrics", promhttp.HandlerFor(
-		p.prometheusRegistry,
-		promhttp.HandlerOpts{},
-	))
-
-	p.logger.Info("Starting Prometheus Exporter Listening on port 9465")
-	err := s.ListenAndServe()
-	if err != nil {
-		p.logger.Error("Failed to start server", zap.Error(err))
 	}
 }
