@@ -149,7 +149,7 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 	for _, labelName := range p.config.CaptureAttributesInMetric {
 		value, present := span.Attributes().Get(labelName)
 		if present {
-			labels[prometheusifyName(labelName)] = value.AsString()
+			labels[applyPromConventions(labelName)] = value.AsString()
 		}
 	}
 
@@ -158,7 +158,7 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 	p.latencyHistogram.With(labels).Observe(float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9)
 }
 
-func prometheusifyName(text string) string {
+func applyPromConventions(text string) string {
 	replacer := strings.NewReplacer(
 		" ", "_",
 		",", "_",
