@@ -112,25 +112,19 @@ func (p *assertsProcessorImpl) buildCompiledRegexps() error {
 	return nil
 }
 
-// Returns true if the span meets the span selection criteria
-func (p *assertsProcessorImpl) matches(span ptrace.Span) bool {
+// Returns true if a span is a root span or if it matches the span selection criteria
+func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 	if len(*p.attributeValueRegExps) > 0 {
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := span.Attributes().Get(attName)
 			if !found || !matchExp.MatchString(value.AsString()) {
 				return false
-			} else {
-
 			}
 		}
 		return true
+	} else {
+		return false
 	}
-	return false
-}
-
-// Returns true if a span is a root span or if it matches the span selection criteria
-func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
-	return span.ParentSpanID().IsEmpty() || p.matches(span)
 }
 
 func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, span ptrace.Span) {
@@ -154,9 +148,6 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 			labels[applyPromConventions(labelName)] = ""
 		}
 	}
-
-	// Recording latency metric
-
 	p.latencyHistogram.With(labels).Observe(float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9)
 }
 
