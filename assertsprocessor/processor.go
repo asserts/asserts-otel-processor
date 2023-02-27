@@ -150,6 +150,8 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 		value, present := span.Attributes().Get(labelName)
 		if present {
 			labels[applyPromConventions(labelName)] = value.AsString()
+		} else {
+			labels[applyPromConventions(labelName)] = ""
 		}
 	}
 
