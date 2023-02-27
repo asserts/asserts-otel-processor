@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -148,13 +149,33 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 	for _, labelName := range p.config.CaptureAttributesInMetric {
 		value, present := span.Attributes().Get(labelName)
 		if present {
-			labels[labelName] = value.AsString()
+			labels[prometheusifyName(labelName)] = value.AsString()
 		}
 	}
 
 	// Recording latency metric
 
 	p.latencyHistogram.With(labels).Observe(float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9)
+}
+
+func prometheusifyName(text string) string {
+	replacer := strings.NewReplacer(
+		" ", "_",
+		",", "_",
+		"\t", "_",
+		"/", "_",
+		"\\", "_",
+		".", "_",
+		"-", "_",
+		":", "_",
+		"=", "_",
+		"“", "_",
+		"@", "_",
+		"<", "_",
+		">", "_",
+		"%", "_percent",
+	)
+	return strings.ToLower(replacer.Replace(text))
 }
 
 func (p *assertsProcessorImpl) shouldCaptureTrace(traceId string, rootSpan ptrace.Span) bool {
