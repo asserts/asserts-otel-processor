@@ -81,7 +81,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 				if traceId == "" {
 					traceId = span.TraceID().String()
 				}
-				if span.SpanID().IsEmpty() {
+				if span.ParentSpanID().IsEmpty() {
 					sampleTrace = p.shouldCaptureTrace(traceId, span)
 				}
 				if p.spanOfInterest(span) {
