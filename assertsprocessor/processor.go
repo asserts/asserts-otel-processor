@@ -122,13 +122,13 @@ func (p *assertsProcessorImpl) shouldCaptureMetrics(span ptrace.Span) bool {
 			if !found {
 				return false
 			}
-			p.logger.Info("Found Span Attribute",
-				zap.String(attName, value.AsString()))
+			//p.logger.Info("Found Span Attribute",
+			//	zap.String(attName, value.AsString()))
 
 			valueMatches := matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())
-			p.logger.Info("Value Regexp Result",
-				zap.String("regexp", matchExp.String()),
-				zap.Bool("result", valueMatches))
+			//p.logger.Info("Value Regexp Result",
+			//	zap.String("regexp", matchExp.String()),
+			//	zap.Bool("result", valueMatches))
 			if !valueMatches {
 				return false
 			}

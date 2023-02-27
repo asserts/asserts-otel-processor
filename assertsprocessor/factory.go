@@ -49,7 +49,9 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	allowedLabels = append(allowedLabels, "namespace")
 	allowedLabels = append(allowedLabels, "service")
 	if pConfig.CaptureAttributesInMetric != nil {
-		allowedLabels = append((*pConfig).CaptureAttributesInMetric)
+		for _, label := range (*pConfig).CaptureAttributesInMetric {
+			allowedLabels = append(allowedLabels, applyPromConventions(label))
+		}
 	}
 
 	p := &assertsProcessorImpl{
@@ -68,7 +70,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 
 	// Start the prometheus server on port 9465
 	p.prometheusRegistry = prometheus.NewRegistry()
-	go startExporter(p.prometheusRegistry)
+	go p.startExporter()
 
 	return p, nil
 }

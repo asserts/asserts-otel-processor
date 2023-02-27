@@ -1,17 +1,16 @@
 package assertsprocessor
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
 )
 
-func startExporter(reg *prometheus.Registry) {
+func (p *assertsProcessorImpl) startExporter() {
 	s := &http.Server{
 		Addr:           ":9465",
 		ReadTimeout:    30 * time.Second,
@@ -20,19 +19,20 @@ func startExporter(reg *prometheus.Registry) {
 	}
 
 	// Add Go module build info.
-	reg.MustRegister(collectors.NewBuildInfoCollector())
-	reg.MustRegister(collectors.NewGoCollector(
+	p.prometheusRegistry.MustRegister(collectors.NewBuildInfoCollector())
+	p.prometheusRegistry.MustRegister(collectors.NewGoCollector(
 		collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
 	))
+	p.prometheusRegistry.Register(p.latencyHistogram)
 
 	// Expose the registered metrics via HTTP.
 	http.Handle("/metrics", promhttp.HandlerFor(
-		reg,
+		p.prometheusRegistry,
 		promhttp.HandlerOpts{},
 	))
 
-	log.Println("Starting Prometheus Exporter Listening on port 9465")
-	log.Fatal(s.ListenAndServe())
+	p.logger.Info("Starting Prometheus Exporter Listening on port 9465")
+	p.logger.Fatal("Error starting Prometheus Server", zap.Error(s.ListenAndServe()))
 }
 
 func applyPromConventions(text string) string {
