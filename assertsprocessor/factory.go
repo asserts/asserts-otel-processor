@@ -66,6 +66,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		}, allowedLabels),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		latencyBounds:       cmap.New[cmap.ConcurrentMap[string, LatencyBound]](),
+		entityKeys:          cmap.New[EntityKeyDto](),
 	}
 
 	// Start the prometheus server on port 9465
