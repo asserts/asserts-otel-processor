@@ -196,7 +196,9 @@ func newProcessor(logger *zap.Logger, config component.Config, nextConsumer cons
 	allowedLabels = append(allowedLabels, "namespace")
 	allowedLabels = append(allowedLabels, "service")
 	if pConfig.CaptureAttributesInMetric != nil {
-		allowedLabels = append((*pConfig).CaptureAttributesInMetric)
+		for _, name := range (*pConfig).CaptureAttributesInMetric {
+			allowedLabels = append(allowedLabels, applyPromConventions(name))
+		}
 	}
 
 	histogramVec := prometheus.NewHistogramVec(prometheus.HistogramOpts{
