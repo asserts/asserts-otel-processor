@@ -121,7 +121,7 @@ func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 	if len(*p.attributeValueRegExps) > 0 {
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := span.Attributes().Get(attName)
-			if !found || !matchExp.MatchString(value.AsString()) {
+			if !found || matchExp.String() != value.AsString() || !matchExp.MatchString(value.AsString()) {
 				if found {
 					p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
 						zap.String("TraceId", span.TraceID().String()),
