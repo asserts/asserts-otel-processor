@@ -3,6 +3,7 @@ package assertsprocessor
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -214,12 +215,14 @@ func newProcessor(logger *zap.Logger, config component.Config, nextConsumer cons
 
 	// Start the prometheus server on port 9465
 	p.prometheusRegistry = prometheus.NewRegistry()
+
+	// Add Go module build info.
+	p.prometheusRegistry.MustRegister(collectors.NewBuildInfoCollector())
+	p.prometheusRegistry.MustRegister(collectors.NewGoCollector(
+		collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
+	))
 	err := p.prometheusRegistry.Register(histogramVec)
-
-	if err == nil {
-		go p.startExporter()
-	}
-
+	go p.startExporter()
 	return p, err
 }
 
