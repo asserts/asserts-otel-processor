@@ -122,10 +122,20 @@ func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := span.Attributes().Get(attName)
 			if !found || !matchExp.MatchString(value.AsString()) {
-				p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
-					zap.String("attribute", attName),
-					zap.String("value", value.AsString()),
-				)
+				if found {
+					p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
+						zap.String("TraceId", span.TraceID().String()),
+						zap.String("SpanId", span.SpanID().String()),
+						zap.String("attribute", attName),
+						zap.String("value", value.AsString()),
+					)
+				} else {
+					p.logger.Info("consumer.ConsumeTraces Attribute not found",
+						zap.String("TraceId", span.TraceID().String()),
+						zap.String("SpanId", span.SpanID().String()),
+						zap.String("attribute", attName),
+					)
+				}
 				return false
 			}
 		}
