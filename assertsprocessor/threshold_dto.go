@@ -7,11 +7,6 @@ type LatencyBound struct {
 	Upper float64
 }
 
-type thresholdRequest struct {
-	entityKey       EntityKeyDto
-	responseChannel chan LatencyBound
-}
-
 type EntityKeyDto struct {
 	EntityType string            `json:"type"`
 	Name       string            `json:"name"`
@@ -20,7 +15,7 @@ type EntityKeyDto struct {
 
 func (ek *EntityKeyDto) AsString() string {
 	var sortedKeys []string
-	for key, _ := range ek.Scope {
+	for key := range ek.Scope {
 		sortedKeys = append(sortedKeys, key)
 	}
 	sort.Strings(sortedKeys)
@@ -36,6 +31,6 @@ func (ek *EntityKeyDto) AsString() string {
 }
 
 type EntityThresholdDto struct {
-	ResourceURIPattern string `json:"request_context"`
-	LatencyUpperBound  string `json:"upper_threshold"`
+	ResourceURIPattern string  `json:"request_context"`
+	LatencyUpperBound  float64 `json:"upper_threshold"`
 }

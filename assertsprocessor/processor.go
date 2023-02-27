@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/orcaman/concurrent-map/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
@@ -10,7 +11,6 @@ import (
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
 	"regexp"
-	"sync"
 )
 
 // The methods from a Span that we care for to enable easy mocking
@@ -20,11 +20,11 @@ type assertsProcessorImpl struct {
 	config                Config
 	attributeValueRegExps *map[string]regexp.Regexp
 	nextConsumer          consumer.Traces
-	latencyBounds         sync.Map
+	latencyBounds         cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, LatencyBound]]
 	latencyHistogram      *prometheus.HistogramVec
 	prometheusRegistry    *prometheus.Registry
 	thresholdSyncTicker   *clock.Ticker
-	entityKeys            sync.Map
+	entityKeys            cmap.ConcurrentMap[string, EntityKeyDto]
 	done                  chan bool
 }
 
@@ -50,6 +50,7 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 	p.logger.Info("consumer.Shutdown")
+	p.done <- true
 	return nil
 }
 
@@ -192,18 +193,17 @@ func (p *assertsProcessorImpl) shouldCaptureTrace(namespace string, serviceName 
 		zap.String("Entity Key", entityKey.AsString()),
 		zap.Float64("Duration", spanDuration))
 
-	load, found := p.latencyBounds.Load(entityKey.AsString())
+	load, found := p.latencyBounds.Get(entityKey.AsString())
 	if !found {
 		p.logger.Info("Thresholds not found for service. Will use default",
 			zap.String("Entity", entityKey.AsString()),
 			zap.Float64("Default Duration", p.config.DefaultLatencyThreshold))
 		// Use default threshold the first time. The entity thresholds will be updated
 		// in the map every minute in async
-		p.entityKeys.Store(entityKey.AsString(), entityKey)
+		p.entityKeys.Set(entityKey.AsString(), entityKey)
 		return spanDuration > p.config.DefaultLatencyThreshold
 	} else {
-		var contextMap, _ = load.(sync.Map)
-		var data, ok = contextMap.Load(rootSpan.Name())
+		var latencyBound, ok = load.Get(rootSpan.Name())
 		if !ok {
 			p.logger.Info("Threshold not found for request. Will use default",
 				zap.String("Entity", entityKey.AsString()),
@@ -211,7 +211,6 @@ func (p *assertsProcessorImpl) shouldCaptureTrace(namespace string, serviceName 
 				zap.Float64("Default Duration", p.config.DefaultLatencyThreshold))
 			return spanDuration > p.config.DefaultLatencyThreshold
 		} else {
-			var latencyBound, _ = data.(LatencyBound)
 			p.logger.Info("Threshold found for request",
 				zap.String("Entity", entityKey.AsString()),
 				zap.String("request", rootSpan.Name()),

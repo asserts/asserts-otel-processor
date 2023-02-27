@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"github.com/google/go-cmp/cmp"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -88,6 +89,8 @@ func TestComputeLatency(t *testing.T) {
 		config: Config{
 			DefaultLatencyThreshold: 0.5,
 		},
+		latencyBounds: cmap.New[cmap.ConcurrentMap[string, LatencyBound]](),
+		entityKeys:    cmap.New[EntityKeyDto](),
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -101,14 +104,18 @@ func TestShouldCaptureTraceDefaultThreshold(t *testing.T) {
 	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
 	logger, _ := zap.NewProduction()
 	p := &assertsProcessorImpl{
+
 		logger: logger,
 		attributeValueRegExps: &map[string]regexp.Regexp{
 			"rpc.system":  *systemPattern,
 			"rpc.service": *servicePattern,
 		},
 		config: Config{
+			Env: "dev", Site: "us-west-2",
 			DefaultLatencyThreshold: 0.5,
 		},
+		latencyBounds: cmap.New[cmap.ConcurrentMap[string, LatencyBound]](),
+		entityKeys:    cmap.New[EntityKeyDto](),
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -116,7 +123,56 @@ func TestShouldCaptureTraceDefaultThreshold(t *testing.T) {
 	testSpan.SetEndTimestamp(2e9)
 	assert.True(t, p.shouldCaptureTrace("n", "s", "123", testSpan))
 
+	dto := EntityKeyDto{
+		EntityType: "Service", Name: "s", Scope: map[string]string{
+			"asserts_env": "dev", "asserts_site": "us-west-2", "namespace": "n",
+		},
+	}
+	load, ok := p.entityKeys.Get(dto.AsString())
+	assert.True(t, ok)
+	assert.Equal(t, load, dto)
+
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
+	assert.False(t, p.shouldCaptureTrace("n", "s", "123", testSpan))
+}
+
+func TestShouldCaptureTraceDynamicThreshold(t *testing.T) {
+	systemPattern, _ := regexp.Compile("aws-api")
+	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
+	logger, _ := zap.NewProduction()
+	p := &assertsProcessorImpl{
+
+		logger: logger,
+		attributeValueRegExps: &map[string]regexp.Regexp{
+			"rpc.system":  *systemPattern,
+			"rpc.service": *servicePattern,
+		},
+		config: Config{
+			Env: "dev", Site: "us-west-2",
+			DefaultLatencyThreshold: 0.5,
+		},
+		latencyBounds: cmap.New[cmap.ConcurrentMap[string, LatencyBound]](),
+		entityKeys:    cmap.New[EntityKeyDto](),
+	}
+
+	dto := EntityKeyDto{
+		EntityType: "Service", Name: "s", Scope: map[string]string{
+			"asserts_env": "dev", "asserts_site": "us-west-2", "namespace": "n",
+		},
+	}
+	p.entityKeys.Set(dto.AsString(), dto)
+	p.latencyBounds.Set(dto.AsString(), cmap.New[LatencyBound]())
+	get, _ := p.latencyBounds.Get(dto.AsString())
+	get.Set("/v1/latency-thresholds", LatencyBound{
+		Upper: 1,
+	})
+
+	testSpan := ptrace.NewSpan()
+	testSpan.SetName("/v1/latency-thresholds")
+
+	// Latency threshold higher than the default, but lower than the dynamic threshold
+	testSpan.SetStartTimestamp(1e9)
+	testSpan.SetEndTimestamp(1e9 + 7e8)
 	assert.False(t, p.shouldCaptureTrace("n", "s", "123", testSpan))
 }

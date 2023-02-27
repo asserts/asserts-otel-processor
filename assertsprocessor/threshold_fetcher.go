@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -18,23 +18,26 @@ func (p *assertsProcessorImpl) fetchThresholds() {
 			return
 		case <-p.thresholdSyncTicker.C:
 			p.logger.Info("Fetching thresholds")
-			p.latencyBounds.Range(p.updateThresholdsAsync)
+			for _, val := range p.entityKeys.Items() {
+				p.updateThresholdsAsync(val)
+			}
 		}
 	}
 }
 
-func (p *assertsProcessorImpl) updateThresholdsAsync(_ any, value any) bool {
-	var entityKey, _ = value.(EntityKeyDto)
-	p.logger.Info("sync.Map.Range(...) called for",
+func (p *assertsProcessorImpl) updateThresholdsAsync(entityKey EntityKeyDto) bool {
+	p.logger.Info("updateThresholdsAsync(...) called for",
 		zap.String("Entity Key", entityKey.AsString()))
 	go func() {
 		thresholds, err := p.getThresholds(entityKey)
 		if err == nil {
-			var latestThresholds sync.Map
+			var latestThresholds = cmap.New[LatencyBound]()
 			for _, threshold := range thresholds {
-				latestThresholds.Store(threshold.ResourceURIPattern, threshold)
+				latestThresholds.Set(threshold.ResourceURIPattern, LatencyBound{
+					Upper: threshold.LatencyUpperBound,
+				})
 			}
-			p.latencyBounds.Store(entityKey.AsString(), &latestThresholds)
+			p.latencyBounds.Set(entityKey.AsString(), latestThresholds)
 		}
 	}()
 	return true
@@ -43,7 +46,7 @@ func (p *assertsProcessorImpl) updateThresholdsAsync(_ any, value any) bool {
 func (p *assertsProcessorImpl) getThresholds(entityKey EntityKeyDto) ([]EntityThresholdDto, error) {
 	var thresholds []EntityThresholdDto
 	client := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Second * 5,
 	}
 	// Add all metrics in request body
 	buf := &bytes.Buffer{}
@@ -80,17 +83,16 @@ func (p *assertsProcessorImpl) getThresholds(entityKey EntityKeyDto) ([]EntityTh
 			err = json.Unmarshal(body, &thresholds)
 		}
 	} else {
-		if b, err := io.ReadAll(response.Body); err == nil {
+		if body, err := io.ReadAll(response.Body); err == nil {
 			p.logger.Error("Un-expected response",
 				zap.String("Entity Key", entityKey.AsString()),
 				zap.Int("status_code", response.StatusCode),
-				zap.String("Response", string(b)),
+				zap.String("Response", string(body)),
 				zap.Error(err))
 		}
 	}
-	err = response.Body.Close()
-	if err != nil {
-		p.logger.Error("Failed to close response body", zap.Error(err))
+	if response != nil && response.Body != nil {
+		err = response.Body.Close()
 	}
 	return thresholds, err
 }

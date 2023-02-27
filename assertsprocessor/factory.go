@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"context"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
@@ -9,7 +10,6 @@ import (
 	"go.opentelemetry.io/collector/processor"
 	"go.uber.org/zap"
 	"regexp"
-	"sync"
 	"time"
 )
 
@@ -65,7 +65,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 			Name:      "latency_seconds",
 		}, allowedLabels),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		latencyBounds:       sync.Map{},
+		latencyBounds:       cmap.New[cmap.ConcurrentMap[string, LatencyBound]](),
 	}
 
 	// Start the prometheus server on port 9465
