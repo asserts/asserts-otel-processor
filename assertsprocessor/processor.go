@@ -121,22 +121,20 @@ func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 	if len(*p.attributeValueRegExps) > 0 {
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := span.Attributes().Get(attName)
-			if !found || matchExp.String() != value.AsString() || !matchExp.MatchString(value.AsString()) {
-				if found {
-					p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
-						zap.String("TraceId", span.TraceID().String()),
-						zap.String("SpanId", span.SpanID().String()),
-						zap.String("attribute", attName),
-						zap.String("value", value.AsString()),
-					)
-				} else {
-					p.logger.Info("consumer.ConsumeTraces Attribute not found",
-						zap.String("TraceId", span.TraceID().String()),
-						zap.String("SpanId", span.SpanID().String()),
-						zap.String("attribute", attName),
-					)
-				}
-				return false
+			if found && (matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())) {
+			} else if found {
+				p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
+					zap.String("TraceId", span.TraceID().String()),
+					zap.String("SpanId", span.SpanID().String()),
+					zap.String("attribute", attName),
+					zap.String("value", value.AsString()),
+				)
+			} else {
+				p.logger.Info("consumer.ConsumeTraces Attribute not found",
+					zap.String("TraceId", span.TraceID().String()),
+					zap.String("SpanId", span.SpanID().String()),
+					zap.String("attribute", attName),
+				)
 			}
 		}
 		return true
