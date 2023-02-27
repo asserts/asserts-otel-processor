@@ -119,11 +119,11 @@ func (p *assertsProcessorImpl) shouldCaptureMetrics(span ptrace.Span) bool {
 		spanAttributes := span.Attributes()
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := spanAttributes.Get(attName)
-			p.logger.Info("Found Span Attribute",
-				zap.String(attName, value.AsString()))
 			if !found {
 				return false
 			}
+			p.logger.Info("Found Span Attribute",
+				zap.String(attName, value.AsString()))
 
 			valueMatches := matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())
 			p.logger.Info("Value Regexp Result",
