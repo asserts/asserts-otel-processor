@@ -119,28 +119,42 @@ func (p *assertsProcessorImpl) buildCompiledRegexps() error {
 // Returns true if a span is a root span or if it matches the span selection criteria
 func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 	if len(*p.attributeValueRegExps) > 0 {
+		spanAttributes := span.Attributes()
 		for attName, matchExp := range *p.attributeValueRegExps {
-			value, found := span.Attributes().Get(attName)
-			if found && (matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())) {
-			} else if found {
-				p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
-					zap.String("TraceId", span.TraceID().String()),
-					zap.String("SpanId", span.SpanID().String()),
-					zap.String("attribute", attName),
-					zap.String("value", value.AsString()),
-				)
-			} else {
-				p.logger.Info("consumer.ConsumeTraces Attribute not found",
-					zap.String("TraceId", span.TraceID().String()),
-					zap.String("SpanId", span.SpanID().String()),
-					zap.String("attribute", attName),
-				)
+			value, found := spanAttributes.Get(attName)
+			asString := value.AsString()
+			traceId := span.TraceID().String()
+			spanId := span.SpanID().String()
+			if !checkMatch(found, matchExp, asString, p, traceId, spanId, attName) {
+				return false
 			}
 		}
 		return true
 	} else {
 		return false
 	}
+}
+
+func checkMatch(found bool, matchExp regexp.Regexp, asString string, p *assertsProcessorImpl, traceId string,
+	spanId string, attName string) bool {
+	matchString := matchExp.MatchString(asString)
+	retVal := found && (matchExp.String() == asString || matchString)
+	if retVal {
+	} else if found {
+		p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
+			zap.String("TraceId", traceId),
+			zap.String("SpanId", spanId),
+			zap.String("attribute", attName),
+			zap.String("value", asString),
+		)
+	} else {
+		p.logger.Info("consumer.ConsumeTraces Attribute not found",
+			zap.String("TraceId", traceId),
+			zap.String("SpanId", spanId),
+			zap.String("attribute", attName),
+		)
+	}
+	return retVal
 }
 
 func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, span ptrace.Span) {
