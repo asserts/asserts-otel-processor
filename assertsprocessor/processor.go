@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 	"regexp"
 	"sync"
-	"time"
 )
 
 // The methods from a Span that we care for to enable easy mocking
@@ -120,11 +119,16 @@ func (p *assertsProcessorImpl) shouldCaptureMetrics(span ptrace.Span) bool {
 		spanAttributes := span.Attributes()
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := spanAttributes.Get(attName)
+			p.logger.Info("Found Span Attribute",
+				zap.String(attName, value.AsString()))
 			if !found {
 				return false
 			}
 
 			valueMatches := matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())
+			p.logger.Info("Value Regexp Result",
+				zap.String("regexp", matchExp.String()),
+				zap.Bool("result", valueMatches))
 			if !valueMatches {
 				return false
 			}
@@ -174,9 +178,6 @@ func (p *assertsProcessorImpl) recordLatency(labels prometheus.Labels, latencySe
 
 func (p *assertsProcessorImpl) shouldCaptureTrace(namespace string, serviceName string, traceId string, rootSpan ptrace.Span) bool {
 	spanDuration := p.computeLatency(rootSpan)
-	p.logger.Info("Sampling based on Root Span Duration",
-		zap.String("Trace Id", traceId),
-		zap.Duration("Duration", time.Duration(spanDuration)))
 
 	var entityKey = EntityKeyDto{
 		EntityType: "Service",
@@ -185,9 +186,15 @@ func (p *assertsProcessorImpl) shouldCaptureTrace(namespace string, serviceName 
 			"asserts_env": p.config.Env, "asserts_site": p.config.Site, "namespace": namespace,
 		},
 	}
+
+	p.logger.Info("Sampling based on Root Span Duration",
+		zap.String("Trace Id", traceId),
+		zap.String("Entity Key", entityKey.AsString()),
+		zap.Float64("Duration", spanDuration))
+
 	load, found := p.latencyBounds.Load(entityKey.AsString())
 	if !found {
-		p.logger.Info("Threshold not found. Will use default",
+		p.logger.Info("Thresholds not found for service. Will use default",
 			zap.String("Entity", entityKey.AsString()),
 			zap.Float64("Default Duration", p.config.DefaultLatencyThreshold))
 		// Use default threshold the first time. The entity thresholds will be updated
@@ -198,9 +205,17 @@ func (p *assertsProcessorImpl) shouldCaptureTrace(namespace string, serviceName 
 		var contextMap, _ = load.(sync.Map)
 		var data, ok = contextMap.Load(rootSpan.Name())
 		if !ok {
+			p.logger.Info("Threshold not found for request. Will use default",
+				zap.String("Entity", entityKey.AsString()),
+				zap.String("request", rootSpan.Name()),
+				zap.Float64("Default Duration", p.config.DefaultLatencyThreshold))
 			return spanDuration > p.config.DefaultLatencyThreshold
 		} else {
-			var latencyBound = data.(LatencyBound)
+			var latencyBound, _ = data.(LatencyBound)
+			p.logger.Info("Threshold found for request",
+				zap.String("Entity", entityKey.AsString()),
+				zap.String("request", rootSpan.Name()),
+				zap.Float64("Threshold", latencyBound.Upper))
 			return spanDuration > latencyBound.Upper
 		}
 	}

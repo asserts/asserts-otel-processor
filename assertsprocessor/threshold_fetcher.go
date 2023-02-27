@@ -24,8 +24,10 @@ func (p *assertsProcessorImpl) fetchThresholds() {
 }
 
 func (p *assertsProcessorImpl) updateThresholdsAsync(_ any, value any) bool {
+	var entityKey, _ = value.(EntityKeyDto)
+	p.logger.Info("sync.Map.Range(...) called for",
+		zap.String("Entity Key", entityKey.AsString()))
 	go func() {
-		var entityKey, _ = value.(EntityKeyDto)
 		thresholds, err := p.getThresholds(entityKey)
 		if err == nil {
 			var latestThresholds sync.Map
