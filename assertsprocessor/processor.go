@@ -35,18 +35,18 @@ type LatencyBound struct {
 
 // Capabilities implements the consumer interface.
 func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
-	p.logger.Debug("consumer.Capabilities callback")
+	p.logger.Info("consumer.Capabilities callback")
 	return consumer.Capabilities{MutatesData: false}
 }
 
 // Start implements the consumer interface.
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
-	p.logger.Debug("consumer.Start callback")
+	p.logger.Info("consumer.Start callback")
 	return p.buildCompiledRegexps()
 }
 
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
-	p.logger.Debug("consumer.Shutdown")
+	p.logger.Info("consumer.Shutdown")
 	return nil
 }
 
@@ -54,7 +54,7 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 // Samples the trace if the latency threshold exceeds for any of the spans of interest.
 // Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	p.logger.Debug("consumer.ConsumeTraces")
+	p.logger.Info("consumer.ConsumeTraces")
 	sampleTrace := false
 	var traceId string
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
@@ -90,7 +90,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 		}
 	}
 	if sampleTrace {
-		p.logger.Debug("consumer.ConsumeTraces Sampling Trace",
+		p.logger.Info("consumer.ConsumeTraces Sampling Trace",
 			zap.String("traceId", traceId))
 		return p.nextConsumer.ConsumeTraces(ctx, traces)
 	}
@@ -98,7 +98,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 }
 
 func (p *assertsProcessorImpl) buildCompiledRegexps() error {
-	p.logger.Debug("consumer.Start compiling regexps")
+	p.logger.Info("consumer.Start compiling regexps")
 	for attName, matchExpString := range *p.config.AttributeExps {
 		compile, err := regexp.Compile(matchExpString)
 		if err != nil {
@@ -106,7 +106,7 @@ func (p *assertsProcessorImpl) buildCompiledRegexps() error {
 		}
 		(*p.attributeValueRegExps)[attName] = *compile
 	}
-	p.logger.Debug("consumer.Start compiled regexps successfully")
+	p.logger.Info("consumer.Start compiled regexps successfully")
 	return nil
 }
 
@@ -117,6 +117,8 @@ func (p *assertsProcessorImpl) matches(span ptrace.Span) bool {
 			value, found := span.Attributes().Get(attName)
 			if !found || !matchExp.MatchString(value.AsString()) {
 				return false
+			} else {
+
 			}
 		}
 		return true
@@ -126,11 +128,11 @@ func (p *assertsProcessorImpl) matches(span ptrace.Span) bool {
 
 // Returns true if a span is a root span or if it matches the span selection criteria
 func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
-	return span.ParentSpanID() == [8]byte{} || p.matches(span)
+	return span.ParentSpanID().IsEmpty() || p.matches(span)
 }
 
 func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, span ptrace.Span) {
-	p.logger.Debug("consumer.ConsumeTraces Capturing span duration metric for",
+	p.logger.Info("consumer.ConsumeTraces Capturing span duration metric for",
 		zap.String("spanKind", span.Kind().String()),
 		zap.String("spanId", span.SpanID().String()),
 	)
@@ -153,7 +155,7 @@ func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, 
 }
 
 func (p *assertsProcessorImpl) shouldCaptureTrace(span ptrace.Span) bool {
-	return (span.EndTimestamp() - span.StartTimestamp()) > 5e8
+	return float64(span.EndTimestamp()-span.StartTimestamp()) > p.config.DefaultLatencyThreshold*1e9
 }
 
 func newProcessor(logger *zap.Logger, config component.Config, nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
