@@ -3,15 +3,12 @@ package assertsprocessor
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -23,7 +20,6 @@ type assertsProcessorImpl struct {
 	config                Config
 	attributeValueRegExps *map[string]regexp.Regexp
 	nextConsumer          consumer.Traces
-	metricsFlushTicker    *clock.Ticker
 	latencyBounds         *map[string]map[string]LatencyBound
 	latencyHistogram      *prometheus.HistogramVec
 	prometheusRegistry    *prometheus.Registry
@@ -85,7 +81,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 				if span.ParentSpanID().IsEmpty() {
 					sampleTrace = p.shouldCaptureTrace(traceId, span)
 				}
-				if p.spanOfInterest(span) {
+				if p.shouldCaptureMetrics(span) {
 					p.captureMetrics(namespace, serviceName, span)
 				}
 			}
@@ -116,16 +112,18 @@ func (p *assertsProcessorImpl) buildCompiledRegexps() error {
 	return nil
 }
 
-// Returns true if a span is a root span or if it matches the span selection criteria
-func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
+// Returns true if a span matches the span selection criteria
+func (p *assertsProcessorImpl) shouldCaptureMetrics(span ptrace.Span) bool {
 	if len(*p.attributeValueRegExps) > 0 {
 		spanAttributes := span.Attributes()
 		for attName, matchExp := range *p.attributeValueRegExps {
 			value, found := spanAttributes.Get(attName)
-			asString := value.AsString()
-			traceId := span.TraceID().String()
-			spanId := span.SpanID().String()
-			if !checkMatch(found, matchExp, asString, p, traceId, spanId, attName) {
+			if !found {
+				return false
+			}
+
+			valueMatches := matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())
+			if !valueMatches {
 				return false
 			}
 		}
@@ -133,28 +131,6 @@ func (p *assertsProcessorImpl) spanOfInterest(span ptrace.Span) bool {
 	} else {
 		return false
 	}
-}
-
-func checkMatch(found bool, matchExp regexp.Regexp, asString string, p *assertsProcessorImpl, traceId string,
-	spanId string, attName string) bool {
-	matchString := matchExp.MatchString(asString)
-	retVal := found && (matchExp.String() == asString || matchString)
-	if retVal {
-	} else if found {
-		p.logger.Info("consumer.ConsumeTraces Attribute match failure for attribute ",
-			zap.String("TraceId", traceId),
-			zap.String("SpanId", spanId),
-			zap.String("attribute", attName),
-			zap.String("value", asString),
-		)
-	} else {
-		p.logger.Info("consumer.ConsumeTraces Attribute not found",
-			zap.String("TraceId", traceId),
-			zap.String("SpanId", spanId),
-			zap.String("attribute", attName),
-		)
-	}
-	return retVal
 }
 
 func (p *assertsProcessorImpl) captureMetrics(namespace string, service string, span ptrace.Span) {
@@ -238,14 +214,16 @@ func newProcessor(logger *zap.Logger, config component.Config, nextConsumer cons
 
 	// Start the prometheus server on port 9465
 	p.prometheusRegistry = prometheus.NewRegistry()
-	p.prometheusRegistry.Register(histogramVec)
+	err := p.prometheusRegistry.Register(histogramVec)
 
-	go startExporter(p.prometheusRegistry)
+	if err == nil {
+		go p.startExporter()
+	}
 
-	return p, nil
+	return p, err
 }
 
-func startExporter(reg *prometheus.Registry) {
+func (p *assertsProcessorImpl) startExporter() {
 	s := &http.Server{
 		Addr:           ":9465",
 		ReadTimeout:    30 * time.Second,
@@ -253,18 +231,15 @@ func startExporter(reg *prometheus.Registry) {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	// Add Go module build info.
-	reg.MustRegister(collectors.NewBuildInfoCollector())
-	reg.MustRegister(collectors.NewGoCollector(
-		collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
-	))
-
 	// Expose the registered metrics via HTTP.
 	http.Handle("/metrics", promhttp.HandlerFor(
-		reg,
+		p.prometheusRegistry,
 		promhttp.HandlerOpts{},
 	))
 
-	log.Println("Starting Prometheus Exporter Listening on port 9465")
-	log.Fatal(s.ListenAndServe())
+	p.logger.Info("Starting Prometheus Exporter Listening on port 9465")
+	err := s.ListenAndServe()
+	if err != nil {
+		p.logger.Error("Failed to start server", zap.Error(err))
+	}
 }
