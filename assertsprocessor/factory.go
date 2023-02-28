@@ -45,6 +45,8 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	pConfig := config.(*Config)
 
 	thresholdsHelper := thresholdHelper{
+		config:              *pConfig,
+		logger:              logger,
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		thresholds:          cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
 		entityKeys:          cmap.New[EntityKeyDto](),
