@@ -7,20 +7,7 @@ import (
 	"testing"
 )
 
-type mockThresholdHelper struct {
-	thresholdHelper
-}
-
-var thresholdDto = ThresholdDto{
-	ResourceURIPattern: "/v1/latency-thresholds", LatencyUpperBound: 1,
-}
-
-func (p *mockThresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto, error) {
-	return []ThresholdDto{thresholdDto}, nil
-}
-
 func TestAsString(t *testing.T) {
-
 	dto := EntityKeyDto{
 		EntityType: "Service", Name: "api-server", Scope: map[string]string{
 			"asserts_env": "dev", "asserts_site": "us-west-2", "namespace": "ride-service",
