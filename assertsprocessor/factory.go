@@ -55,7 +55,11 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		config:                *pConfig,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
 	}
-	metricsHelper.buildHistogram()
+	err := metricsHelper.buildHistogram()
+
+	if err != nil {
+		return nil, err
+	}
 
 	traceSampler := sampler{
 		logger:          logger,

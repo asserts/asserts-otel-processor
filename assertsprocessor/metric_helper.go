@@ -92,7 +92,7 @@ func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds fl
 	p.latencyHistogram.With(labels).Observe(latencySeconds)
 }
 
-func (p *metricHelper) buildHistogram() {
+func (p *metricHelper) buildHistogram() error {
 	var allowedLabels []string
 	allowedLabels = append(allowedLabels, "asserts_env")
 	allowedLabels = append(allowedLabels, "asserts_site")
@@ -111,7 +111,12 @@ func (p *metricHelper) buildHistogram() {
 		Subsystem: "span",
 		Name:      "latency_seconds",
 	}, allowedLabels)
-	p.prometheusRegistry.Register(p.latencyHistogram)
+	err := p.prometheusRegistry.Register(p.latencyHistogram)
+	if err != nil {
+		p.logger.Fatal("Error starting Prometheus Server", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func (p *metricHelper) startExporter() {
@@ -127,11 +132,6 @@ func (p *metricHelper) startExporter() {
 	p.prometheusRegistry.MustRegister(collectors.NewGoCollector(
 		collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
 	))
-	err := p.prometheusRegistry.Register(p.latencyHistogram)
-	if err != nil {
-		p.logger.Fatal("Error starting Prometheus Server", zap.Error(err))
-		return
-	}
 
 	// Expose the registered metrics via HTTP.
 	http.Handle("/metrics", promhttp.HandlerFor(
