@@ -5,7 +5,6 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
 )
 
@@ -13,11 +12,11 @@ import (
 
 type assertsProcessorImpl struct {
 	logger           *zap.Logger
-	config           Config
+	config           *Config
 	nextConsumer     consumer.Traces
-	thresholdsHelper thresholdHelper
-	metricBuilder    metricHelper
-	sampler          sampler
+	thresholdsHelper *thresholdHelper
+	metricBuilder    *metricHelper
+	sampler          *sampler
 }
 
 // Capabilities implements the consumer interface.
@@ -50,45 +49,12 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 // Samples the trace if the latency threshold exceeds for the root spans.
 // Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	sampleTrace := false
-	var traceId string
-	for i := 0; i < traces.ResourceSpans().Len(); i++ {
-		resourceSpans := traces.ResourceSpans().At(i)
-		resourceAttributes := resourceSpans.Resource().Attributes()
+	return spanIterator(ctx, traces, p.processSpan)
+}
 
-		var namespace string
-		namespaceAttr, found := resourceAttributes.Get(conventions.AttributeServiceNamespace)
-		if found {
-			namespace = namespaceAttr.Str()
-		}
-
-		serviceAttr, found := resourceAttributes.Get(conventions.AttributeServiceName)
-		if !found {
-			continue
-		}
-		serviceName := serviceAttr.Str()
-		ilsSlice := resourceSpans.ScopeSpans()
-		for j := 0; j < ilsSlice.Len(); j++ {
-			ils := ilsSlice.At(j)
-			spans := ils.Spans()
-			for k := 0; k < spans.Len(); k++ {
-				span := spans.At(k)
-				if traceId == "" {
-					traceId = span.TraceID().String()
-				}
-				if span.ParentSpanID().IsEmpty() {
-					sampleTrace = p.sampler.shouldCaptureTrace(namespace, serviceName, traceId, span)
-				}
-				if p.metricBuilder.shouldCaptureMetrics(span) {
-					p.metricBuilder.captureMetrics(namespace, serviceName, span)
-				}
-			}
-		}
-	}
-	if sampleTrace {
-		p.logger.Info("consumer.ConsumeTraces Sampling Trace",
-			zap.String("traceId", traceId))
-		return p.nextConsumer.ConsumeTraces(ctx, traces)
-	}
+func (p *assertsProcessorImpl) processSpan(namespace string, serviceName string, ctx context.Context,
+	traces ptrace.Traces, span ptrace.Span) error {
+	p.sampler.sampleTrace(namespace, serviceName, ctx, traces, span)
+	p.metricBuilder.captureMetrics(namespace, serviceName, span)
 	return nil
 }

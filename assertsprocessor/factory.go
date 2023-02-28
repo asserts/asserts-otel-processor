@@ -33,6 +33,7 @@ func createDefaultConfig() component.Config {
 		Env:                     "dev",
 		Site:                    "us-west-2",
 		DefaultLatencyThreshold: 0.5,
+		MaxTracesPerMinute:      5,
 	}
 }
 
@@ -44,6 +45,11 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
+	regexps, err := compileRequestContextRegexps(logger, pConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	thresholdsHelper := thresholdHelper{
 		config:              *pConfig,
 		logger:              logger,
@@ -54,28 +60,35 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 
 	metricsHelper := metricHelper{
 		logger:                logger,
-		config:                *pConfig,
+		config:                pConfig,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
 	}
-	err := metricsHelper.buildHistogram()
+	err = metricsHelper.buildHistogram()
 
 	if err != nil {
 		return nil, err
 	}
 
+	pq := cmap.New[cmap.ConcurrentMap[string, *TracePQ]]()
 	traceSampler := sampler{
-		logger:          logger,
-		config:          *pConfig,
-		thresholdHelper: thresholdsHelper,
+		logger:              logger,
+		config:              pConfig,
+		thresholdHelper:     thresholdsHelper,
+		topTraces:           &pq,
+		traceFlushTicker:    clock.FromContext(ctx).NewTicker(time.Minute),
+		nextConsumer:        nextConsumer,
+		maxTracesPerService: pConfig.MaxTracesPerMinute,
+		requestRegexps:      regexps,
+		stop:                make(chan bool),
 	}
 
 	p := &assertsProcessorImpl{
 		logger:           logger,
-		config:           *pConfig,
+		config:           pConfig,
 		nextConsumer:     nextConsumer,
-		metricBuilder:    metricsHelper,
-		thresholdsHelper: thresholdsHelper,
-		sampler:          traceSampler,
+		metricBuilder:    &metricsHelper,
+		thresholdsHelper: &thresholdsHelper,
+		sampler:          &traceSampler,
 	}
 
 	go metricsHelper.startExporter()
