@@ -29,7 +29,7 @@ func TestShouldSampleTrue(t *testing.T) {
 
 	var s = sampler{
 		logger:          logger,
-		config:          config,
+		config:          &config,
 		thresholdHelper: th,
 	}
 
@@ -37,7 +37,7 @@ func TestShouldSampleTrue(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 
-	assert.True(t, s.shouldCaptureTrace("platform", "api-server", "trace-id", testSpan))
+	assert.True(t, s.latencyIsHigh("platform", "api-server", testSpan))
 }
 
 func TestShouldSampleFalse(t *testing.T) {
@@ -61,7 +61,7 @@ func TestShouldSampleFalse(t *testing.T) {
 
 	var s = sampler{
 		logger:          logger,
-		config:          config,
+		config:          &config,
 		thresholdHelper: th,
 	}
 
@@ -69,5 +69,5 @@ func TestShouldSampleFalse(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
 
-	assert.False(t, s.shouldCaptureTrace("platform", "api-server", "trace-id", testSpan))
+	assert.False(t, s.latencyIsHigh("platform", "api-server", testSpan))
 }
