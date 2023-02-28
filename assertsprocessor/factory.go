@@ -3,7 +3,6 @@ package assertsprocessor
 import (
 	"context"
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
@@ -31,6 +30,8 @@ func NewFactory() processor.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
+		Env:                     "dev",
+		Site:                    "us-west-2",
 		DefaultLatencyThreshold: 0.5,
 	}
 }
@@ -43,35 +44,27 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
-	var allowedLabels []string
-	allowedLabels = append(allowedLabels, "asserts_env")
-	allowedLabels = append(allowedLabels, "asserts_site")
-	allowedLabels = append(allowedLabels, "namespace")
-	allowedLabels = append(allowedLabels, "service")
-	if pConfig.CaptureAttributesInMetric != nil {
-		for _, label := range (*pConfig).CaptureAttributesInMetric {
-			allowedLabels = append(allowedLabels, applyPromConventions(label))
-		}
-	}
-
-	p := &assertsProcessorImpl{
-		logger:                logger,
-		config:                *pConfig,
-		nextConsumer:          nextConsumer,
-		attributeValueRegExps: &map[string]regexp.Regexp{},
-		latencyHistogram: prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: "otel",
-			Subsystem: "span",
-			Name:      "latency_seconds",
-		}, allowedLabels),
+	thresholdsHelper := thresholdHelper{
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		latencyBounds:       cmap.New[cmap.ConcurrentMap[string, LatencyBound]](),
+		thresholds:          cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
 		entityKeys:          cmap.New[EntityKeyDto](),
 	}
 
-	// Start the prometheus server on port 9465
-	p.prometheusRegistry = prometheus.NewRegistry()
-	go p.startExporter()
+	metricsHelper := metricHelper{
+		config:                *pConfig,
+		attributeValueRegExps: &map[string]regexp.Regexp{},
+	}
+
+	p := &assertsProcessorImpl{
+		logger:           logger,
+		config:           *pConfig,
+		nextConsumer:     nextConsumer,
+		metricBuilder:    metricsHelper,
+		thresholdsHelper: thresholdsHelper,
+	}
+
+	metricsHelper.buildHistogram()
+	go metricsHelper.startExporter()
 
 	return p, nil
 }
