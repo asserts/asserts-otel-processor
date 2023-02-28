@@ -111,6 +111,7 @@ func (p *metricHelper) buildHistogram() {
 		Subsystem: "span",
 		Name:      "latency_seconds",
 	}, allowedLabels)
+	p.prometheusRegistry.Register(p.latencyHistogram)
 }
 
 func (p *metricHelper) startExporter() {

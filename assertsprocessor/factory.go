@@ -55,6 +55,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		config:                *pConfig,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
 	}
+	metricsHelper.buildHistogram()
 
 	traceSampler := sampler{
 		logger:          logger,
@@ -71,8 +72,6 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		sampler:          traceSampler,
 	}
 
-	metricsHelper.buildHistogram()
 	go metricsHelper.startExporter()
-
 	return p, nil
 }
