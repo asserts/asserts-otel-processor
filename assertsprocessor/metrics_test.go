@@ -48,7 +48,7 @@ func TestBuildLabels(t *testing.T) {
 			"rpc.system":  *systemPattern,
 			"rpc.service": *servicePattern,
 		},
-		config: Config{
+		config: &Config{
 			Env:  "dev",
 			Site: "us-west-2",
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
@@ -87,14 +87,14 @@ func TestCaptureMetrics(t *testing.T) {
 			"rpc.system":  *systemPattern,
 			"rpc.service": *servicePattern,
 		},
-		config: Config{
+		config: &Config{
 			Env:  "dev",
 			Site: "us-west-2",
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
 				"aws.table.name", "aws.queue.url"},
 		},
 	}
-	p.buildHistogram()
+	_ = p.buildHistogram()
 	testSpan := ptrace.NewSpan()
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")

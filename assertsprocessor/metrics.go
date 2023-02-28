@@ -14,7 +14,7 @@ import (
 
 type metricHelper struct {
 	logger                *zap.Logger
-	config                Config
+	config                *Config
 	prometheusRegistry    *prometheus.Registry
 	latencyHistogram      *prometheus.HistogramVec
 	attributeValueRegExps *map[string]regexp.Regexp
@@ -60,9 +60,11 @@ func (p *metricHelper) shouldCaptureMetrics(span ptrace.Span) bool {
 }
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span ptrace.Span) {
-	labels := p.buildLabels(namespace, service, span)
-	latencySeconds := computeLatency(span)
-	p.recordLatency(labels, latencySeconds)
+	if p.shouldCaptureMetrics(span) {
+		labels := p.buildLabels(namespace, service, span)
+		latencySeconds := computeLatency(span)
+		p.recordLatency(labels, latencySeconds)
+	}
 }
 
 func (p *metricHelper) buildLabels(namespace string, service string, span ptrace.Span) prometheus.Labels {
