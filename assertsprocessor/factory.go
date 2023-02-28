@@ -51,8 +51,15 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	metricsHelper := metricHelper{
+		logger:                logger,
 		config:                *pConfig,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
+	}
+
+	traceSampler := sampler{
+		logger:          logger,
+		config:          *pConfig,
+		thresholdHelper: thresholdsHelper,
 	}
 
 	p := &assertsProcessorImpl{
@@ -61,6 +68,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		nextConsumer:     nextConsumer,
 		metricBuilder:    metricsHelper,
 		thresholdsHelper: thresholdsHelper,
+		sampler:          traceSampler,
 	}
 
 	metricsHelper.buildHistogram()
