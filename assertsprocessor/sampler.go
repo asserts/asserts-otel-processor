@@ -143,7 +143,6 @@ func (s *sampler) flushTraces() {
 			s.logger.Info("Trace flush background routine stopped")
 			return
 		case <-s.traceFlushTicker.C:
-			s.logger.Info("Gathering Traces for flush")
 			var previousTraces = s.topTracesMap
 			s.topTracesMap = &sync.Map{}
 			var serviceQueues = map[string]*TraceQueue{}
@@ -153,26 +152,28 @@ func (s *sampler) flushTraces() {
 				var typeName, part2, _ = strings.Cut(part1, "#")
 				var name, _, _ = strings.Cut(part2, "#")
 				var entityKey = scopeString + "#" + typeName + "#" + name
-
 				var q = value.(*traceQueues)
 
 				// Flush all the errors
-				s.logger.Info("Flushing Error Traces for",
-					zap.String("Request", requestKey),
-					zap.Int("Num Traces", len(q.errorQueue.priorityQueue)))
-				for _, item := range q.errorQueue.priorityQueue {
-					_ = s.nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+				if len(q.errorQueue.priorityQueue) > 0 {
+					s.logger.Info("Flushing Error Traces for",
+						zap.String("Request", requestKey),
+						zap.Int("Num Traces", len(q.errorQueue.priorityQueue)))
+					for _, item := range q.errorQueue.priorityQueue {
+						_ = s.nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+					}
 				}
 
-				serviceQueue := serviceQueues[entityKey]
-				if serviceQueue == nil {
-					serviceQueue = NewTraceQueue(s.config.MaxTracesPerMinute)
-					serviceQueues[entityKey] = serviceQueue
+				if len(q.slowQueue.priorityQueue) > 0 {
+					serviceQueue := serviceQueues[entityKey]
+					if serviceQueue == nil {
+						serviceQueue = NewTraceQueue(s.config.MaxTracesPerMinute)
+						serviceQueues[entityKey] = serviceQueue
+					}
+					for _, item := range q.slowQueue.priorityQueue {
+						serviceQueue.push(item)
+					}
 				}
-				for _, item := range q.slowQueue.priorityQueue {
-					serviceQueue.push(item)
-				}
-
 				return true
 			})
 
