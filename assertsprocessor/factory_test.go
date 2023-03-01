@@ -7,7 +7,6 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor"
-	"go.uber.org/zap"
 	"testing"
 )
 
@@ -31,23 +30,24 @@ func TestNewFactory(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	factory := NewFactory()
-	var config = factory.CreateDefaultConfig().(Config)
-	assert.Equal(t, "dev", config.Env)
-	assert.Equal(t, "us-west-2", config.Site)
-	assert.Equal(t, 100, config.MaxTracesPerMinute)
-	assert.Equal(t, 0.5, config.DefaultLatencyThreshold)
+	var defaultConfig = factory.CreateDefaultConfig()
+	var pConfig = defaultConfig.(*Config)
+	assert.Equal(t, "dev", pConfig.Env)
+	assert.Equal(t, "us-west-2", pConfig.Site)
+	assert.Equal(t, 100, pConfig.MaxTracesPerMinute)
+	assert.Equal(t, 0.5, pConfig.DefaultLatencyThreshold)
 }
 
 func TestCreateProcessor(t *testing.T) {
 	factory := NewFactory()
-	var config = factory.CreateDefaultConfig().(Config)
-	assert.Equal(t, "dev", config.Env)
-	assert.Equal(t, "us-west-2", config.Site)
-	assert.Equal(t, 100, config.MaxTracesPerMinute)
-	assert.Equal(t, 0.5, config.DefaultLatencyThreshold)
+	var defaultConfig = factory.CreateDefaultConfig()
+	var pConfig = defaultConfig.(*Config)
+	assert.Equal(t, "dev", pConfig.Env)
+	assert.Equal(t, "us-west-2", pConfig.Site)
+	assert.Equal(t, 100, pConfig.MaxTracesPerMinute)
+	assert.Equal(t, 0.5, pConfig.DefaultLatencyThreshold)
 
 	ctx := context.Background()
-	logger, _ := zap.NewProduction()
 	var createSettings = processor.CreateSettings{
 		ID: component.NewIDWithName(component.DataTypeTraces, ""),
 	}

@@ -29,7 +29,7 @@ func NewFactory() processor.Factory {
 }
 
 func createDefaultConfig() component.Config {
-	return Config{
+	return &Config{
 		Env:                            "dev",
 		Site:                           "us-west-2",
 		DefaultLatencyThreshold:        0.5,
