@@ -5,14 +5,15 @@ import (
 )
 
 type Config struct {
-	AssertsServer             string             `mapstructure:"asserts_server"`
-	Env                       string             `mapstructure:"asserts_env"`
-	Site                      string             `mapstructure:"asserts_site"`
-	AttributeExps             *map[string]string `mapstructure:"span_attribute_match_regex"`
-	RequestContextExps        *map[string]string `mapstructure:"request_context_regex"`
-	CaptureAttributesInMetric []string           `mapstructure:"attributes_as_metric_labels"`
-	DefaultLatencyThreshold   float64            `mapstructure:"sampling_latency_threshold_seconds"`
-	MaxTracesPerMinute        int                `mapstructure:"max_traces_per_minute"`
+	AssertsServer                  string             `mapstructure:"asserts_server"`
+	Env                            string             `mapstructure:"asserts_env"`
+	Site                           string             `mapstructure:"asserts_site"`
+	AttributeExps                  *map[string]string `mapstructure:"span_attribute_match_regex"`
+	RequestContextExps             *map[string]string `mapstructure:"request_context_regex"`
+	CaptureAttributesInMetric      []string           `mapstructure:"attributes_as_metric_labels"`
+	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
+	MaxTracesPerMinute             int                `mapstructure:"max_traces_per_minute"`
+	MaxTracesPerMinutePerContainer int                `mapstructure:"max_traces_per_minute_per_container"`
 }
 
 // Validate implements the component.ConfigValidator interface.

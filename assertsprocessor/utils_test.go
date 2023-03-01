@@ -10,6 +10,15 @@ import (
 	"testing"
 )
 
+func TestBuildEntityKey(t *testing.T) {
+	assert.Equal(t, EntityKeyDto{
+		Type: "Service", Name: "payment-service",
+		Scope: map[string]string{"env": "dev", "site": "us-west-2", "namespace": "payments"},
+	}, buildEntityKey(&Config{
+		Env: "dev", Site: "us-west-2",
+	}, "payments", "payment-service"))
+}
+
 func TestComputeLatency(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 	testSpan.SetStartTimestamp(1e9)
@@ -115,7 +124,7 @@ func TestTraceHasErrorFalse(t *testing.T) {
 	testSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	assert.False(t, traceHasError(ctx, testTrace))
+	assert.False(t, hasError(ctx, testTrace))
 }
 
 func TestTraceHasErrorTrue(t *testing.T) {
@@ -132,5 +141,5 @@ func TestTraceHasErrorTrue(t *testing.T) {
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 	testSpan.Attributes().PutBool("error", true)
 
-	assert.True(t, traceHasError(ctx, testTrace))
+	assert.True(t, hasError(ctx, testTrace))
 }

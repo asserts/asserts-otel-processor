@@ -29,11 +29,12 @@ func NewFactory() processor.Factory {
 }
 
 func createDefaultConfig() component.Config {
-	return &Config{
-		Env:                     "dev",
-		Site:                    "us-west-2",
-		DefaultLatencyThreshold: 0.5,
-		MaxTracesPerMinute:      5,
+	return Config{
+		Env:                            "dev",
+		Site:                           "us-west-2",
+		DefaultLatencyThreshold:        0.5,
+		MaxTracesPerMinute:             100,
+		MaxTracesPerMinutePerContainer: 5,
 	}
 }
 
@@ -43,24 +44,25 @@ func createTracesProcessor(ctx context.Context, params processor.CreateSettings,
 
 func newProcessor(logger *zap.Logger, ctx context.Context, config component.Config, nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
 	logger.Info("Creating assertsotelprocessor")
-	pConfig := config.(*Config)
+	pConfig := config.(Config)
 
-	regexps, err := compileRequestContextRegexps(logger, pConfig)
+	regexps, err := compileRequestContextRegexps(logger, &pConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	thresholdsHelper := thresholdHelper{
-		config:              *pConfig,
+		config:              &pConfig,
 		logger:              logger,
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		thresholds:          cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
 		entityKeys:          cmap.New[EntityKeyDto](),
+		stop:                make(chan bool),
 	}
 
 	metricsHelper := metricHelper{
 		logger:                logger,
-		config:                pConfig,
+		config:                &pConfig,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
 	}
 	err = metricsHelper.buildHistogram()
@@ -69,22 +71,21 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		return nil, err
 	}
 
-	pq := cmap.New[cmap.ConcurrentMap[string, *TracePQ]]()
+	pq := cmap.New[cmap.ConcurrentMap[string, *traceQueues]]()
 	traceSampler := sampler{
-		logger:              logger,
-		config:              pConfig,
-		thresholdHelper:     thresholdsHelper,
-		topTraces:           &pq,
-		traceFlushTicker:    clock.FromContext(ctx).NewTicker(time.Minute),
-		nextConsumer:        nextConsumer,
-		maxTracesPerService: pConfig.MaxTracesPerMinute,
-		requestRegexps:      regexps,
-		stop:                make(chan bool),
+		logger:           logger,
+		config:           &pConfig,
+		thresholdHelper:  &thresholdsHelper,
+		topTraces:        &pq,
+		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		nextConsumer:     nextConsumer,
+		requestRegexps:   regexps,
+		stop:             make(chan bool),
 	}
 
 	p := &assertsProcessorImpl{
 		logger:           logger,
-		config:           pConfig,
+		config:           &pConfig,
 		nextConsumer:     nextConsumer,
 		metricBuilder:    &metricsHelper,
 		thresholdsHelper: &thresholdsHelper,

@@ -19,13 +19,13 @@ type assertsProcessorImpl struct {
 	sampler          *sampler
 }
 
-// Capabilities implements the consumer interface.
+// Capabilities implements the consumer.Traces interface.
 func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 	p.logger.Info("consumer.Capabilities callback")
 	return consumer.Capabilities{MutatesData: false}
 }
 
-// Start implements the consumer interface.
+// Start implements the component.Component interface.
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
 	p.logger.Info("consumer.Start callback")
 	err := p.metricBuilder.compileSpanFilterRegexps()
@@ -35,10 +35,12 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 		} else {
 			p.logger.Info("Asserts Server not specified. No dynamic thresholds")
 		}
+		go p.sampler.flushTraces()
 	}
 	return err
 }
 
+// Shutdown implements the component.Component interface
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 	p.logger.Info("consumer.Shutdown")
 	p.thresholdsHelper.stopUpdates()

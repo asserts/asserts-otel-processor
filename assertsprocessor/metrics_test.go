@@ -11,15 +11,21 @@ import (
 )
 
 func TestShouldCaptureMetrics(t *testing.T) {
-	systemPattern, _ := regexp.Compile("aws-api")
-	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]regexp.Regexp{
-			"rpc.system":  *systemPattern,
-			"rpc.service": *servicePattern,
+		config: &Config{
+			AttributeExps: &map[string]string{
+				"rpc.system":  "aws-api",
+				"rpc.service": "(Sqs)|(DynamoDb)",
+			},
 		},
+		attributeValueRegExps: &map[string]regexp.Regexp{},
+	}
+
+	err := p.compileSpanFilterRegexps()
+	if err != nil {
+		return
 	}
 
 	testSpan := ptrace.NewSpan()

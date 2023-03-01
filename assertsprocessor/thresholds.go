@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"net/http"
-	"sort"
 	"time"
 )
 
@@ -17,31 +16,8 @@ type ThresholdDto struct {
 	LatencyUpperBound  float64 `json:"upper_threshold"`
 }
 
-type EntityKeyDto struct {
-	EntityType string            `json:"type"`
-	Name       string            `json:"name"`
-	Scope      map[string]string `json:"scope"`
-}
-
-func (ek *EntityKeyDto) AsString() string {
-	var sortedKeys []string
-	for key := range ek.Scope {
-		sortedKeys = append(sortedKeys, key)
-	}
-	sort.Strings(sortedKeys)
-	var scopeString = "{"
-	for _, key := range sortedKeys {
-		if len(scopeString) > 0 {
-			scopeString = scopeString + ", "
-		}
-		scopeString = scopeString + key + "=" + ek.Scope[key]
-	}
-	scopeString = scopeString + "}"
-	return scopeString + "/" + ek.EntityType + "/" + ek.Name
-}
-
 type thresholdHelper struct {
-	config              Config
+	config              *Config
 	logger              *zap.Logger
 	thresholds          cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, ThresholdDto]]
 	thresholdSyncTicker *clock.Ticker
@@ -50,12 +26,7 @@ type thresholdHelper struct {
 }
 
 func (th *thresholdHelper) getThreshold(ns string, service string, request string) float64 {
-	var entityKey = EntityKeyDto{
-		EntityType: "Service", Name: service,
-		Scope: map[string]string{
-			"env": th.config.Env, "site": th.config.Site, "namespace": ns,
-		},
-	}
+	var entityKey = buildEntityKey(th.config, ns, service)
 	_, found := th.entityKeys.Get(entityKey.AsString())
 	if !found {
 		th.entityKeys.Set(entityKey.AsString(), entityKey)
@@ -74,13 +45,14 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 }
 
 func (th *thresholdHelper) stopUpdates() {
-	th.stop <- true
+	go func() { th.stop <- true }()
 }
 
 func (th *thresholdHelper) updateThresholds() {
 	for {
 		select {
 		case <-th.stop:
+			th.logger.Info("Stopping threshold updates")
 			return
 		case <-th.thresholdSyncTicker.C:
 			th.logger.Info("Fetching thresholds")

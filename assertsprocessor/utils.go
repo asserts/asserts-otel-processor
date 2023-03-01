@@ -9,6 +9,16 @@ import (
 	"regexp"
 )
 
+func buildEntityKey(config *Config, namespace string, service string) EntityKeyDto {
+	return EntityKeyDto{
+		Type: "Service",
+		Name: service,
+		Scope: map[string]string{
+			"env": config.Env, "site": config.Site, "namespace": namespace,
+		},
+	}
+}
+
 func computeLatency(span ptrace.Span) float64 {
 	return float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9
 }
@@ -16,12 +26,14 @@ func computeLatency(span ptrace.Span) float64 {
 func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*map[string]regexp.Regexp, error) {
 	logger.Info("consumer.Start compiling request context regexps")
 	var exps = map[string]regexp.Regexp{}
-	for attName, matchExpString := range *config.RequestContextExps {
-		compile, err := regexp.Compile(matchExpString)
-		if err != nil {
-			return nil, err
+	if config.RequestContextExps != nil {
+		for attName, matchExpString := range *config.RequestContextExps {
+			compile, err := regexp.Compile(matchExpString)
+			if err != nil {
+				return nil, err
+			}
+			exps[attName] = *compile
 		}
-		exps[attName] = *compile
 	}
 	logger.Debug("consumer.Start compiled request context regexps successfully")
 	return &exps, nil
@@ -31,16 +43,16 @@ func getExp(exps *map[string]regexp.Regexp, span ptrace.Span) string {
 	for attName, regExp := range *exps {
 		value, found := span.Attributes().Get(attName)
 		if found {
-			submatch := regExp.FindStringSubmatch(value.AsString())
-			if len(submatch) >= 1 {
-				return submatch[1]
+			subMatch := regExp.FindStringSubmatch(value.AsString())
+			if len(subMatch) >= 1 {
+				return subMatch[1]
 			}
 		}
 	}
 	return ""
 }
 
-func traceHasError(ctx context.Context, traces ptrace.Traces) bool {
+func hasError(ctx context.Context, traces ptrace.Traces) bool {
 	var slice []int
 	callback := func(ns string, service string, ctx context.Context, traces ptrace.Traces, span ptrace.Span) error {
 		attributes := span.Attributes()
