@@ -16,7 +16,7 @@ import (
 var testConfig = Config{
 	Env:           "dev",
 	Site:          "us-west-2",
-	AssertsServer: &AssertsServer{endpoint: "http://localhost:8030"},
+	AssertsServer: &map[string]string{"endpoint": "http://localhost:8030"},
 	AttributeExps: &map[string]string{
 		"attribute": ".+",
 	},

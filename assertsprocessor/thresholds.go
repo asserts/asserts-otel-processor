@@ -91,8 +91,8 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	}
 
 	// Build request
-	assertsServer := th.config.AssertsServer
-	url := assertsServer.endpoint + "/v1/latency-thresholds"
+	assertsServer := *th.config.AssertsServer
+	url := assertsServer["endpoint"] + "/v1/latency-thresholds"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		th.logger.Error("Got error", zap.Error(err))
@@ -104,8 +104,8 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	)
 
 	// Add authentication headers
-	if assertsServer.user != "" && assertsServer.password != "" {
-		req.Header.Add("Authorization", "Basic "+basicAuth(assertsServer.user, assertsServer.password))
+	if assertsServer["user"] != "" && assertsServer["password"] != "" {
+		req.Header.Add("Authorization", "Basic "+basicAuth(assertsServer["user"], assertsServer["password"]))
 	}
 
 	// Make the call

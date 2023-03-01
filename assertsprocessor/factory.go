@@ -30,8 +30,8 @@ func NewFactory() processor.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		AssertsServer: &AssertsServer{
-			endpoint: "https://demo.app.asserts.ai",
+		AssertsServer: &map[string]string{
+			"endpoint": "https://demo.app.asserts.ai",
 		},
 		Env:                            "dev",
 		Site:                           "us-west-2",
