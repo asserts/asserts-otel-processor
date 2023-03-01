@@ -1,6 +1,8 @@
 package assertsprocessor
 
-import "sort"
+import (
+	"sort"
+)
 
 type EntityKeyDto struct {
 	Type  string            `json:"type"`
@@ -22,5 +24,14 @@ func (ek *EntityKeyDto) AsString() string {
 		scopeString = scopeString + key + "=" + ek.Scope[key]
 	}
 	scopeString = scopeString + "}"
-	return scopeString + "/" + ek.Type + "/" + ek.Name
+	return scopeString + "#" + ek.Type + "#" + ek.Name
+}
+
+type RequestKey struct {
+	entityKey EntityKeyDto
+	request   string
+}
+
+func (rq *RequestKey) AsString() string {
+	return rq.entityKey.AsString() + "#" + rq.request
 }

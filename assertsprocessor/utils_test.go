@@ -63,7 +63,7 @@ func TestGetExpMatch(t *testing.T) {
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
-	value := getExp(&map[string]regexp.Regexp{
+	value := getRequest(&map[string]regexp.Regexp{
 		"http.url": *compile,
 	}, testSpan)
 	assert.Equal(t, "/342994379019/NodeJSPerf-WithLayer", value)
@@ -74,7 +74,7 @@ func TestGetExpNoMatch(t *testing.T) {
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")
-	value := getExp(&map[string]regexp.Regexp{
+	value := getRequest(&map[string]regexp.Regexp{
 		"http.url": *compile,
 	}, testSpan)
 	assert.Equal(t, "", value)

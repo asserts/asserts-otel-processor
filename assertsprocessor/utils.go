@@ -39,7 +39,7 @@ func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*map[stri
 	return &exps, nil
 }
 
-func getExp(exps *map[string]regexp.Regexp, span ptrace.Span) string {
+func getRequest(exps *map[string]regexp.Regexp, span ptrace.Span) string {
 	for attName, regExp := range *exps {
 		value, found := span.Attributes().Get(attName)
 		if found {

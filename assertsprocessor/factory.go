@@ -2,13 +2,13 @@ package assertsprocessor
 
 import (
 	"context"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/processor"
 	"go.uber.org/zap"
 	"regexp"
+	"sync"
 	"time"
 )
 
@@ -35,6 +35,8 @@ func createDefaultConfig() component.Config {
 		DefaultLatencyThreshold:        0.5,
 		MaxTracesPerMinute:             100,
 		MaxTracesPerMinutePerContainer: 5,
+		NormalSamplingFrequencyMinutes: 5,
+		TraceFlushIntervalSeconds:      15,
 	}
 }
 
@@ -55,8 +57,8 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		config:              pConfig,
 		logger:              logger,
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		thresholds:          cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
-		entityKeys:          cmap.New[EntityKeyDto](),
+		thresholds:          &sync.Map{},
+		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
 	}
 
@@ -71,16 +73,17 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		return nil, err
 	}
 
-	pq := cmap.New[cmap.ConcurrentMap[string, *traceQueues]]()
+	traceFlushInterval := time.Duration(pConfig.TraceFlushIntervalSeconds) * time.Second
 	traceSampler := sampler{
-		logger:           logger,
-		config:           pConfig,
-		thresholdHelper:  &thresholdsHelper,
-		topTraces:        &pq,
-		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		nextConsumer:     nextConsumer,
-		requestRegexps:   regexps,
-		stop:             make(chan bool),
+		logger:               logger,
+		config:               pConfig,
+		thresholdHelper:      &thresholdsHelper,
+		topTracesMap:         &sync.Map{},
+		healthySamplingState: &sync.Map{},
+		traceFlushTicker:     clock.FromContext(ctx).NewTicker(traceFlushInterval),
+		nextConsumer:         nextConsumer,
+		requestRegexps:       regexps,
+		stop:                 make(chan bool),
 	}
 
 	p := &assertsProcessorImpl{

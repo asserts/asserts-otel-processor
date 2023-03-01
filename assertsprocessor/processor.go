@@ -44,6 +44,7 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 	p.logger.Info("consumer.Shutdown")
 	p.thresholdsHelper.stopUpdates()
+	p.sampler.stopFlushing()
 	return nil
 }
 
@@ -56,7 +57,9 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 
 func (p *assertsProcessorImpl) processSpan(namespace string, serviceName string, ctx context.Context,
 	traces ptrace.Traces, span ptrace.Span) error {
-	p.sampler.sampleTrace(namespace, serviceName, ctx, traces, span)
+	if span.ParentSpanID().IsEmpty() {
+		p.sampler.sampleTrace(namespace, serviceName, ctx, traces, span)
+	}
 	p.metricBuilder.captureMetrics(namespace, serviceName, span)
 	return nil
 }

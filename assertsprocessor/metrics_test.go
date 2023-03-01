@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"regexp"
 	"testing"
+	"time"
 )
 
 func TestShouldCaptureMetrics(t *testing.T) {
@@ -125,4 +126,26 @@ func TestCaptureMetrics(t *testing.T) {
 	metric, err := p.latencyHistogram.GetMetricWith(expectedLabels)
 	assert.Nil(t, err)
 	assert.NotNil(t, metric)
+}
+
+func TestStartExporter(t *testing.T) {
+	systemPattern, _ := regexp.Compile("aws-api")
+	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
+	logger, _ := zap.NewProduction()
+	p := metricHelper{
+		logger: logger,
+		attributeValueRegExps: &map[string]regexp.Regexp{
+			"rpc.system":  *systemPattern,
+			"rpc.service": *servicePattern,
+		},
+		config: &Config{
+			Env:  "dev",
+			Site: "us-west-2",
+			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
+				"aws.table.name", "aws.queue.url"},
+		},
+	}
+	_ = p.buildHistogram()
+	go p.startExporter()
+	time.Sleep(2 * time.Second)
 }

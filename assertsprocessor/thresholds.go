@@ -3,11 +3,11 @@ package assertsprocessor
 import (
 	"bytes"
 	"encoding/json"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/tilinna/clock"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -19,29 +19,25 @@ type ThresholdDto struct {
 type thresholdHelper struct {
 	config              *Config
 	logger              *zap.Logger
-	thresholds          cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, ThresholdDto]]
+	thresholds          *sync.Map
 	thresholdSyncTicker *clock.Ticker
-	entityKeys          cmap.ConcurrentMap[string, EntityKeyDto]
+	entityKeys          *sync.Map
 	stop                chan bool
 }
 
 func (th *thresholdHelper) getThreshold(ns string, service string, request string) float64 {
 	var entityKey = buildEntityKey(th.config, ns, service)
-	_, found := th.entityKeys.Get(entityKey.AsString())
-	if !found {
-		th.entityKeys.Set(entityKey.AsString(), entityKey)
-	}
-	thresholds, found := th.thresholds.Get(entityKey.AsString())
-	if !found {
-		return th.config.DefaultLatencyThreshold
-	} else {
-		threshold, found := thresholds.Get(request)
-		if !found {
-			return th.config.DefaultLatencyThreshold
-		} else {
-			return threshold.LatencyUpperBound
+	th.entityKeys.LoadOrStore(entityKey.AsString(), entityKey)
+	var thresholds, _ = th.thresholds.Load(entityKey.AsString())
+	if thresholds != nil {
+		thresholdMap := thresholds.(map[string]*ThresholdDto)
+		if thresholdMap[request] != nil {
+			return (*thresholdMap[request]).LatencyUpperBound
+		} else if thresholdMap[""] != nil {
+			return (*thresholdMap[""]).LatencyUpperBound
 		}
 	}
+	return th.config.DefaultLatencyThreshold
 }
 
 func (th *thresholdHelper) stopUpdates() {
@@ -56,9 +52,11 @@ func (th *thresholdHelper) updateThresholds() {
 			return
 		case <-th.thresholdSyncTicker.C:
 			th.logger.Info("Fetching thresholds")
-			for _, val := range th.entityKeys.Items() {
-				th.updateThresholdsAsync(val)
-			}
+			th.entityKeys.Range(func(key any, value any) bool {
+				entityKey := value.(EntityKeyDto)
+				th.updateThresholdsAsync(entityKey)
+				return true
+			})
 		}
 	}
 }
@@ -69,11 +67,11 @@ func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
 	go func() {
 		thresholds, err := th.getThresholds(entityKey)
 		if err == nil {
-			var latestThresholds = cmap.New[ThresholdDto]()
+			var latestThresholds = map[string]*ThresholdDto{}
 			for _, threshold := range thresholds {
-				latestThresholds.Set(threshold.ResourceURIPattern, threshold)
+				latestThresholds[threshold.ResourceURIPattern] = &threshold
 			}
-			th.thresholds.Set(entityKey.AsString(), latestThresholds)
+			th.thresholds.Store(entityKey.AsString(), latestThresholds)
 		}
 	}()
 	return true

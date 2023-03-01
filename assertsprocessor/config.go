@@ -14,6 +14,8 @@ type Config struct {
 	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
 	MaxTracesPerMinute             int                `mapstructure:"max_traces_per_minute"`
 	MaxTracesPerMinutePerContainer int                `mapstructure:"max_traces_per_minute_per_container"`
+	NormalSamplingFrequencyMinutes int                `mapstructure:"healthy_sampling_freq_minutes"`
+	TraceFlushIntervalSeconds      int                `mapstructure:"trace_flush_interval_seconds"`
 }
 
 // Validate implements the component.ConfigValidator interface.

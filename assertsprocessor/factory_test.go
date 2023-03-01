@@ -38,13 +38,6 @@ func TestDefaultConfig(t *testing.T) {
 
 //func TestCreateProcessor(t *testing.T) {
 //	factory := NewFactory()
-//	var defaultConfig = factory.CreateDefaultConfig()
-//	var pConfig = convert(defaultConfig)
-//	assert.Equal(t, "dev", pConfig.Env)
-//	assert.Equal(t, "us-west-2", pConfig.Site)
-//	assert.Equal(t, 100, pConfig.MaxTracesPerMinute)
-//	assert.Equal(t, 0.5, pConfig.DefaultLatencyThreshold)
-//
 //	ctx := context.Background()
 //	var createSettings = processor.CreateSettings{
 //		ID: component.NewIDWithName(component.DataTypeTraces, ""),
@@ -84,6 +77,6 @@ func TestDefaultConfig(t *testing.T) {
 //	assert.NotNil(t, _assertsProcessor.sampler.stop)
 //	assert.Equal(t, nextConsumer, _assertsProcessor.sampler.nextConsumer)
 //	assert.Equal(t, _assertsProcessor.thresholdsHelper, _assertsProcessor.sampler.thresholdHelper)
-//	assert.NotNil(t, _assertsProcessor.sampler.topTraces)
+//	assert.NotNil(t, _assertsProcessor.sampler.topTracesMap)
 //	assert.NotNil(t, _assertsProcessor.sampler.traceFlushTicker)
 //}

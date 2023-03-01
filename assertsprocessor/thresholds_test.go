@@ -2,10 +2,10 @@ package assertsprocessor
 
 import (
 	"context"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/tilinna/clock"
 	"go.uber.org/zap"
+	"sync"
 	"testing"
 	"time"
 )
@@ -20,8 +20,8 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 			AssertsServer:           "http://localhost:8030",
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
-		entityKeys: cmap.New[EntityKeyDto](),
+		thresholds: &sync.Map{},
+		entityKeys: &sync.Map{},
 	}
 
 	dto := EntityKeyDto{
@@ -30,12 +30,14 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 		},
 	}
 	assert.Equal(t, 0.5, m.getThreshold("platform", "api-server", "123"))
-	load, ok := m.entityKeys.Get(dto.AsString())
-	assert.True(t, ok)
-	assert.Equal(t, dto, load)
+	m.entityKeys.Range(func(key any, value any) bool {
+		assert.Equal(t, dto.AsString(), key.(string))
+		assert.Equal(t, dto, value.(EntityKeyDto))
+		return true
+	})
 }
 
-func TestGetThresholdFound(t *testing.T) {
+func TestGetRequestThresholdFound(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	var m = thresholdHelper{
 		logger: logger,
@@ -45,8 +47,8 @@ func TestGetThresholdFound(t *testing.T) {
 			AssertsServer:           "http://localhost:8030",
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
-		entityKeys: cmap.New[EntityKeyDto](),
+		thresholds: &sync.Map{},
+		entityKeys: &sync.Map{},
 	}
 
 	dto := EntityKeyDto{
@@ -54,15 +56,52 @@ func TestGetThresholdFound(t *testing.T) {
 			"env": "dev", "site": "us-west-2", "namespace": "platform",
 		},
 	}
-	m.entityKeys.Set(dto.AsString(), dto)
+	m.entityKeys.Store(dto.AsString(), dto)
 
-	byRequest := cmap.New[ThresholdDto]()
-	m.thresholds.Set(dto.AsString(), byRequest)
+	byRequest := map[string]*ThresholdDto{}
+	m.thresholds.Store(dto.AsString(), byRequest)
 
-	byRequest.Set("/v1/latency-thresholds", ThresholdDto{
+	byRequest["/v1/latency-thresholds"] = &ThresholdDto{
 		ResourceURIPattern: "/v1/latency-thresholds",
 		LatencyUpperBound:  1,
-	})
+	}
+
+	byRequest[""] = &ThresholdDto{
+		ResourceURIPattern: "",
+		LatencyUpperBound:  2,
+	}
+
+	assert.Equal(t, float64(1), m.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
+}
+
+func TestGetServiceDefaultThresholdFound(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	var m = thresholdHelper{
+		logger: logger,
+		config: &Config{
+			Env:                     "dev",
+			Site:                    "us-west-2",
+			AssertsServer:           "http://localhost:8030",
+			DefaultLatencyThreshold: 0.5,
+		},
+		thresholds: &sync.Map{},
+		entityKeys: &sync.Map{},
+	}
+
+	dto := EntityKeyDto{
+		Type: "Service", Name: "api-server", Scope: map[string]string{
+			"env": "dev", "site": "us-west-2", "namespace": "platform",
+		},
+	}
+	m.entityKeys.Store(dto.AsString(), dto)
+
+	byRequest := map[string]*ThresholdDto{}
+	m.thresholds.Store(dto.AsString(), byRequest)
+
+	byRequest[""] = &ThresholdDto{
+		ResourceURIPattern: "",
+		LatencyUpperBound:  1,
+	}
 
 	assert.Equal(t, float64(1), m.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
 }
@@ -77,8 +116,8 @@ func TestStopUpdates(t *testing.T) {
 			AssertsServer:           "http://localhost:8030",
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
-		entityKeys: cmap.New[EntityKeyDto](),
+		thresholds: &sync.Map{},
+		entityKeys: &sync.Map{},
 		stop:       make(chan bool),
 	}
 	m.stopUpdates()
@@ -96,19 +135,19 @@ func TestUpdateThresholds(t *testing.T) {
 			AssertsServer:           "http://localhost:8030",
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds:          cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
-		entityKeys:          cmap.New[EntityKeyDto](),
+		thresholds:          &sync.Map{},
+		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
-		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Second * 5),
+		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Second),
 	}
 	entityKey := EntityKeyDto{
 		Type: "Service", Name: "api-server", Scope: map[string]string{
 			"env": "dev", "site": "us-west-2",
 		},
 	}
-	m.entityKeys.Set(entityKey.AsString(), entityKey)
+	m.entityKeys.Store(entityKey.AsString(), entityKey)
 	go func() { m.updateThresholds() }()
-	time.Sleep(10 * time.Second)
-	m.stopUpdates()
 	time.Sleep(2 * time.Second)
+	m.stopUpdates()
+	time.Sleep(1 * time.Second)
 }
