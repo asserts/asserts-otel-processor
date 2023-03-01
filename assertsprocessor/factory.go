@@ -44,15 +44,15 @@ func createTracesProcessor(ctx context.Context, params processor.CreateSettings,
 
 func newProcessor(logger *zap.Logger, ctx context.Context, config component.Config, nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
 	logger.Info("Creating assertsotelprocessor")
-	pConfig := config.(Config)
+	pConfig := config.(*Config)
 
-	regexps, err := compileRequestContextRegexps(logger, &pConfig)
+	regexps, err := compileRequestContextRegexps(logger, pConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	thresholdsHelper := thresholdHelper{
-		config:              &pConfig,
+		config:              pConfig,
 		logger:              logger,
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		thresholds:          cmap.New[cmap.ConcurrentMap[string, ThresholdDto]](),
@@ -62,7 +62,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 
 	metricsHelper := metricHelper{
 		logger:                logger,
-		config:                &pConfig,
+		config:                pConfig,
 		attributeValueRegExps: &map[string]regexp.Regexp{},
 	}
 	err = metricsHelper.buildHistogram()
@@ -74,7 +74,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	pq := cmap.New[cmap.ConcurrentMap[string, *traceQueues]]()
 	traceSampler := sampler{
 		logger:           logger,
-		config:           &pConfig,
+		config:           pConfig,
 		thresholdHelper:  &thresholdsHelper,
 		topTraces:        &pq,
 		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Minute),
@@ -85,7 +85,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 
 	p := &assertsProcessorImpl{
 		logger:           logger,
-		config:           &pConfig,
+		config:           pConfig,
 		nextConsumer:     nextConsumer,
 		metricBuilder:    &metricsHelper,
 		thresholdsHelper: &thresholdsHelper,
