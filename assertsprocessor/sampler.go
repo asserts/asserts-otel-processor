@@ -69,20 +69,27 @@ func (s *sampler) sampleTrace(namespace string, serviceName string, ctx context.
 	}
 	traceHasError := hasError(ctx, trace)
 	latencyIsHigh := s.latencyIsHigh(namespace, serviceName, rootSpan)
+	latency := computeLatency(rootSpan)
 	if traceHasError || latencyIsHigh {
 		// Get the latency queue for the entity and request
 		pq := s.getTraceQueues(key)
 		if traceHasError {
+			s.logger.Info("Capturing error trace",
+				zap.String("traceId", rootSpan.TraceID().String()),
+				zap.Float64("latency", latency))
 			pq.errorQueue.push(&Item{
 				trace:   &trace,
 				ctx:     &ctx,
-				latency: computeLatency(rootSpan),
+				latency: latency,
 			})
 		} else {
+			s.logger.Info("Capturing slow trace",
+				zap.String("traceId", rootSpan.TraceID().String()),
+				zap.Float64("latency", latency))
 			pq.slowQueue.push(&Item{
 				trace:   &trace,
 				ctx:     &ctx,
-				latency: computeLatency(rootSpan),
+				latency: latency,
 			})
 		}
 	} else {
@@ -93,13 +100,16 @@ func (s *sampler) sampleTrace(namespace string, serviceName string, ctx context.
 		})
 		samplingState := state.(*periodicSamplingState)
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
+			s.logger.Info("Capturing normal trace",
+				zap.String("traceId", rootSpan.TraceID().String()),
+				zap.Float64("latency", latency))
 			pq := s.getTraceQueues(key)
 
 			// Push to the latency queue to prioritize the healthy sample too
 			pq.slowQueue.push(&Item{
 				trace:   &trace,
 				ctx:     &ctx,
-				latency: computeLatency(rootSpan),
+				latency: latency,
 			})
 		}
 	}
@@ -116,14 +126,6 @@ func (s *sampler) getTraceQueues(key RequestKey) *traceQueues {
 func (s *sampler) latencyIsHigh(namespace string, serviceName string, rootSpan ptrace.Span) bool {
 	if rootSpan.ParentSpanID().IsEmpty() {
 		spanDuration := computeLatency(rootSpan)
-
-		var entityKey = buildEntityKey(s.config, namespace, serviceName)
-
-		s.logger.Info("Sampling check based on Root Span Duration",
-			zap.String("Trace Id", rootSpan.TraceID().String()),
-			zap.String("Entity Key", entityKey.AsString()),
-			zap.Float64("Duration", spanDuration))
-
 		threshold := s.thresholdHelper.getThreshold(namespace, serviceName, rootSpan.Name())
 		return spanDuration > threshold
 	}
@@ -153,7 +155,11 @@ func (s *sampler) flushTraces() {
 				var entityKey = scopeString + "#" + typeName + "#" + name
 
 				var q = value.(*traceQueues)
+
 				// Flush all the errors
+				s.logger.Info("Flushing Error Traces for",
+					zap.String("Request", requestKey),
+					zap.Int("Num Traces", len(q.errorQueue.priorityQueue)))
 				for _, item := range q.errorQueue.priorityQueue {
 					_ = s.nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
 				}
@@ -172,7 +178,7 @@ func (s *sampler) flushTraces() {
 
 			// Drain the latency queue
 			for entityKey, q := range serviceQueues {
-				s.logger.Info("Flushing High Latency Traces",
+				s.logger.Info("Flushing Slow Traces",
 					zap.String("Service", entityKey),
 					zap.Int("Num Traces", len(q.priorityQueue)))
 				for _, tp := range q.priorityQueue {
