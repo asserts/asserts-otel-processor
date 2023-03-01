@@ -34,11 +34,11 @@ type periodicSamplingState struct {
 func (state *periodicSamplingState) sample(everyNMinutes int) bool {
 	state.rwMutex.RLock()
 	currentTime := time.Now().Unix()
-	sampleNow := currentTime-state.lastSampleTime > int64(everyNMinutes*3600)
+	sampleNow := currentTime-state.lastSampleTime > int64(time.Duration(everyNMinutes)*time.Minute)
 	if sampleNow {
 		state.rwMutex.RUnlock()
 		state.rwMutex.Lock()
-		if currentTime-state.lastSampleTime > int64(everyNMinutes*3600) {
+		if currentTime-state.lastSampleTime > int64(time.Duration(everyNMinutes)*time.Minute) {
 			state.lastSampleTime = currentTime
 		}
 		state.rwMutex.Unlock()
