@@ -103,6 +103,8 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 		zap.String("Entity Key", entityKey.AsString()),
 	)
 
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
 	// Add authentication headers
 	if assertsServer["user"] != "" && assertsServer["password"] != "" {
 		req.Header.Add("Authorization", "Basic "+basicAuth(assertsServer["user"], assertsServer["password"]))
