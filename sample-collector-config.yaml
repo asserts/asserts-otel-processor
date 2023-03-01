@@ -17,7 +17,8 @@ exporters:
 
 processors:
   assertsprocessor:
-    asserts_server: http://localhost:8030
+    asserts_server:
+      endpoint: http://localhost:8030
     asserts_env: dev
     asserts_site: dev
     span_attribute_match_regex:

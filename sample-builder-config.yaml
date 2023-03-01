@@ -20,7 +20,7 @@ extensions:
 processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.71.0
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.71.0
-  - gomod: github.com/asserts/asserts-otel-processor/assertsprocessor v0.0.34
+  - gomod: github.com/asserts/asserts-otel-processor/assertsprocessor v0.0.36
 connectors:
   - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.71.0
 
