@@ -4,8 +4,14 @@ import (
 	"regexp"
 )
 
+type AssertsServer struct {
+	endpoint string `mapstructure:"endpoint"`
+	user     string `mapstructure:"user"`
+	password string `mapstructure:"password"`
+}
+
 type Config struct {
-	AssertsServer                  string             `mapstructure:"asserts_server"`
+	AssertsServer                  *AssertsServer     `mapstructure:"asserts_server"`
 	Env                            string             `mapstructure:"asserts_env"`
 	Site                           string             `mapstructure:"asserts_site"`
 	AttributeExps                  *map[string]string `mapstructure:"span_attribute_match_regex"`

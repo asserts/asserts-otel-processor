@@ -17,7 +17,7 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 		config: &Config{
 			Env:                     "dev",
 			Site:                    "us-west-2",
-			AssertsServer:           "http://localhost:8030",
+			AssertsServer:           &AssertsServer{endpoint: "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
 		thresholds: &sync.Map{},
@@ -44,7 +44,7 @@ func TestGetRequestThresholdFound(t *testing.T) {
 		config: &Config{
 			Env:                     "dev",
 			Site:                    "us-west-2",
-			AssertsServer:           "http://localhost:8030",
+			AssertsServer:           &AssertsServer{endpoint: "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
 		thresholds: &sync.Map{},
@@ -81,7 +81,7 @@ func TestGetServiceDefaultThresholdFound(t *testing.T) {
 		config: &Config{
 			Env:                     "dev",
 			Site:                    "us-west-2",
-			AssertsServer:           "http://localhost:8030",
+			AssertsServer:           &AssertsServer{endpoint: "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
 		thresholds: &sync.Map{},
@@ -113,7 +113,7 @@ func TestStopUpdates(t *testing.T) {
 		config: &Config{
 			Env:                     "dev",
 			Site:                    "us-west-2",
-			AssertsServer:           "http://localhost:8030",
+			AssertsServer:           &AssertsServer{endpoint: "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
 		thresholds: &sync.Map{},
@@ -130,9 +130,13 @@ func TestUpdateThresholds(t *testing.T) {
 	var m = thresholdHelper{
 		logger: logger,
 		config: &Config{
-			Env:                     "dev",
-			Site:                    "us-west-2",
-			AssertsServer:           "http://localhost:8030",
+			Env:  "dev",
+			Site: "us-west-2",
+			AssertsServer: &AssertsServer{
+				endpoint: "http://localhost:8030",
+				user:     "user",
+				password: "password",
+			},
 			DefaultLatencyThreshold: 0.5,
 		},
 		thresholds:          &sync.Map{},

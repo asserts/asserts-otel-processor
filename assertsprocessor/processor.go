@@ -30,7 +30,7 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 	p.logger.Info("consumer.Start callback")
 	err := p.metricBuilder.compileSpanFilterRegexps()
 	if err == nil {
-		if p.config.AssertsServer != "" {
+		if p.config.AssertsServer != nil && p.config.AssertsServer.endpoint != "" {
 			go p.thresholdsHelper.updateThresholds()
 		} else {
 			p.logger.Info("Asserts Server not specified. No dynamic thresholds")

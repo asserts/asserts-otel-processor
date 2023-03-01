@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"github.com/tilinna/clock"
 	"go.uber.org/zap"
@@ -90,7 +91,8 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	}
 
 	// Build request
-	url := th.config.AssertsServer + "/v1/latency-thresholds"
+	assertsServer := th.config.AssertsServer
+	url := assertsServer.endpoint + "/v1/latency-thresholds"
 	req, err := http.NewRequest("POST", url, bytes.NewReader(buf.Bytes()))
 	if err != nil {
 		th.logger.Error("Got error", zap.Error(err))
@@ -102,7 +104,9 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	)
 
 	// Add authentication headers
-	// req.Header.Add("Authorization", "Basic ")
+	if assertsServer.user != "" && assertsServer.password != "" {
+		req.Header.Add("Authorization", "Basic "+basicAuth(assertsServer.user, assertsServer.password))
+	}
 
 	// Make the call
 	response, err := client.Do(req)
@@ -129,4 +133,9 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 		err = response.Body.Close()
 	}
 	return thresholds, err
+}
+
+func basicAuth(username string, password string) string {
+	auth := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(auth))
 }

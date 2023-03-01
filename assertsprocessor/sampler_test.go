@@ -18,7 +18,7 @@ var logger, _ = zap.NewProduction()
 var config = Config{
 	Env:                            "dev",
 	Site:                           "us-west-2",
-	AssertsServer:                  "http://localhost:8030",
+	AssertsServer:                  &AssertsServer{endpoint: "http://localhost:8030"},
 	DefaultLatencyThreshold:        0.5,
 	MaxTracesPerMinute:             100,
 	MaxTracesPerMinutePerContainer: 5,

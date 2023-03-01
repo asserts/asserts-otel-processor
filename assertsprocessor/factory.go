@@ -30,6 +30,9 @@ func NewFactory() processor.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
+		AssertsServer: &AssertsServer{
+			endpoint: "https://demo.app.asserts.ai",
+		},
 		Env:                            "dev",
 		Site:                           "us-west-2",
 		DefaultLatencyThreshold:        0.5,

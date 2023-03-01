@@ -21,7 +21,10 @@ ocb_0.71.0_darwin_amd64 --config=sample-builder-config.yaml
 ```
 processors:
   assertsprocessor:
-    asserts_server: http://localhost:8030
+    asserts_server: 
+      endpoint: http://localhost:8030
+      user: 
+      password:
     asserts_env: dev
     asserts_site: us-west-2
     span_attribute_match_regex:
