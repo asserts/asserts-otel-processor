@@ -59,60 +59,79 @@ type sampler struct {
 	requestRegexps       *map[string]regexp.Regexp
 }
 
-func (s *sampler) sampleTrace(namespace string, serviceName string, ctx context.Context,
-	trace ptrace.Traces, rootSpan ptrace.Span) {
-	entityKey := buildEntityKey(s.config, namespace, serviceName)
-	request := getRequest(s.requestRegexps, rootSpan)
-	key := RequestKey{
-		entityKey: entityKey,
-		request:   request,
+type traceSummary struct {
+	hasError        bool
+	isSlow          bool
+	slowestRootSpan *ptrace.Span
+	requestKey      RequestKey
+	latency         float64
+}
+
+func (s *sampler) sampleTrace(ctx context.Context,
+	trace ptrace.Traces, spanSets []*resourceSpanGroup) {
+	summary := s.getSummary(spanSets)
+	item := Item{
+		trace:   &trace,
+		ctx:     &ctx,
+		latency: summary.latency,
 	}
-	traceHasError := hasError(ctx, trace)
-	latencyIsHigh := s.latencyIsHigh(namespace, serviceName, rootSpan)
-	latency := computeLatency(rootSpan)
-	if traceHasError || latencyIsHigh {
-		// Get the latency queue for the entity and request
-		pq := s.getTraceQueues(key)
-		if traceHasError {
+	if summary.hasError || summary.isSlow {
+		// Get the trace queue for the entity and request
+		pq := s.getTraceQueues(summary.requestKey)
+		if summary.hasError {
 			s.logger.Info("Capturing error trace",
-				zap.String("traceId", rootSpan.TraceID().String()),
-				zap.Float64("latency", latency))
-			pq.errorQueue.push(&Item{
-				trace:   &trace,
-				ctx:     &ctx,
-				latency: latency,
-			})
+				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
+				zap.Float64("latency", computeLatency(*summary.slowestRootSpan)))
+			pq.errorQueue.push(&item)
 		} else {
 			s.logger.Info("Capturing slow trace",
-				zap.String("traceId", rootSpan.TraceID().String()),
-				zap.Float64("latency", latency))
-			pq.slowQueue.push(&Item{
-				trace:   &trace,
-				ctx:     &ctx,
-				latency: latency,
-			})
+				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
+				zap.Float64("latency", computeLatency(*summary.slowestRootSpan)))
+			pq.slowQueue.push(&item)
 		}
 	} else {
 		// Capture healthy samples based on configured sampling rate
-		state, _ := s.healthySamplingState.LoadOrStore(key.AsString(), &periodicSamplingState{
+		state, _ := s.healthySamplingState.LoadOrStore(summary.requestKey.AsString(), &periodicSamplingState{
 			lastSampleTime: 0,
 			rwMutex:        &sync.RWMutex{},
 		})
 		samplingState := state.(*periodicSamplingState)
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
 			s.logger.Info("Capturing normal trace",
-				zap.String("traceId", rootSpan.TraceID().String()),
-				zap.Float64("latency", latency))
-			pq := s.getTraceQueues(key)
+				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
+				zap.Float64("latency", summary.latency))
+			pq := s.getTraceQueues(summary.requestKey)
 
 			// Push to the latency queue to prioritize the healthy sample too
-			pq.slowQueue.push(&Item{
-				trace:   &trace,
-				ctx:     &ctx,
-				latency: latency,
-			})
+			pq.slowQueue.push(&item)
 		}
 	}
+}
+
+func (s *sampler) getSummary(spanSets []*resourceSpanGroup) *traceSummary {
+	summary := traceSummary{}
+	summary.hasError = false
+	summary.isSlow = false
+	maxLatency := float64(0)
+	for _, spanSet := range spanSets {
+		summary.hasError = summary.hasError || spanSet.hasError()
+		entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
+		for _, rootSpan := range spanSet.rootSpans {
+			request := getRequest(s.requestRegexps, *rootSpan)
+			summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, *rootSpan)
+			max := math.Max(maxLatency, computeLatency(*rootSpan))
+			if max > maxLatency {
+				maxLatency = max
+				summary.slowestRootSpan = rootSpan
+				summary.requestKey = RequestKey{
+					entityKey: entityKey,
+					request:   request,
+				}
+				summary.latency = maxLatency
+			}
+		}
+	}
+	return &summary
 }
 
 func (s *sampler) getTraceQueues(key RequestKey) *traceQueues {
@@ -123,13 +142,10 @@ func (s *sampler) getTraceQueues(key RequestKey) *traceQueues {
 	return pq.(*traceQueues)
 }
 
-func (s *sampler) latencyIsHigh(namespace string, serviceName string, rootSpan ptrace.Span) bool {
-	if rootSpan.ParentSpanID().IsEmpty() {
-		spanDuration := computeLatency(rootSpan)
-		threshold := s.thresholdHelper.getThreshold(namespace, serviceName, rootSpan.Name())
-		return spanDuration > threshold
-	}
-	return false
+func (s *sampler) isSlow(namespace string, serviceName string, rootSpan ptrace.Span) bool {
+	spanDuration := computeLatency(rootSpan)
+	threshold := s.thresholdHelper.getThreshold(namespace, serviceName, rootSpan.Name())
+	return spanDuration > threshold
 }
 
 func (s *sampler) stopFlushing() {
@@ -158,7 +174,7 @@ func (s *sampler) flushTraces() {
 				if len(q.errorQueue.priorityQueue) > 0 {
 					s.logger.Info("Flushing Error Traces for",
 						zap.String("Request", requestKey),
-						zap.Int("Num Traces", len(q.errorQueue.priorityQueue)))
+						zap.Int("Count", len(q.errorQueue.priorityQueue)))
 					for _, item := range q.errorQueue.priorityQueue {
 						_ = s.nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
 					}
@@ -181,7 +197,7 @@ func (s *sampler) flushTraces() {
 			for entityKey, q := range serviceQueues {
 				s.logger.Info("Flushing Slow Traces",
 					zap.String("Service", entityKey),
-					zap.Int("Num Traces", len(q.priorityQueue)))
+					zap.Int("Count", len(q.priorityQueue)))
 				for _, tp := range q.priorityQueue {
 					_ = s.nextConsumer.ConsumeTraces(*tp.ctx, *tp.trace)
 				}

@@ -39,7 +39,6 @@ func createDefaultConfig() component.Config {
 		MaxTracesPerMinute:             100,
 		MaxTracesPerMinutePerContainer: 5,
 		NormalSamplingFrequencyMinutes: 5,
-		TraceFlushIntervalSeconds:      15,
 	}
 }
 
@@ -76,14 +75,13 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		return nil, err
 	}
 
-	traceFlushInterval := time.Duration(pConfig.TraceFlushIntervalSeconds) * time.Second
 	traceSampler := sampler{
 		logger:               logger,
 		config:               pConfig,
 		thresholdHelper:      &thresholdsHelper,
 		topTracesMap:         &sync.Map{},
 		healthySamplingState: &sync.Map{},
-		traceFlushTicker:     clock.FromContext(ctx).NewTicker(traceFlushInterval),
+		traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Minute),
 		nextConsumer:         nextConsumer,
 		requestRegexps:       regexps,
 		stop:                 make(chan bool),

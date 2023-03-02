@@ -18,10 +18,10 @@ type Config struct {
 	RequestContextExps             *map[string]string `mapstructure:"request_context_regex"`
 	CaptureAttributesInMetric      []string           `mapstructure:"attributes_as_metric_labels"`
 	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
+	TraceFlushIntervalSeconds      int                `mapstructure:"trace_flush_interval_seconds"`
 	MaxTracesPerMinute             int                `mapstructure:"max_traces_per_minute"`
 	MaxTracesPerMinutePerContainer int                `mapstructure:"max_traces_per_minute_per_container"`
 	NormalSamplingFrequencyMinutes int                `mapstructure:"normal_trace_sampling_rate_minutes"`
-	TraceFlushIntervalSeconds      int                `mapstructure:"trace_flush_interval_seconds"`
 }
 
 // Validate implements the component.ConfigValidator interface.

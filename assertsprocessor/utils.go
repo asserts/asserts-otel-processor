@@ -52,26 +52,44 @@ func getRequest(exps *map[string]regexp.Regexp, span ptrace.Span) string {
 	return ""
 }
 
-func hasError(ctx context.Context, traces ptrace.Traces) bool {
+func spanHasError(span *ptrace.Span) bool {
 	var slice []int
-	callback := func(ns string, service string, ctx context.Context, traces ptrace.Traces, span ptrace.Span) error {
-		attributes := span.Attributes()
-		attributes.Range(func(k string, v pcommon.Value) bool {
-			if k == "error" && v.Bool() {
-				slice = append(slice, 1)
-				return false
-			} else {
-				return true
-			}
-		})
-		return nil
-	}
-	_ = spanIterator(ctx, traces, callback)
+	span.Attributes().Range(func(k string, v pcommon.Value) bool {
+		if k == "error" && v.Bool() {
+			slice = append(slice, 1)
+			return false
+		}
+		return true
+	})
 	return len(slice) > 0
 }
 
+type resourceSpanGroup struct {
+	resourceAttributes *pcommon.Map
+	rootSpans          []*ptrace.Span
+	nestedSpans        []*ptrace.Span
+	namespace          string
+	service            string
+}
+
+func (ss *resourceSpanGroup) hasError() bool {
+	for _, span := range ss.rootSpans {
+		if spanHasError(span) {
+			return true
+		}
+	}
+
+	for _, span := range ss.nestedSpans {
+		if spanHasError(span) {
+			return true
+		}
+	}
+	return false
+}
+
 func spanIterator(ctx context.Context, traces ptrace.Traces,
-	callback func(string, string, context.Context, ptrace.Traces, ptrace.Span) error) error {
+	callback func(context.Context, ptrace.Traces, []*resourceSpanGroup) error) error {
+	spanSet := make([]*resourceSpanGroup, 0)
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		resourceSpans := traces.ResourceSpans().At(i)
 		resourceAttributes := resourceSpans.Resource().Attributes()
@@ -87,18 +105,28 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 			continue
 		}
 		serviceName := serviceAttr.Str()
+
+		_spanStruct := resourceSpanGroup{
+			service:            serviceName,
+			namespace:          namespace,
+			resourceAttributes: &resourceAttributes,
+			rootSpans:          make([]*ptrace.Span, 0),
+			nestedSpans:        make([]*ptrace.Span, 0),
+		}
+		spanSet = append(spanSet, &_spanStruct)
 		ilsSlice := resourceSpans.ScopeSpans()
 		for j := 0; j < ilsSlice.Len(); j++ {
 			ils := ilsSlice.At(j)
 			spans := ils.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
-				err := callback(namespace, serviceName, ctx, traces, span)
-				if err != nil {
-					return err
+				if span.ParentSpanID().IsEmpty() {
+					_spanStruct.rootSpans = append(_spanStruct.rootSpans, &span)
+				} else {
+					_spanStruct.nestedSpans = append(_spanStruct.nestedSpans, &span)
 				}
 			}
 		}
 	}
-	return nil
+	return callback(ctx, traces, spanSet)
 }

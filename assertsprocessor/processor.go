@@ -52,14 +52,21 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 // Samples the trace if the latency threshold exceeds for the root spans.
 // Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	return spanIterator(ctx, traces, p.processSpan)
+	return spanIterator(ctx, traces, p.processSpans)
 }
 
-func (p *assertsProcessorImpl) processSpan(namespace string, serviceName string, ctx context.Context,
-	traces ptrace.Traces, span ptrace.Span) error {
-	if span.ParentSpanID().IsEmpty() {
-		p.sampler.sampleTrace(namespace, serviceName, ctx, traces, span)
+func (p *assertsProcessorImpl) processSpans(ctx context.Context,
+	traces ptrace.Traces, spanStructs []*resourceSpanGroup) error {
+	p.sampler.sampleTrace(ctx, traces, spanStructs)
+
+	for _, _spanStruct := range spanStructs {
+		for _, _span := range _spanStruct.rootSpans {
+			p.metricBuilder.captureMetrics(_spanStruct.namespace, _spanStruct.service, *_span)
+		}
+
+		for _, _span := range _spanStruct.nestedSpans {
+			p.metricBuilder.captureMetrics(_spanStruct.namespace, _spanStruct.service, *_span)
+		}
 	}
-	p.metricBuilder.captureMetrics(namespace, serviceName, span)
 	return nil
 }
