@@ -41,7 +41,7 @@ type sampler struct {
 type traceSummary struct {
 	hasError        bool
 	isSlow          bool
-	slowestRootSpan *ptrace.Span
+	slowestRootSpan ptrace.Span
 	requestKey      RequestKey
 	latency         float64
 }
@@ -68,7 +68,7 @@ func (s *sampler) sampleTrace(ctx context.Context,
 				zap.Float64("latency", summary.latency))
 			pq.slowQueue.push(&item)
 		}
-	} else if summary.slowestRootSpan != nil {
+	} else if &summary.slowestRootSpan != nil {
 		// Capture healthy samples based on configured sampling rate
 		state, _ := s.healthySamplingState.LoadOrStore(summary.requestKey.AsString(), &periodicSamplingState{
 			lastSampleTime: 0,
@@ -100,9 +100,9 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 	summary.hasError = summary.hasError || spanSet.hasError(s.logger)
 	entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
 	for _, rootSpan := range spanSet.rootSpans {
-		request := getRequest(s.requestRegexps, *rootSpan)
-		summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, *rootSpan)
-		max := math.Max(maxLatency, computeLatency(*rootSpan))
+		request := getRequest(s.requestRegexps, rootSpan)
+		summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, rootSpan)
+		max := math.Max(maxLatency, computeLatency(rootSpan))
 		if max > maxLatency {
 			maxLatency = max
 			summary.slowestRootSpan = rootSpan

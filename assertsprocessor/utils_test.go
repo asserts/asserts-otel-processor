@@ -108,10 +108,10 @@ func TestSpanIterator(t *testing.T) {
 			assert.Equal(t, "platform", spanStructs.namespace)
 			assert.Equal(t, "api-server", spanStructs.service)
 			assert.Equal(t, 1, len(spanStructs.rootSpans))
-			assert.Equal(t, rootSpan, *spanStructs.rootSpans[0])
+			assert.Equal(t, rootSpan, spanStructs.rootSpans[0])
 			assert.Equal(t, 2, len(spanStructs.nestedSpans))
-			assert.Equal(t, nestedSpan1, *spanStructs.nestedSpans[0])
-			assert.Equal(t, nestedSpan2, *spanStructs.nestedSpans[1])
+			assert.Equal(t, nestedSpan1, spanStructs.nestedSpans[0])
+			assert.Equal(t, nestedSpan2, spanStructs.nestedSpans[1])
 			return nil
 		})
 	assert.Nil(t, err)

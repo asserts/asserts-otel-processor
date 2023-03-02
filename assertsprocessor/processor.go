@@ -60,11 +60,11 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context,
 	p.sampler.sampleTrace(ctx, traces, traceId, spanSet)
 
 	for _, _span := range spanSet.rootSpans {
-		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, *_span)
+		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, _span)
 	}
 
 	for _, _span := range spanSet.nestedSpans {
-		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, *_span)
+		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, _span)
 	}
 	return nil
 }

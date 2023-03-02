@@ -4,7 +4,6 @@ import (
 	"context"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	semconv "go.opentelemetry.io/collector/semconv/v1.16.0"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
 	"regexp"
@@ -54,31 +53,26 @@ func getRequest(exps *map[string]regexp.Regexp, span ptrace.Span) string {
 }
 
 func spanHasError(span ptrace.Span, logger *zap.Logger) bool {
-	errorAtt, ok := span.Attributes().Get("error")
-	if ok && errorAtt.Bool() {
-		return true
-	}
-	errorAtt, ok = span.Attributes().Get(semconv.AttributeOtelStatusCode)
-	return ok && errorAtt.Str() == semconv.AttributeOtelStatusCodeError
+	return span.Status().Code() == ptrace.StatusCodeError
 }
 
 type resourceSpanGroup struct {
 	resourceAttributes *pcommon.Map
-	rootSpans          []*ptrace.Span
-	nestedSpans        []*ptrace.Span
+	rootSpans          []ptrace.Span
+	nestedSpans        []ptrace.Span
 	namespace          string
 	service            string
 }
 
 func (ss *resourceSpanGroup) hasError(logger *zap.Logger) bool {
 	for _, span := range ss.rootSpans {
-		if spanHasError(*span, logger) {
+		if spanHasError(span, logger) {
 			return true
 		}
 	}
 
 	for _, span := range ss.nestedSpans {
-		if spanHasError(*span, logger) {
+		if spanHasError(span, logger) {
 			return true
 		}
 	}
@@ -114,9 +108,9 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 				span := spans.At(k)
 				traceID = span.TraceID().String()
 				if span.ParentSpanID().IsEmpty() {
-					spanSet.rootSpans = append(spanSet.rootSpans, &span)
+					spanSet.rootSpans = append(spanSet.rootSpans, span)
 				} else {
-					spanSet.nestedSpans = append(spanSet.nestedSpans, &span)
+					spanSet.nestedSpans = append(spanSet.nestedSpans, span)
 				}
 			}
 		}
