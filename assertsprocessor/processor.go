@@ -56,17 +56,15 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 }
 
 func (p *assertsProcessorImpl) processSpans(ctx context.Context,
-	traces ptrace.Traces, traceId string, spanStructs []*resourceSpanGroup) error {
-	p.sampler.sampleTrace(ctx, traces, traceId, spanStructs)
+	traces ptrace.Traces, traceId string, spanSet *resourceSpanGroup) error {
+	p.sampler.sampleTrace(ctx, traces, traceId, spanSet)
 
-	for _, _spanStruct := range spanStructs {
-		for _, _span := range _spanStruct.rootSpans {
-			p.metricBuilder.captureMetrics(_spanStruct.namespace, _spanStruct.service, *_span)
-		}
+	for _, _span := range spanSet.rootSpans {
+		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, *_span)
+	}
 
-		for _, _span := range _spanStruct.nestedSpans {
-			p.metricBuilder.captureMetrics(_spanStruct.namespace, _spanStruct.service, *_span)
-		}
+	for _, _span := range spanSet.nestedSpans {
+		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, *_span)
 	}
 	return nil
 }

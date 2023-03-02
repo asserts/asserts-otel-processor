@@ -124,13 +124,11 @@ func TestSampleTraceWithError(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
-	s.sampleTrace(ctx, testTrace, "", []*resourceSpanGroup{
-		{
-			namespace: "platform", service: "api-server",
-			rootSpans:          []*ptrace.Span{&rootSpan},
-			nestedSpans:        []*ptrace.Span{&childSpan},
-			resourceAttributes: &attributes,
-		},
+	s.sampleTrace(ctx, testTrace, "", &resourceSpanGroup{
+		namespace: "platform", service: "api-server",
+		rootSpans:          []*ptrace.Span{&rootSpan},
+		nestedSpans:        []*ptrace.Span{&childSpan},
+		resourceAttributes: &attributes,
 	})
 
 	s.topTracesMap.Range(func(key any, value any) bool {
@@ -183,13 +181,11 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
-	s.sampleTrace(ctx, testTrace, "", []*resourceSpanGroup{
-		{
-			namespace: "platform", service: "api-server",
-			rootSpans:          []*ptrace.Span{&rootSpan},
-			nestedSpans:        []*ptrace.Span{&childSpan},
-			resourceAttributes: &attributes,
-		},
+	s.sampleTrace(ctx, testTrace, "", &resourceSpanGroup{
+		namespace: "platform", service: "api-server",
+		rootSpans:          []*ptrace.Span{&rootSpan},
+		nestedSpans:        []*ptrace.Span{&childSpan},
+		resourceAttributes: &attributes,
 	})
 
 	s.topTracesMap.Range(func(key any, value any) bool {
@@ -242,13 +238,11 @@ func TestSampleNormalTrace(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 2e8)
 	childSpan.SetEndTimestamp(1e9 + 3e8)
 
-	s.sampleTrace(ctx, testTrace, "", []*resourceSpanGroup{
-		{
-			namespace: "platform", service: "api-server",
-			rootSpans:          []*ptrace.Span{&rootSpan},
-			nestedSpans:        []*ptrace.Span{&childSpan},
-			resourceAttributes: &attributes,
-		},
+	s.sampleTrace(ctx, testTrace, "", &resourceSpanGroup{
+		namespace: "platform", service: "api-server",
+		rootSpans:          []*ptrace.Span{&rootSpan},
+		nestedSpans:        []*ptrace.Span{&childSpan},
+		resourceAttributes: &attributes,
 	})
 
 	s.topTracesMap.Range(func(key any, value any) bool {
@@ -301,13 +295,11 @@ func TestFlushTraces(t *testing.T) {
 	latencySpan.SetStartTimestamp(1e9)
 	latencySpan.SetEndTimestamp(1e9 + 6e8)
 
-	s.sampleTrace(ctx, latencyTrace, "", []*resourceSpanGroup{
-		{
-			namespace: "platform", service: "api-server",
-			rootSpans:          []*ptrace.Span{&latencySpan},
-			nestedSpans:        []*ptrace.Span{},
-			resourceAttributes: &attributes,
-		},
+	s.sampleTrace(ctx, latencyTrace, "", &resourceSpanGroup{
+		namespace: "platform", service: "api-server",
+		rootSpans:          []*ptrace.Span{&latencySpan},
+		nestedSpans:        []*ptrace.Span{},
+		resourceAttributes: &attributes,
 	})
 
 	errorTrace := ptrace.NewTraces()
@@ -324,13 +316,11 @@ func TestFlushTraces(t *testing.T) {
 	errorSpan.SetStartTimestamp(1e9)
 	errorSpan.SetEndTimestamp(1e9 + 3e8)
 
-	s.sampleTrace(ctx, errorTrace, "", []*resourceSpanGroup{
-		{
-			namespace: "platform", service: "api-server",
-			rootSpans:          []*ptrace.Span{&errorSpan},
-			nestedSpans:        []*ptrace.Span{},
-			resourceAttributes: &attributes,
-		},
+	s.sampleTrace(ctx, errorTrace, "", &resourceSpanGroup{
+		namespace: "platform", service: "api-server",
+		rootSpans:          []*ptrace.Span{&errorSpan},
+		nestedSpans:        []*ptrace.Span{},
+		resourceAttributes: &attributes,
 	})
 
 	normalTrace := ptrace.NewTraces()
@@ -346,13 +336,11 @@ func TestFlushTraces(t *testing.T) {
 	normalSpan.SetStartTimestamp(1e9)
 	normalSpan.SetEndTimestamp(1e9 + 3e8)
 
-	s.sampleTrace(ctx, errorTrace, "", []*resourceSpanGroup{
-		{
-			namespace: "platform", service: "api-server",
-			rootSpans:          []*ptrace.Span{&normalSpan},
-			nestedSpans:        []*ptrace.Span{},
-			resourceAttributes: &attributes,
-		},
+	s.sampleTrace(ctx, errorTrace, "", &resourceSpanGroup{
+		namespace: "platform", service: "api-server",
+		rootSpans:          []*ptrace.Span{&normalSpan},
+		nestedSpans:        []*ptrace.Span{},
+		resourceAttributes: &attributes,
 	})
 
 	counter := atomic.Int32{}

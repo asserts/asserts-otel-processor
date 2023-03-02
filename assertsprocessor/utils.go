@@ -102,8 +102,8 @@ func (ss *resourceSpanGroup) hasError(logger *zap.Logger) bool {
 }
 
 func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
-	callback func(context.Context, ptrace.Traces, string, []*resourceSpanGroup) error) error {
-	spanSet := make([]*resourceSpanGroup, 0)
+	callback func(context.Context, ptrace.Traces, string, *resourceSpanGroup) error) error {
+	var spanSet = &resourceSpanGroup{}
 	traceID := ""
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		resourceSpans := traces.ResourceSpans().At(i)
@@ -120,15 +120,8 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 			continue
 		}
 		serviceName := serviceAttr.Str()
-
-		_spanStruct := resourceSpanGroup{
-			service:            serviceName,
-			namespace:          namespace,
-			resourceAttributes: &resourceAttributes,
-			rootSpans:          make([]*ptrace.Span, 0),
-			nestedSpans:        make([]*ptrace.Span, 0),
-		}
-		spanSet = append(spanSet, &_spanStruct)
+		spanSet.namespace = namespace
+		spanSet.service = serviceName
 		ilsSlice := resourceSpans.ScopeSpans()
 		for j := 0; j < ilsSlice.Len(); j++ {
 			ils := ilsSlice.At(j)
@@ -137,18 +130,16 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 				span := spans.At(k)
 				traceID = span.TraceID().String()
 				if span.ParentSpanID().IsEmpty() {
-					_spanStruct.rootSpans = append(_spanStruct.rootSpans, &span)
+					spanSet.rootSpans = append(spanSet.rootSpans, &span)
 				} else {
-					_spanStruct.nestedSpans = append(_spanStruct.nestedSpans, &span)
+					spanSet.nestedSpans = append(spanSet.nestedSpans, &span)
 				}
 			}
 		}
 	}
-	for _, _group := range spanSet {
-		logger.Info("Span Group",
-			zap.String("Trace Id", traceID),
-			zap.Int("Root Spans", len(_group.rootSpans)),
-			zap.Int("Nested Spans", len(_group.nestedSpans)))
-	}
+	logger.Info("Span Group",
+		zap.String("Trace Id", traceID),
+		zap.Int("Root Spans", len(spanSet.rootSpans)),
+		zap.Int("Nested Spans", len(spanSet.nestedSpans)))
 	return callback(ctx, traces, traceID, spanSet)
 }

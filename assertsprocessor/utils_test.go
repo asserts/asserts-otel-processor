@@ -104,15 +104,14 @@ func TestSpanIterator(t *testing.T) {
 
 	production, _ := zap.NewProduction()
 	err := spanIterator(production, ctx, testTrace,
-		func(context context.Context, trace ptrace.Traces, traceId string, spanStructs []*resourceSpanGroup) error {
-			assert.Equal(t, 1, len(spanStructs))
-			assert.Equal(t, "platform", spanStructs[0].namespace)
-			assert.Equal(t, "api-server", spanStructs[0].service)
-			assert.Equal(t, 1, len(spanStructs[0].rootSpans))
-			assert.Equal(t, rootSpan, *spanStructs[0].rootSpans[0])
-			assert.Equal(t, 2, len(spanStructs[0].nestedSpans))
-			assert.Equal(t, nestedSpan1, *spanStructs[0].nestedSpans[0])
-			assert.Equal(t, nestedSpan2, *spanStructs[0].nestedSpans[1])
+		func(context context.Context, trace ptrace.Traces, traceId string, spanStructs *resourceSpanGroup) error {
+			assert.Equal(t, "platform", spanStructs.namespace)
+			assert.Equal(t, "api-server", spanStructs.service)
+			assert.Equal(t, 1, len(spanStructs.rootSpans))
+			assert.Equal(t, rootSpan, *spanStructs.rootSpans[0])
+			assert.Equal(t, 2, len(spanStructs.nestedSpans))
+			assert.Equal(t, nestedSpan1, *spanStructs.nestedSpans[0])
+			assert.Equal(t, nestedSpan2, *spanStructs.nestedSpans[1])
 			return nil
 		})
 	assert.Nil(t, err)

@@ -47,7 +47,7 @@ type traceSummary struct {
 }
 
 func (s *sampler) sampleTrace(ctx context.Context,
-	trace ptrace.Traces, traceId string, spanSets []*resourceSpanGroup) {
+	trace ptrace.Traces, traceId string, spanSets *resourceSpanGroup) {
 	summary := s.getSummary(traceId, spanSets)
 	item := Item{
 		trace:   &trace,
@@ -68,7 +68,7 @@ func (s *sampler) sampleTrace(ctx context.Context,
 				zap.Float64("latency", summary.latency))
 			pq.slowQueue.push(&item)
 		}
-	} else {
+	} else if summary.slowestRootSpan != nil {
 		// Capture healthy samples based on configured sampling rate
 		state, _ := s.healthySamplingState.LoadOrStore(summary.requestKey.AsString(), &periodicSamplingState{
 			lastSampleTime: 0,
@@ -92,27 +92,25 @@ func (s *sampler) sampleTrace(ctx context.Context,
 	}
 }
 
-func (s *sampler) getSummary(traceId string, spanSets []*resourceSpanGroup) *traceSummary {
+func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceSummary {
 	summary := traceSummary{}
 	summary.hasError = false
 	summary.isSlow = false
 	maxLatency := float64(0)
-	for _, spanSet := range spanSets {
-		summary.hasError = summary.hasError || spanSet.hasError(s.logger)
-		entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
-		for _, rootSpan := range spanSet.rootSpans {
-			request := getRequest(s.requestRegexps, *rootSpan)
-			summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, *rootSpan)
-			max := math.Max(maxLatency, computeLatency(*rootSpan))
-			if max > maxLatency {
-				maxLatency = max
-				summary.slowestRootSpan = rootSpan
-				summary.requestKey = RequestKey{
-					entityKey: entityKey,
-					request:   request,
-				}
-				summary.latency = maxLatency
+	summary.hasError = summary.hasError || spanSet.hasError(s.logger)
+	entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
+	for _, rootSpan := range spanSet.rootSpans {
+		request := getRequest(s.requestRegexps, *rootSpan)
+		summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, *rootSpan)
+		max := math.Max(maxLatency, computeLatency(*rootSpan))
+		if max > maxLatency {
+			maxLatency = max
+			summary.slowestRootSpan = rootSpan
+			summary.requestKey = RequestKey{
+				entityKey: entityKey,
+				request:   request,
 			}
+			summary.latency = maxLatency
 		}
 	}
 	s.logger.Info("Trace summary",
