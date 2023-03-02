@@ -55,7 +55,9 @@ func getRequest(exps *map[string]regexp.Regexp, span ptrace.Span) string {
 
 func spanHasError(span *ptrace.Span, logger *zap.Logger) bool {
 	var slice = make([]int, 0)
+	var attributeNames = ""
 	span.Attributes().Range(func(k string, v pcommon.Value) bool {
+		attributeNames = attributeNames + ", " + k
 		if k == "error" {
 			logger.Info("Error Flag",
 				zap.String("spanId", span.SpanID().String()),
@@ -75,6 +77,9 @@ func spanHasError(span *ptrace.Span, logger *zap.Logger) bool {
 		}
 		return true
 	})
+	logger.Info("Span attributes",
+		zap.String("spanId", span.SpanID().String()),
+		zap.String("attributes", attributeNames))
 	return len(slice) > 0
 }
 
