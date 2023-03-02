@@ -26,27 +26,6 @@ func (tQ *traceQueues) slowTraceCount() int {
 	return len(tQ.slowQueue.priorityQueue)
 }
 
-type periodicSamplingState struct {
-	lastSampleTime int64
-	rwMutex        *sync.RWMutex
-}
-
-func (state *periodicSamplingState) sample(everyNMinutes int) bool {
-	state.rwMutex.RLock()
-	currentTime := time.Now().Unix()
-	sampleNow := currentTime-state.lastSampleTime > int64(time.Duration(everyNMinutes)*time.Minute)
-	if sampleNow {
-		state.rwMutex.RUnlock()
-		state.rwMutex.Lock()
-		if currentTime-state.lastSampleTime > int64(time.Duration(everyNMinutes)*time.Minute) {
-			state.lastSampleTime = currentTime
-		}
-		state.rwMutex.Unlock()
-		return true
-	}
-	return false
-}
-
 type sampler struct {
 	logger               *zap.Logger
 	config               *Config
@@ -81,12 +60,12 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		if summary.hasError {
 			s.logger.Info("Capturing error trace",
 				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
-				zap.Float64("latency", computeLatency(*summary.slowestRootSpan)))
+				zap.Float64("latency", summary.latency))
 			pq.errorQueue.push(&item)
 		} else {
 			s.logger.Info("Capturing slow trace",
 				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
-				zap.Float64("latency", computeLatency(*summary.slowestRootSpan)))
+				zap.Float64("latency", summary.latency))
 			pq.slowQueue.push(&item)
 		}
 	} else {
@@ -96,6 +75,11 @@ func (s *sampler) sampleTrace(ctx context.Context,
 			rwMutex:        &sync.RWMutex{},
 		})
 		samplingState := state.(*periodicSamplingState)
+		s.logger.Info("Found Normal trace",
+			zap.String("request", summary.requestKey.AsString()),
+			zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
+			zap.Float64("latency", summary.latency),
+			zap.Time("lastSampleTime", time.Unix(samplingState.lastSampleTime, 0)))
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
 			s.logger.Info("Capturing normal trace",
 				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
@@ -113,8 +97,9 @@ func (s *sampler) getSummary(spanSets []*resourceSpanGroup) *traceSummary {
 	summary.hasError = false
 	summary.isSlow = false
 	maxLatency := float64(0)
+	traceId := spanSets[0].rootSpans[0].TraceID().String()
 	for _, spanSet := range spanSets {
-		summary.hasError = summary.hasError || spanSet.hasError()
+		summary.hasError = summary.hasError || spanSet.hasError(s.logger)
 		entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
 		for _, rootSpan := range spanSet.rootSpans {
 			request := getRequest(s.requestRegexps, *rootSpan)
@@ -131,6 +116,12 @@ func (s *sampler) getSummary(spanSets []*resourceSpanGroup) *traceSummary {
 			}
 		}
 	}
+	s.logger.Info("Trace summary",
+		zap.String("traceId", traceId),
+		zap.String("request", summary.requestKey.AsString()),
+		zap.Bool("slow", summary.isSlow),
+		zap.Bool("error", summary.hasError),
+		zap.Float64("latency", summary.latency))
 	return &summary
 }
 
