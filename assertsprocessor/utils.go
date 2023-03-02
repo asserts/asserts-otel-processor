@@ -53,34 +53,13 @@ func getRequest(exps *map[string]regexp.Regexp, span ptrace.Span) string {
 	return ""
 }
 
-func spanHasError(span *ptrace.Span, logger *zap.Logger) bool {
-	var slice = make([]int, 0)
-	var attributeNames = ""
-	span.Attributes().Range(func(k string, v pcommon.Value) bool {
-		attributeNames = attributeNames + ", " + k
-		if k == "error" {
-			logger.Info("Error Flag",
-				zap.String("spanId", span.SpanID().String()),
-				zap.String("error", v.AsString()))
-			if v.AsString() == "true" {
-				slice = append(slice, 1)
-				return false
-			}
-		} else if k == semconv.AttributeOtelStatusCode {
-			logger.Info("Error Flag",
-				zap.String("spanId", span.SpanID().String()),
-				zap.String("error", v.AsString()))
-			if v.Str() == semconv.AttributeOtelStatusCodeError {
-				slice = append(slice, 1)
-				return false
-			}
-		}
+func spanHasError(span ptrace.Span, logger *zap.Logger) bool {
+	errorAtt, ok := span.Attributes().Get("error")
+	if ok && errorAtt.Bool() {
 		return true
-	})
-	logger.Info("Span attributes",
-		zap.String("spanId", span.SpanID().String()),
-		zap.String("attributes", attributeNames))
-	return len(slice) > 0
+	}
+	errorAtt, ok = span.Attributes().Get(semconv.AttributeOtelStatusCode)
+	return ok && errorAtt.Str() == semconv.AttributeOtelStatusCodeError
 }
 
 type resourceSpanGroup struct {
@@ -93,13 +72,13 @@ type resourceSpanGroup struct {
 
 func (ss *resourceSpanGroup) hasError(logger *zap.Logger) bool {
 	for _, span := range ss.rootSpans {
-		if spanHasError(span, logger) {
+		if spanHasError(*span, logger) {
 			return true
 		}
 	}
 
 	for _, span := range ss.nestedSpans {
-		if spanHasError(span, logger) {
+		if spanHasError(*span, logger) {
 			return true
 		}
 	}
