@@ -47,8 +47,8 @@ type traceSummary struct {
 }
 
 func (s *sampler) sampleTrace(ctx context.Context,
-	trace ptrace.Traces, traceId string, spanSets *resourceSpanGroup) {
-	summary := s.getSummary(traceId, spanSets)
+	trace ptrace.Traces, traceId string, spanSet *resourceSpanGroup) {
+	summary := s.getSummary(traceId, spanSet)
 	item := Item{
 		trace:   &trace,
 		ctx:     &ctx,
@@ -68,7 +68,7 @@ func (s *sampler) sampleTrace(ctx context.Context,
 				zap.Float64("latency", summary.latency))
 			pq.slowQueue.push(&item)
 		}
-	} else if &summary.slowestRootSpan != nil {
+	} else if len(spanSet.rootSpans) > 0 {
 		// Capture healthy samples based on configured sampling rate
 		state, _ := s.healthySamplingState.LoadOrStore(summary.requestKey.AsString(), &periodicSamplingState{
 			lastSampleTime: 0,
