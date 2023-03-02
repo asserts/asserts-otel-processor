@@ -52,12 +52,12 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 // Samples the trace if the latency threshold exceeds for the root spans.
 // Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	return spanIterator(ctx, traces, p.processSpans)
+	return spanIterator(p.logger, ctx, traces, p.processSpans)
 }
 
 func (p *assertsProcessorImpl) processSpans(ctx context.Context,
-	traces ptrace.Traces, spanStructs []*resourceSpanGroup) error {
-	p.sampler.sampleTrace(ctx, traces, spanStructs)
+	traces ptrace.Traces, traceId string, spanStructs []*resourceSpanGroup) error {
+	p.sampler.sampleTrace(ctx, traces, traceId, spanStructs)
 
 	for _, _spanStruct := range spanStructs {
 		for _, _span := range _spanStruct.rootSpans {

@@ -102,8 +102,9 @@ func TestSpanIterator(t *testing.T) {
 	nestedSpan2.SetParentSpanID(rootSpan.SpanID())
 	nestedSpan2.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	err := spanIterator(ctx, testTrace,
-		func(context context.Context, trace ptrace.Traces, spanStructs []*resourceSpanGroup) error {
+	production, _ := zap.NewProduction()
+	err := spanIterator(production, ctx, testTrace,
+		func(context context.Context, trace ptrace.Traces, traceId string, spanStructs []*resourceSpanGroup) error {
 			assert.Equal(t, 1, len(spanStructs))
 			assert.Equal(t, "platform", spanStructs[0].namespace)
 			assert.Equal(t, "api-server", spanStructs[0].service)

@@ -101,9 +101,10 @@ func (ss *resourceSpanGroup) hasError(logger *zap.Logger) bool {
 	return false
 }
 
-func spanIterator(ctx context.Context, traces ptrace.Traces,
-	callback func(context.Context, ptrace.Traces, []*resourceSpanGroup) error) error {
+func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
+	callback func(context.Context, ptrace.Traces, string, []*resourceSpanGroup) error) error {
 	spanSet := make([]*resourceSpanGroup, 0)
+	traceID := ""
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		resourceSpans := traces.ResourceSpans().At(i)
 		resourceAttributes := resourceSpans.Resource().Attributes()
@@ -134,6 +135,7 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 			spans := ils.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
+				traceID = span.TraceID().String()
 				if span.ParentSpanID().IsEmpty() {
 					_spanStruct.rootSpans = append(_spanStruct.rootSpans, &span)
 				} else {
@@ -142,5 +144,11 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 			}
 		}
 	}
-	return callback(ctx, traces, spanSet)
+	for _, _group := range spanSet {
+		logger.Info("Span Group",
+			zap.String("Trace Id", traceID),
+			zap.Int("Root Spans", len(_group.rootSpans)),
+			zap.Int("Nested Spans", len(_group.nestedSpans)))
+	}
+	return callback(ctx, traces, traceID, spanSet)
 }

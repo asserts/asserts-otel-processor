@@ -47,8 +47,8 @@ type traceSummary struct {
 }
 
 func (s *sampler) sampleTrace(ctx context.Context,
-	trace ptrace.Traces, spanSets []*resourceSpanGroup) {
-	summary := s.getSummary(spanSets)
+	trace ptrace.Traces, traceId string, spanSets []*resourceSpanGroup) {
+	summary := s.getSummary(traceId, spanSets)
 	item := Item{
 		trace:   &trace,
 		ctx:     &ctx,
@@ -92,12 +92,11 @@ func (s *sampler) sampleTrace(ctx context.Context,
 	}
 }
 
-func (s *sampler) getSummary(spanSets []*resourceSpanGroup) *traceSummary {
+func (s *sampler) getSummary(traceId string, spanSets []*resourceSpanGroup) *traceSummary {
 	summary := traceSummary{}
 	summary.hasError = false
 	summary.isSlow = false
 	maxLatency := float64(0)
-	traceId := spanSets[0].rootSpans[0].TraceID().String()
 	for _, spanSet := range spanSets {
 		summary.hasError = summary.hasError || spanSet.hasError(s.logger)
 		entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
