@@ -4,8 +4,8 @@ dist:
   description: Local OpenTelemetry Collector binary, testing only.
   version: 0.71.0-dev
   otelcol_version: 0.71.0
-  output_path: ./build
-  #debug_compilation: true
+  output_path: /Users/radhakrishnanj/asserts/github/asserts-otel-processor/build
+  debug_compilation: true
 
 receivers:
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.71.0
@@ -20,7 +20,7 @@ extensions:
 processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.71.0
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.71.0
-  - gomod: github.com/asserts/asserts-otel-processor/assertsprocessor v0.0.36
+  - gomod: github.com/asserts/asserts-otel-processor/assertsprocessor v0.0.46
 connectors:
   - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.71.0
 
