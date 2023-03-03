@@ -52,7 +52,7 @@ func getRequest(exps *map[string]*regexp.Regexp, span ptrace.Span) string {
 	return ""
 }
 
-func spanHasError(span ptrace.Span, logger *zap.Logger) bool {
+func spanHasError(span ptrace.Span) bool {
 	return span.Status().Code() == ptrace.StatusCodeError
 }
 
@@ -64,15 +64,15 @@ type resourceSpanGroup struct {
 	service            string
 }
 
-func (ss *resourceSpanGroup) hasError(logger *zap.Logger) bool {
+func (ss *resourceSpanGroup) hasError() bool {
 	for _, span := range ss.rootSpans {
-		if spanHasError(span, logger) {
+		if spanHasError(span) {
 			return true
 		}
 	}
 
 	for _, span := range ss.nestedSpans {
-		if spanHasError(span, logger) {
+		if spanHasError(span) {
 			return true
 		}
 	}

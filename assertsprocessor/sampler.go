@@ -97,7 +97,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 	summary.hasError = false
 	summary.isSlow = false
 	maxLatency := float64(0)
-	summary.hasError = summary.hasError || spanSet.hasError(s.logger)
+	summary.hasError = summary.hasError || spanSet.hasError()
 	entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
 	for _, rootSpan := range spanSet.rootSpans {
 		request := getRequest(s.requestRegexps, rootSpan)
