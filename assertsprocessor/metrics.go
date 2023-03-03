@@ -17,7 +17,7 @@ type metricHelper struct {
 	config                *Config
 	prometheusRegistry    *prometheus.Registry
 	latencyHistogram      *prometheus.HistogramVec
-	attributeValueRegExps *map[string]regexp.Regexp
+	attributeValueRegExps *map[string]*regexp.Regexp
 }
 
 func (p *metricHelper) compileSpanFilterRegexps() error {
@@ -27,7 +27,7 @@ func (p *metricHelper) compileSpanFilterRegexps() error {
 		if err != nil {
 			return err
 		}
-		(*p.attributeValueRegExps)[attName] = *compile
+		(*p.attributeValueRegExps)[attName] = compile
 	}
 	p.logger.Debug("consumer.Start compiled regexps successfully")
 	return nil

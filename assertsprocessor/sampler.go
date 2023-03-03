@@ -35,7 +35,7 @@ type sampler struct {
 	traceFlushTicker     *clock.Ticker
 	nextConsumer         consumer.Traces
 	stop                 chan bool
-	requestRegexps       *map[string]regexp.Regexp
+	requestRegexps       *map[string]*regexp.Regexp
 }
 
 type traceSummary struct {
@@ -164,7 +164,7 @@ func (s *sampler) flushTraces() {
 						zap.String("Request", requestKey),
 						zap.Int("Count", len(q.errorQueue.priorityQueue)))
 					for _, item := range q.errorQueue.priorityQueue {
-						_ = s.nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+						_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
 					}
 				}
 
@@ -187,7 +187,7 @@ func (s *sampler) flushTraces() {
 					zap.String("Service", entityKey),
 					zap.Int("Count", len(q.priorityQueue)))
 				for _, tp := range q.priorityQueue {
-					_ = s.nextConsumer.ConsumeTraces(*tp.ctx, *tp.trace)
+					_ = (*s).nextConsumer.ConsumeTraces(*tp.ctx, *tp.trace)
 				}
 			}
 		}

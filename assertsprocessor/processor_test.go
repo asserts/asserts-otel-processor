@@ -51,7 +51,7 @@ func TestStart(t *testing.T) {
 		metricBuilder: &metricHelper{
 			logger:                testLogger,
 			config:                &testConfig,
-			attributeValueRegExps: &map[string]regexp.Regexp{},
+			attributeValueRegExps: &map[string]*regexp.Regexp{},
 		},
 		thresholdsHelper: &_th,
 		sampler: &sampler{
@@ -63,7 +63,7 @@ func TestStart(t *testing.T) {
 			stop:                 make(chan bool),
 			traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:      &_th,
-			requestRegexps:       &map[string]regexp.Regexp{},
+			requestRegexps:       &map[string]*regexp.Regexp{},
 		},
 	}
 	assert.Nil(t, p.Start(ctx, nil))
@@ -128,7 +128,7 @@ func TestConsumeTraces(t *testing.T) {
 		metricBuilder: &metricHelper{
 			logger:                testLogger,
 			config:                &testConfig,
-			attributeValueRegExps: &map[string]regexp.Regexp{},
+			attributeValueRegExps: &map[string]*regexp.Regexp{},
 		},
 		thresholdsHelper: &_th,
 		sampler: &sampler{
@@ -140,7 +140,7 @@ func TestConsumeTraces(t *testing.T) {
 			stop:                 make(chan bool),
 			traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:      &_th,
-			requestRegexps:       &map[string]regexp.Regexp{},
+			requestRegexps:       &map[string]*regexp.Regexp{},
 		},
 	}
 

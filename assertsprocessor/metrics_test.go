@@ -21,7 +21,7 @@ func TestShouldCaptureMetrics(t *testing.T) {
 				"rpc.service": "(Sqs)|(DynamoDb)",
 			},
 		},
-		attributeValueRegExps: &map[string]regexp.Regexp{},
+		attributeValueRegExps: &map[string]*regexp.Regexp{},
 	}
 
 	err := p.compileSpanFilterRegexps()
@@ -51,9 +51,9 @@ func TestBuildLabels(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]regexp.Regexp{
-			"rpc.system":  *systemPattern,
-			"rpc.service": *servicePattern,
+		attributeValueRegExps: &map[string]*regexp.Regexp{
+			"rpc.system":  systemPattern,
+			"rpc.service": servicePattern,
 		},
 		config: &Config{
 			Env:  "dev",
@@ -90,9 +90,9 @@ func TestCaptureMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]regexp.Regexp{
-			"rpc.system":  *systemPattern,
-			"rpc.service": *servicePattern,
+		attributeValueRegExps: &map[string]*regexp.Regexp{
+			"rpc.system":  systemPattern,
+			"rpc.service": servicePattern,
 		},
 		config: &Config{
 			Env:  "dev",
@@ -134,9 +134,9 @@ func TestStartExporter(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]regexp.Regexp{
-			"rpc.system":  *systemPattern,
-			"rpc.service": *servicePattern,
+		attributeValueRegExps: &map[string]*regexp.Regexp{
+			"rpc.system":  systemPattern,
+			"rpc.service": servicePattern,
 		},
 		config: &Config{
 			Env:  "dev",
