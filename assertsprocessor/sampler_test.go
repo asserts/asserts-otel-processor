@@ -48,7 +48,7 @@ func TestLatencyIsHighTrue(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 
-	assert.True(t, s.isSlow("platform", "api-server", testSpan))
+	assert.True(t, s.isSlow("platform", "api-server", testSpan, "/api"))
 }
 
 func TestLatencyIsHighFalse(t *testing.T) {
@@ -62,7 +62,7 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
 
-	assert.False(t, s.isSlow("platform", "api-server", testSpan))
+	assert.False(t, s.isSlow("platform", "api-server", testSpan, "/api"))
 }
 
 func TestGetTracesQueue(t *testing.T) {
@@ -191,7 +191,7 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	s.topTracesMap.Range(func(key any, value any) bool {
 		stringKey := key.(string)
 		traceQueue := *value.(*traceQueues)
-		assert.Equal(t, "{, env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
 		assert.Equal(t, 1, traceQueue.slowTraceCount())
 		assert.Equal(t, 0, traceQueue.errorTraceCount())
 		item := *traceQueue.slowQueue.priorityQueue[0]
@@ -248,7 +248,7 @@ func TestSampleNormalTrace(t *testing.T) {
 	s.topTracesMap.Range(func(key any, value any) bool {
 		stringKey := key.(string)
 		traceQueue := *value.(*traceQueues)
-		assert.Equal(t, "{, env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
 		assert.Equal(t, 1, traceQueue.slowTraceCount())
 		assert.Equal(t, 0, traceQueue.errorTraceCount())
 		item := *traceQueue.slowQueue.priorityQueue[0]

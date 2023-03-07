@@ -103,7 +103,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 	entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
 	for _, rootSpan := range spanSet.rootSpans {
 		request := getRequest(s.requestRegexps, rootSpan)
-		summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, rootSpan)
+		summary.isSlow = summary.isSlow || s.isSlow(spanSet.namespace, spanSet.service, rootSpan, request)
 		max := math.Max(maxLatency, computeLatency(rootSpan))
 		if max > maxLatency {
 			maxLatency = max
@@ -132,9 +132,13 @@ func (s *sampler) getTraceQueues(key RequestKey) *traceQueues {
 	return pq.(*traceQueues)
 }
 
-func (s *sampler) isSlow(namespace string, serviceName string, rootSpan ptrace.Span) bool {
+func (s *sampler) isSlow(namespace string, serviceName string, rootSpan ptrace.Span, request string) bool {
 	spanDuration := computeLatency(rootSpan)
-	threshold := s.thresholdHelper.getThreshold(namespace, serviceName, rootSpan.Name())
+	threshold := s.thresholdHelper.getThreshold(namespace, serviceName, request)
+	s.logger.Debug("Slow check ",
+		zap.String("traceId", rootSpan.TraceID().String()),
+		zap.Float64("latency", spanDuration),
+		zap.Float64("threshold", threshold))
 	return spanDuration > threshold
 }
 
