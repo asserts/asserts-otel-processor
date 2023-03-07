@@ -49,20 +49,22 @@ func (th *thresholdHelper) startUpdates() {
 	config := *th.config
 	endPoint := (*config.AssertsServer)["endpoint"]
 	if endPoint != "" {
-		for {
-			select {
-			case <-th.stop:
-				th.logger.Info("Stopping threshold updates")
-				return
-			case <-th.thresholdSyncTicker.C:
-				th.logger.Debug("Fetching thresholds")
-				th.entityKeys.Range(func(key any, value any) bool {
-					entityKey := value.(EntityKeyDto)
-					th.updateThresholdsAsync(entityKey)
-					return true
-				})
+		go func() {
+			for {
+				select {
+				case <-th.stop:
+					th.logger.Info("Stopping threshold updates")
+					return
+				case <-th.thresholdSyncTicker.C:
+					th.logger.Debug("Fetching thresholds")
+					th.entityKeys.Range(func(key any, value any) bool {
+						entityKey := value.(EntityKeyDto)
+						th.updateThresholdsAsync(entityKey)
+						return true
+					})
+				}
 			}
-		}
+		}()
 	}
 }
 

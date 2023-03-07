@@ -146,39 +146,41 @@ func (s *sampler) stopTraceFlusher() {
 }
 
 func (s *sampler) startTraceFlusher() {
-	for {
-		select {
-		case <-s.stop:
-			s.logger.Info("Trace flush background routine stopped")
-			return
-		case <-s.traceFlushTicker.C:
-			var previousTraces = s.topTracesMap
-			s.topTracesMap = &sync.Map{}
-			previousTraces.Range(func(key any, value any) bool {
-				var requestKey = key.(string)
-				var q = value.(*traceQueues)
+	go func() {
+		for {
+			select {
+			case <-s.stop:
+				s.logger.Info("Trace flush background routine stopped")
+				return
+			case <-s.traceFlushTicker.C:
+				var previousTraces = s.topTracesMap
+				s.topTracesMap = &sync.Map{}
+				previousTraces.Range(func(key any, value any) bool {
+					var requestKey = key.(string)
+					var q = value.(*traceQueues)
 
-				// Flush all the errors
-				if len(q.errorQueue.priorityQueue) > 0 {
-					s.logger.Debug("Flushing Error Traces for",
-						zap.String("Request", requestKey),
-						zap.Int("Count", len(q.errorQueue.priorityQueue)))
-					for _, item := range q.errorQueue.priorityQueue {
-						_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+					// Flush all the errors
+					if len(q.errorQueue.priorityQueue) > 0 {
+						s.logger.Debug("Flushing Error Traces for",
+							zap.String("Request", requestKey),
+							zap.Int("Count", len(q.errorQueue.priorityQueue)))
+						for _, item := range q.errorQueue.priorityQueue {
+							_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+						}
 					}
-				}
 
-				// Flush all the slow traces
-				if len(q.slowQueue.priorityQueue) > 0 {
-					s.logger.Debug("Flushing Slow Traces for",
-						zap.String("Request", requestKey),
-						zap.Int("Count", len(q.slowQueue.priorityQueue)))
-					for _, item := range q.slowQueue.priorityQueue {
-						_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+					// Flush all the slow traces
+					if len(q.slowQueue.priorityQueue) > 0 {
+						s.logger.Debug("Flushing Slow Traces for",
+							zap.String("Request", requestKey),
+							zap.Int("Count", len(q.slowQueue.priorityQueue)))
+						for _, item := range q.slowQueue.priorityQueue {
+							_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+						}
 					}
-				}
-				return true
-			})
+					return true
+				})
+			}
 		}
-	}
+	}()
 }

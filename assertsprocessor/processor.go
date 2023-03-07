@@ -30,7 +30,7 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 	if err := p.metricBuilder.compileSpanFilterRegexps(); err != nil {
 		return err
 	}
-	go p.sampler.startProcessing()
+	p.sampler.startProcessing()
 	return nil
 }
 
