@@ -25,8 +25,8 @@ var testConfig = Config{
 	},
 	CaptureAttributesInMetric:      []string{"attribute"},
 	DefaultLatencyThreshold:        0.5,
-	MaxTracesPerMinute:             100,
-	MaxTracesPerMinutePerContainer: 5,
+	LimitPerService:                100,
+	LimitPerRequestPerService:      5,
 	NormalSamplingFrequencyMinutes: 5,
 }
 

@@ -32,7 +32,7 @@ func TestDefaultConfig(t *testing.T) {
 	var pConfig = defaultConfig.(*Config)
 	assert.Equal(t, "dev", pConfig.Env)
 	assert.Equal(t, "us-west-2", pConfig.Site)
-	assert.Equal(t, 100, pConfig.MaxTracesPerMinute)
+	assert.Equal(t, 100, pConfig.LimitPerService)
 	assert.Equal(t, 0.5, pConfig.DefaultLatencyThreshold)
 }
 

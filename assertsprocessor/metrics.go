@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -109,7 +110,7 @@ func (p *metricHelper) buildHistogram() error {
 
 func (p *metricHelper) startExporter() {
 	s := &http.Server{
-		Addr:           ":9465",
+		Addr:           ":" + strconv.FormatUint(p.config.PrometheusExporterPort, 10),
 		ReadTimeout:    30 * time.Second,
 		WriteTimeout:   30 * time.Second,
 		MaxHeaderBytes: 1 << 20,
@@ -127,7 +128,7 @@ func (p *metricHelper) startExporter() {
 		promhttp.HandlerOpts{},
 	))
 
-	p.logger.Info("Starting Prometheus Exporter Listening on port 9465")
+	p.logger.Info("Starting Prometheus Exporter Listening", zap.Uint64("port", p.config.PrometheusExporterPort))
 	p.logger.Fatal("Error starting Prometheus Server", zap.Error(s.ListenAndServe()))
 }
 

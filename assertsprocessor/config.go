@@ -1,6 +1,7 @@
 package assertsprocessor
 
 import (
+	"fmt"
 	"regexp"
 )
 
@@ -18,9 +19,10 @@ type Config struct {
 	RequestContextExps             *map[string]string `mapstructure:"request_context_regex"`
 	CaptureAttributesInMetric      []string           `mapstructure:"attributes_as_metric_labels"`
 	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
-	MaxTracesPerMinute             int                `mapstructure:"max_traces_per_minute"`
-	MaxTracesPerMinutePerContainer int                `mapstructure:"max_traces_per_minute_per_container"`
+	LimitPerService                int                `mapstructure:"trace_rate_limit_per_service"`
+	LimitPerRequestPerService      int                `mapstructure:"trace_rate_limit_per_service_per_request"`
 	NormalSamplingFrequencyMinutes int                `mapstructure:"normal_trace_sampling_rate_minutes"`
+	PrometheusExporterPort         uint64             `mapstructure:"prometheus_exporter_port"`
 }
 
 // Validate implements the component.ConfigValidator interface.
@@ -39,5 +41,21 @@ func (config *Config) Validate() error {
 			return err
 		}
 	}
+
+	if config.LimitPerService < config.LimitPerRequestPerService {
+		return ValidationError{
+			message: fmt.Sprintf("LimitPerService: %d < LimitPerRequestPerService: %d",
+				config.LimitPerService, config.LimitPerRequestPerService),
+		}
+	}
 	return nil
+}
+
+type ValidationError struct {
+	message string
+	error
+}
+
+func (v ValidationError) Error() string {
+	return v.message
 }

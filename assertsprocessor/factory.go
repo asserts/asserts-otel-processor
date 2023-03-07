@@ -36,9 +36,10 @@ func createDefaultConfig() component.Config {
 		Env:                            "dev",
 		Site:                           "us-west-2",
 		DefaultLatencyThreshold:        0.5,
-		MaxTracesPerMinute:             100,
-		MaxTracesPerMinutePerContainer: 5,
+		LimitPerService:                100,
+		LimitPerRequestPerService:      5,
 		NormalSamplingFrequencyMinutes: 5,
+		PrometheusExporterPort:         9465,
 	}
 }
 

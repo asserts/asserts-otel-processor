@@ -32,7 +32,10 @@ processors:
      - "rpc.method"
      - "aws.table.name"
      - "aws.queue.url"
-service:
+service: 
+  telemetry:
+    logs: 
+      level: "debug"
   pipelines:
     traces:
       receivers: [otlp]

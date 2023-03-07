@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap"
 	"math"
 	"regexp"
-	"strings"
 	"sync"
 )
 
@@ -126,8 +125,8 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 
 func (s *sampler) getTraceQueues(key RequestKey) *traceQueues {
 	var pq, _ = s.topTracesMap.LoadOrStore(key.AsString(), &traceQueues{
-		slowQueue:  NewTraceQueue(int(math.Min(5, float64(s.config.MaxTracesPerMinutePerContainer)))),
-		errorQueue: NewTraceQueue(int(math.Min(5, float64(s.config.MaxTracesPerMinutePerContainer)))),
+		slowQueue:  NewTraceQueue(int(math.Min(5, float64(s.config.LimitPerRequestPerService)))),
+		errorQueue: NewTraceQueue(int(math.Min(5, float64(s.config.LimitPerRequestPerService)))),
 	})
 	return pq.(*traceQueues)
 }
@@ -155,13 +154,8 @@ func (s *sampler) startTraceFlusher() {
 		case <-s.traceFlushTicker.C:
 			var previousTraces = s.topTracesMap
 			s.topTracesMap = &sync.Map{}
-			var serviceQueues = map[string]*TraceQueue{}
 			previousTraces.Range(func(key any, value any) bool {
 				var requestKey = key.(string)
-				var scopeString, part1, _ = strings.Cut(requestKey, "#")
-				var typeName, part2, _ = strings.Cut(part1, "#")
-				var name, _, _ = strings.Cut(part2, "#")
-				var entityKey = scopeString + "#" + typeName + "#" + name
 				var q = value.(*traceQueues)
 
 				// Flush all the errors
@@ -174,28 +168,17 @@ func (s *sampler) startTraceFlusher() {
 					}
 				}
 
+				// Flush all the slow traces
 				if len(q.slowQueue.priorityQueue) > 0 {
-					serviceQueue := serviceQueues[entityKey]
-					if serviceQueue == nil {
-						serviceQueue = NewTraceQueue(s.config.MaxTracesPerMinute)
-						serviceQueues[entityKey] = serviceQueue
-					}
+					s.logger.Debug("Flushing Slow Traces for",
+						zap.String("Request", requestKey),
+						zap.Int("Count", len(q.slowQueue.priorityQueue)))
 					for _, item := range q.slowQueue.priorityQueue {
-						serviceQueue.push(item)
+						_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
 					}
 				}
 				return true
 			})
-
-			// Drain the latency queue
-			for entityKey, q := range serviceQueues {
-				s.logger.Debug("Flushing Slow Traces",
-					zap.String("Service", entityKey),
-					zap.Int("Count", len(q.priorityQueue)))
-				for _, tp := range q.priorityQueue {
-					_ = (*s).nextConsumer.ConsumeTraces(*tp.ctx, *tp.trace)
-				}
-			}
 		}
 	}
 }

@@ -16,12 +16,12 @@ import (
 
 var logger, _ = zap.NewProduction()
 var config = Config{
-	Env:                            "dev",
-	Site:                           "us-west-2",
-	AssertsServer:                  &map[string]string{"endpoint": "http://localhost:8030"},
-	DefaultLatencyThreshold:        0.5,
-	MaxTracesPerMinute:             100,
-	MaxTracesPerMinutePerContainer: 5,
+	Env:                       "dev",
+	Site:                      "us-west-2",
+	AssertsServer:             &map[string]string{"endpoint": "http://localhost:8030"},
+	DefaultLatencyThreshold:   0.5,
+	LimitPerService:           100,
+	LimitPerRequestPerService: 5,
 }
 
 var th = thresholdHelper{

@@ -139,8 +139,9 @@ func TestStartExporter(t *testing.T) {
 			"rpc.service": servicePattern,
 		},
 		config: &Config{
-			Env:  "dev",
-			Site: "us-west-2",
+			Env:                    "dev",
+			Site:                   "us-west-2",
+			PrometheusExporterPort: 19465,
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
 				"aws.table.name", "aws.queue.url"},
 		},
