@@ -40,10 +40,10 @@ processors:
      - "aws.queue.url"
     # Default threshold to identify slow trace
     sampling_latency_threshold_seconds: 0.5
+    # Max traces per service
+    trace_rate_limit_per_service: 100
     # Max traces per request
-    max_traces_per_minute: 100
-    # Max traces per container per minute. This overrides the per request limit
-    max_traces_per_minute_per_container: 100
+    trace_rate_limit_per_service_per_request: 5
     normal_trace_sampling_rate_minutes: 5
     trace_flush_interval_seconds: 15
 ```
