@@ -53,7 +53,6 @@ func TestStart(t *testing.T) {
 			config:                &testConfig,
 			attributeValueRegExps: &map[string]*regexp.Regexp{},
 		},
-		thresholdsHelper: &_th,
 		sampler: &sampler{
 			logger:               testLogger,
 			config:               &testConfig,
@@ -130,7 +129,6 @@ func TestConsumeTraces(t *testing.T) {
 			config:                &testConfig,
 			attributeValueRegExps: &map[string]*regexp.Regexp{},
 		},
-		thresholdsHelper: &_th,
 		sampler: &sampler{
 			logger:               testLogger,
 			config:               &testConfig,

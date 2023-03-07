@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 )
 
 type traceQueues struct {
@@ -46,6 +45,16 @@ type traceSummary struct {
 	latency         float64
 }
 
+func (s *sampler) startProcessing() {
+	s.thresholdHelper.startUpdates()
+	s.startTraceFlusher()
+}
+
+func (s *sampler) stopProcessing() {
+	s.thresholdHelper.stopUpdates()
+	s.stopTraceFlusher()
+}
+
 func (s *sampler) sampleTrace(ctx context.Context,
 	trace ptrace.Traces, traceId string, spanSet *resourceSpanGroup) {
 	summary := s.getSummary(traceId, spanSet)
@@ -58,30 +67,25 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		// Get the trace queue for the entity and request
 		pq := s.getTraceQueues(summary.requestKey)
 		if summary.hasError {
-			s.logger.Info("Capturing error trace",
+			s.logger.Debug("Capturing error trace",
 				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
 				zap.Float64("latency", summary.latency))
 			pq.errorQueue.push(&item)
 		} else {
-			s.logger.Info("Capturing slow trace",
+			s.logger.Debug("Capturing slow trace",
 				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
 				zap.Float64("latency", summary.latency))
 			pq.slowQueue.push(&item)
 		}
-	} else if len(spanSet.rootSpans) > 0 {
+	} else if len(spanSet.rootSpans) > 0 && summary.requestKey.AsString() != "" {
 		// Capture healthy samples based on configured sampling rate
 		state, _ := s.healthySamplingState.LoadOrStore(summary.requestKey.AsString(), &periodicSamplingState{
 			lastSampleTime: 0,
 			rwMutex:        &sync.RWMutex{},
 		})
 		samplingState := state.(*periodicSamplingState)
-		s.logger.Info("Found Normal trace",
-			zap.String("request", summary.requestKey.AsString()),
-			zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
-			zap.Float64("latency", summary.latency),
-			zap.Time("lastSampleTime", time.Unix(samplingState.lastSampleTime, 0)))
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
-			s.logger.Info("Capturing normal trace",
+			s.logger.Debug("Capturing normal trace",
 				zap.String("traceId", summary.slowestRootSpan.TraceID().String()),
 				zap.Float64("latency", summary.latency))
 			pq := s.getTraceQueues(summary.requestKey)
@@ -94,8 +98,6 @@ func (s *sampler) sampleTrace(ctx context.Context,
 
 func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceSummary {
 	summary := traceSummary{}
-	summary.hasError = false
-	summary.isSlow = false
 	maxLatency := float64(0)
 	summary.hasError = summary.hasError || spanSet.hasError()
 	entityKey := buildEntityKey(s.config, spanSet.namespace, spanSet.service)
@@ -113,7 +115,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 			summary.latency = maxLatency
 		}
 	}
-	s.logger.Info("Trace summary",
+	s.logger.Debug("Trace summary",
 		zap.String("traceId", traceId),
 		zap.String("request", summary.requestKey.AsString()),
 		zap.Bool("slow", summary.isSlow),
@@ -136,11 +138,11 @@ func (s *sampler) isSlow(namespace string, serviceName string, rootSpan ptrace.S
 	return spanDuration > threshold
 }
 
-func (s *sampler) stopFlushing() {
-	func() { s.stop <- true }()
+func (s *sampler) stopTraceFlusher() {
+	go func() { s.stop <- true }()
 }
 
-func (s *sampler) flushTraces() {
+func (s *sampler) startTraceFlusher() {
 	for {
 		select {
 		case <-s.stop:
@@ -160,7 +162,7 @@ func (s *sampler) flushTraces() {
 
 				// Flush all the errors
 				if len(q.errorQueue.priorityQueue) > 0 {
-					s.logger.Info("Flushing Error Traces for",
+					s.logger.Debug("Flushing Error Traces for",
 						zap.String("Request", requestKey),
 						zap.Int("Count", len(q.errorQueue.priorityQueue)))
 					for _, item := range q.errorQueue.priorityQueue {
@@ -183,7 +185,7 @@ func (s *sampler) flushTraces() {
 
 			// Drain the latency queue
 			for entityKey, q := range serviceQueues {
-				s.logger.Info("Flushing Slow Traces",
+				s.logger.Debug("Flushing Slow Traces",
 					zap.String("Service", entityKey),
 					zap.Int("Count", len(q.priorityQueue)))
 				for _, tp := range q.priorityQueue {

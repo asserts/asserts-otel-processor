@@ -49,7 +49,7 @@ func getRequest(exps *map[string]*regexp.Regexp, span ptrace.Span) string {
 			}
 		}
 	}
-	return ""
+	return span.Name()
 }
 
 func spanHasError(span ptrace.Span) bool {
@@ -87,16 +87,19 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 		resourceSpans := traces.ResourceSpans().At(i)
 		resourceAttributes := resourceSpans.Resource().Attributes()
 
+		// service is a required attribute
+		serviceAttr, found := resourceAttributes.Get(conventions.AttributeServiceName)
+		if !found {
+			continue
+		}
+
+		// namespace is an optional attribute
 		var namespace string
 		namespaceAttr, found := resourceAttributes.Get(conventions.AttributeServiceNamespace)
 		if found {
 			namespace = namespaceAttr.Str()
 		}
 
-		serviceAttr, found := resourceAttributes.Get(conventions.AttributeServiceName)
-		if !found {
-			continue
-		}
 		serviceName := serviceAttr.Str()
 		spanSet.namespace = namespace
 		spanSet.service = serviceName
@@ -115,7 +118,7 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 			}
 		}
 	}
-	logger.Info("Span Group",
+	logger.Debug("Span Group",
 		zap.String("Trace Id", traceID),
 		zap.Int("Root Spans", len(spanSet.rootSpans)),
 		zap.Int("Nested Spans", len(spanSet.nestedSpans)))

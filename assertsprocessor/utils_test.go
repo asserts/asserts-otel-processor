@@ -71,13 +71,14 @@ func TestGetExpMatch(t *testing.T) {
 
 func TestGetExpNoMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
+	testSpan.SetName("BackgroundJob")
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")
 	value := getRequest(&map[string]*regexp.Regexp{
 		"http.url": compile,
 	}, testSpan)
-	assert.Equal(t, "", value)
+	assert.Equal(t, "BackgroundJob", value)
 }
 
 func TestSpanIterator(t *testing.T) {

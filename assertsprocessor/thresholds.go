@@ -45,25 +45,29 @@ func (th *thresholdHelper) stopUpdates() {
 	go func() { th.stop <- true }()
 }
 
-func (th *thresholdHelper) updateThresholds() {
-	for {
-		select {
-		case <-th.stop:
-			th.logger.Info("Stopping threshold updates")
-			return
-		case <-th.thresholdSyncTicker.C:
-			th.logger.Info("Fetching thresholds")
-			th.entityKeys.Range(func(key any, value any) bool {
-				entityKey := value.(EntityKeyDto)
-				th.updateThresholdsAsync(entityKey)
-				return true
-			})
+func (th *thresholdHelper) startUpdates() {
+	config := *th.config
+	endPoint := (*config.AssertsServer)["endpoint"]
+	if endPoint != "" {
+		for {
+			select {
+			case <-th.stop:
+				th.logger.Info("Stopping threshold updates")
+				return
+			case <-th.thresholdSyncTicker.C:
+				th.logger.Debug("Fetching thresholds")
+				th.entityKeys.Range(func(key any, value any) bool {
+					entityKey := value.(EntityKeyDto)
+					th.updateThresholdsAsync(entityKey)
+					return true
+				})
+			}
 		}
 	}
 }
 
 func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
-	th.logger.Info("updateThresholdsAsync(...) called for",
+	th.logger.Debug("updateThresholdsAsync(...) called for",
 		zap.String("Entity Key", entityKey.AsString()))
 	go func() {
 		thresholds, err := th.getThresholds(entityKey)
@@ -98,7 +102,7 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 		th.logger.Error("Got error", zap.Error(err))
 	}
 
-	th.logger.Info("Fetching thresholds",
+	th.logger.Debug("Fetching thresholds",
 		zap.String("URL", url),
 		zap.String("Entity Key", entityKey.AsString()),
 	)
@@ -134,6 +138,12 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	if response != nil && response.Body != nil {
 		err = response.Body.Close()
 	}
+	var fields = make([]zap.Field, 0)
+	fields = append(fields, zap.String("Entity", entityKey.AsString()))
+	for _, threshold := range thresholds {
+		fields = append(fields, zap.Float64(threshold.ResourceURIPattern, threshold.LatencyUpperBound))
+	}
+	th.logger.Debug("Got thresholds ", fields...)
 	return thresholds, err
 }
 

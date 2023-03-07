@@ -33,32 +33,32 @@ func NewTraceQueue(maxSize int) *TraceQueue {
 	return &traceQueue
 }
 
-func (qw *TraceQueue) push(item *Item) {
-	qw.mutex.Lock()
-	defer qw.mutex.Unlock()
-	qw.pushUnsafe(item)
+func (tq *TraceQueue) push(item *Item) {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+	tq.pushUnsafe(item)
 }
 
-func (qw *TraceQueue) pushUnsafe(item *Item) {
+func (tq *TraceQueue) pushUnsafe(item *Item) {
 	// If limit reached, compare new item with
 	// existing item to see if it qualifies to be in the heap
-	if len(qw.priorityQueue) == qw.maxSize {
+	if len(tq.priorityQueue) == tq.maxSize {
 		// Need to pop to compare
-		pop := heap.Pop(&qw.priorityQueue)
+		pop := heap.Pop(&tq.priorityQueue)
 		if pop.(*Item).latency > item.latency {
 			// If new item is lower priority, put the popped item back
 			// and return
-			heap.Push(&qw.priorityQueue, pop)
+			heap.Push(&tq.priorityQueue, pop)
 			return
 		}
 	}
-	heap.Push(&qw.priorityQueue, item)
+	heap.Push(&tq.priorityQueue, item)
 }
 
-func (qw *TraceQueue) pop() *Item {
-	qw.mutex.Lock()
-	defer qw.mutex.Unlock()
-	pop := heap.Pop(&qw.priorityQueue)
+func (tq *TraceQueue) pop() *Item {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+	pop := heap.Pop(&tq.priorityQueue)
 
 	return pop.(*Item)
 }

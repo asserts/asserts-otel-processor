@@ -88,12 +88,11 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	p := &assertsProcessorImpl{
-		logger:           logger,
-		config:           pConfig,
-		nextConsumer:     nextConsumer,
-		metricBuilder:    &metricsHelper,
-		thresholdsHelper: &thresholdsHelper,
-		sampler:          &traceSampler,
+		logger:        logger,
+		config:        pConfig,
+		nextConsumer:  nextConsumer,
+		metricBuilder: &metricsHelper,
+		sampler:       &traceSampler,
 	}
 
 	go metricsHelper.startExporter()

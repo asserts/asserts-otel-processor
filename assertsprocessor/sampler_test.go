@@ -351,13 +351,13 @@ func TestFlushTraces(t *testing.T) {
 	assert.Equal(t, int32(1), counter.Load())
 
 	counter = atomic.Int32{}
-	go func() { s.flushTraces() }()
+	go func() { s.startTraceFlusher() }()
 	time.Sleep(2 * time.Second)
 	s.topTracesMap.Range(func(key any, value any) bool {
 		counter.Inc()
 		return true
 	})
 	assert.Equal(t, int32(0), counter.Load())
-	s.stopFlushing()
+	s.stopProcessing()
 	time.Sleep(1 * time.Second)
 }

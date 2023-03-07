@@ -11,12 +11,11 @@ import (
 // The methods from a Span that we care for to enable easy mocking
 
 type assertsProcessorImpl struct {
-	logger           *zap.Logger
-	config           *Config
-	nextConsumer     consumer.Traces
-	thresholdsHelper *thresholdHelper
-	metricBuilder    *metricHelper
-	sampler          *sampler
+	logger        *zap.Logger
+	config        *Config
+	nextConsumer  consumer.Traces
+	metricBuilder *metricHelper
+	sampler       *sampler
 }
 
 // Capabilities implements the consumer.Traces interface.
@@ -28,23 +27,17 @@ func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 // Start implements the component.Component interface.
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
 	p.logger.Info("consumer.Start callback")
-	err := p.metricBuilder.compileSpanFilterRegexps()
-	if err == nil {
-		if p.config.AssertsServer != nil && (*p.config.AssertsServer)["endpoint"] != "" {
-			go p.thresholdsHelper.updateThresholds()
-		} else {
-			p.logger.Info("Asserts Server not specified. No dynamic thresholds")
-		}
-		go p.sampler.flushTraces()
+	if err := p.metricBuilder.compileSpanFilterRegexps(); err != nil {
+		return err
 	}
-	return err
+	go p.sampler.startProcessing()
+	return nil
 }
 
 // Shutdown implements the component.Component interface
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 	p.logger.Info("consumer.Shutdown")
-	p.thresholdsHelper.stopUpdates()
-	p.sampler.stopFlushing()
+	p.sampler.stopProcessing()
 	return nil
 }
 

@@ -150,7 +150,7 @@ func TestUpdateThresholds(t *testing.T) {
 		},
 	}
 	m.entityKeys.Store(entityKey.AsString(), entityKey)
-	go func() { m.updateThresholds() }()
+	go func() { m.startUpdates() }()
 	time.Sleep(2 * time.Second)
 	m.stopUpdates()
 	time.Sleep(1 * time.Second)

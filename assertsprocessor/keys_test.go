@@ -11,7 +11,7 @@ func TestEntityKeyAsString(t *testing.T) {
 			"env": "dev", "site": "us-west-2", "namespace": "ride-service",
 		},
 	}
-	assert.Equal(t, "{, env=dev, namespace=ride-service, site=us-west-2}#Service#api-server", dto.AsString())
+	assert.Equal(t, "{env=dev, namespace=ride-service, site=us-west-2}#Service#api-server", dto.AsString())
 }
 
 func TestRequestKeyAsString(t *testing.T) {
@@ -23,5 +23,5 @@ func TestRequestKeyAsString(t *testing.T) {
 	request := RequestKey{
 		entityKey: dto, request: "/api",
 	}
-	assert.Equal(t, "{, env=dev, namespace=ride-service, site=us-west-2}#Service#api-server#/api", request.AsString())
+	assert.Equal(t, "{env=dev, namespace=ride-service, site=us-west-2}#Service#api-server#/api", request.AsString())
 }

@@ -17,11 +17,13 @@ func (ek *EntityKeyDto) AsString() string {
 	}
 	sort.Strings(sortedKeys)
 	var scopeString = "{"
+	var i = 0
 	for _, key := range sortedKeys {
-		if len(scopeString) > 0 {
+		if i > 0 {
 			scopeString = scopeString + ", "
 		}
 		scopeString = scopeString + key + "=" + ek.Scope[key]
+		i = i + 1
 	}
 	scopeString = scopeString + "}"
 	return scopeString + "#" + ek.Type + "#" + ek.Name

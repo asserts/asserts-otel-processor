@@ -21,7 +21,7 @@ type metricHelper struct {
 }
 
 func (p *metricHelper) compileSpanFilterRegexps() error {
-	p.logger.Info("consumer.Start compiling regexps")
+	p.logger.Info("compiling regexps")
 	for attName, matchExpString := range *p.config.AttributeExps {
 		compile, err := regexp.Compile(matchExpString)
 		if err != nil {
@@ -29,7 +29,7 @@ func (p *metricHelper) compileSpanFilterRegexps() error {
 		}
 		(*p.attributeValueRegExps)[attName] = compile
 	}
-	p.logger.Debug("consumer.Start compiled regexps successfully")
+	p.logger.Debug("compiled regexps successfully")
 	return nil
 }
 
@@ -42,13 +42,7 @@ func (p *metricHelper) shouldCaptureMetrics(span ptrace.Span) bool {
 			if !found {
 				return false
 			}
-			//p.logger.Info("Found Span Attribute",
-			//	zap.String(attName, value.AsString()))
-
 			valueMatches := matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())
-			//p.logger.Info("Value Regexp Result",
-			//	zap.String("regexp", matchExp.String()),
-			//	zap.Bool("result", valueMatches))
 			if !valueMatches {
 				return false
 			}
@@ -68,10 +62,6 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span ptr
 }
 
 func (p *metricHelper) buildLabels(namespace string, service string, span ptrace.Span) prometheus.Labels {
-	p.logger.Info("consumer.ConsumeTraces Capturing span duration metric for",
-		zap.String("spanId", span.SpanID().String()),
-	)
-
 	labels := prometheus.Labels{
 		"asserts_env":  p.config.Env,
 		"asserts_site": p.config.Site,
@@ -95,11 +85,7 @@ func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds fl
 }
 
 func (p *metricHelper) buildHistogram() error {
-	var allowedLabels []string
-	allowedLabels = append(allowedLabels, "asserts_env")
-	allowedLabels = append(allowedLabels, "asserts_site")
-	allowedLabels = append(allowedLabels, "namespace")
-	allowedLabels = append(allowedLabels, "service")
+	var allowedLabels = []string{"asserts_env", "asserts_site", "namespace", "service"}
 	if p.config.CaptureAttributesInMetric != nil {
 		for _, label := range p.config.CaptureAttributesInMetric {
 			allowedLabels = append(allowedLabels, p.applyPromConventions(label))
