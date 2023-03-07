@@ -13,8 +13,9 @@ import (
 )
 
 type ThresholdDto struct {
-	ResourceURIPattern string  `json:"request_context"`
-	LatencyUpperBound  float64 `json:"upper_threshold"`
+	RequestType       string  `json:"requestType"`
+	RequestContext    string  `json:"requestContext"`
+	LatencyUpperBound float64 `json:"upperThreshold"`
 }
 
 type thresholdHelper struct {
@@ -76,7 +77,7 @@ func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
 		if err == nil {
 			var latestThresholds = map[string]*ThresholdDto{}
 			for _, threshold := range thresholds {
-				latestThresholds[threshold.ResourceURIPattern] = &threshold
+				latestThresholds[threshold.RequestContext] = &threshold
 			}
 			th.thresholds.Store(entityKey.AsString(), latestThresholds)
 		}
@@ -125,6 +126,8 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 			zap.String("Entity Key", entityKey.AsString()), zap.Error(err))
 	} else if response.StatusCode == 200 {
 		body, err := io.ReadAll(response.Body)
+		bodyString := string(body)
+		th.logger.Debug("Got Thresholds Response ", zap.String("Body", bodyString))
 		if err == nil {
 			err = json.Unmarshal(body, &thresholds)
 		}
@@ -143,7 +146,7 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	var fields = make([]zap.Field, 0)
 	fields = append(fields, zap.String("Entity", entityKey.AsString()))
 	for _, threshold := range thresholds {
-		fields = append(fields, zap.Float64(threshold.ResourceURIPattern, threshold.LatencyUpperBound))
+		fields = append(fields, zap.Float64(threshold.RequestContext, threshold.LatencyUpperBound))
 	}
 	th.logger.Debug("Got thresholds ", fields...)
 	return thresholds, err

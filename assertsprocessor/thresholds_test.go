@@ -62,13 +62,13 @@ func TestGetRequestThresholdFound(t *testing.T) {
 	m.thresholds.Store(dto.AsString(), byRequest)
 
 	byRequest["/v1/latency-thresholds"] = &ThresholdDto{
-		ResourceURIPattern: "/v1/latency-thresholds",
-		LatencyUpperBound:  1,
+		RequestContext:    "/v1/latency-thresholds",
+		LatencyUpperBound: 1,
 	}
 
 	byRequest[""] = &ThresholdDto{
-		ResourceURIPattern: "",
-		LatencyUpperBound:  2,
+		RequestContext:    "",
+		LatencyUpperBound: 2,
 	}
 
 	assert.Equal(t, float64(1), m.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
@@ -99,8 +99,8 @@ func TestGetServiceDefaultThresholdFound(t *testing.T) {
 	m.thresholds.Store(dto.AsString(), byRequest)
 
 	byRequest[""] = &ThresholdDto{
-		ResourceURIPattern: "",
-		LatencyUpperBound:  1,
+		RequestContext:    "",
+		LatencyUpperBound: 1,
 	}
 
 	assert.Equal(t, float64(1), m.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
