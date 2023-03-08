@@ -47,8 +47,7 @@ func (th *thresholdHelper) stopUpdates() {
 }
 
 func (th *thresholdHelper) startUpdates() {
-	config := *th.config
-	endPoint := (*config.AssertsServer)["endpoint"]
+	endPoint := (*(*th.config).AssertsServer)["endpoint"]
 	if endPoint != "" {
 		go func() {
 			for {
