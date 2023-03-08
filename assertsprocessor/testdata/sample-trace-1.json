@@ -1,0 +1,568 @@
+{
+  "data": [
+    {
+      "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+      "spans": [
+        {
+          "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+          "spanID": "ba3cefdcb3ec3aba",
+          "operationName": "DynamoDb.GetItem",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+              "spanID": "55fa24fe773a82fc"
+            }
+          ],
+          "startTime": 1677238823771686,
+          "duration": 269037,
+          "tags": [
+            {
+              "key": "otel.library.name",
+              "type": "string",
+              "value": "io.opentelemetry.aws-sdk-2.2"
+            },
+            {
+              "key": "otel.library.version",
+              "type": "string",
+              "value": "1.21.0-alpha"
+            },
+            {
+              "key": "thread.id",
+              "type": "int64",
+              "value": 44
+            },
+            {
+              "key": "net.transport",
+              "type": "string",
+              "value": "ip_tcp"
+            },
+            {
+              "key": "http.flavor",
+              "type": "string",
+              "value": "1.1"
+            },
+            {
+              "key": "rpc.service",
+              "type": "string",
+              "value": "DynamoDb"
+            },
+            {
+              "key": "http.url",
+              "type": "string",
+              "value": "https://dynamodb.us-west-2.amazonaws.com/"
+            },
+            {
+              "key": "aws.table.name",
+              "type": "string",
+              "value": "ride-bookings-missing"
+            },
+            {
+              "key": "db.operation",
+              "type": "string",
+              "value": "GetItem"
+            },
+            {
+              "key": "rpc.system",
+              "type": "string",
+              "value": "aws-api"
+            },
+            {
+              "key": "thread.name",
+              "type": "string",
+              "value": "scheduling-1"
+            },
+            {
+              "key": "http.request_content_length",
+              "type": "int64",
+              "value": 95
+            },
+            {
+              "key": "net.peer.name",
+              "type": "string",
+              "value": "dynamodb.us-west-2.amazonaws.com"
+            },
+            {
+              "key": "rpc.method",
+              "type": "string",
+              "value": "GetItem"
+            },
+            {
+              "key": "db.system",
+              "type": "string",
+              "value": "dynamodb"
+            },
+            {
+              "key": "http.method",
+              "type": "string",
+              "value": "POST"
+            },
+            {
+              "key": "span.kind",
+              "type": "string",
+              "value": "client"
+            },
+            {
+              "key": "otel.status_code",
+              "type": "string",
+              "value": "ERROR"
+            },
+            {
+              "key": "error",
+              "type": "bool",
+              "value": true
+            },
+            {
+              "key": "internal.span.format",
+              "type": "string",
+              "value": "proto"
+            }
+          ],
+          "logs": [
+            {
+              "timestamp": 1677238824039838,
+              "fields": [
+                {
+                  "key": "event",
+                  "type": "string",
+                  "value": "exception"
+                },
+                {
+                  "key": "exception.message",
+                  "type": "string",
+                  "value": "Requested resource not found (Service: DynamoDb, Status Code: 400, Request ID: BH6EFM4IIR7B6GVONEV9QJVGGBVV4KQNSO5AEMVJF66Q9ASUAAJG)"
+                },
+                {
+                  "key": "exception.stacktrace",
+                  "type": "string",
+                  "value": "software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException: Requested resource not found (Service: DynamoDb, Status Code: 400, Request ID: BH6EFM4IIR7B6GVONEV9QJVGGBVV4KQNSO5AEMVJF66Q9ASUAAJG)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleErrorResponse(CombinedResponseHandler.java:125)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleResponse(CombinedResponseHandler.java:82)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handle(CombinedResponseHandler.java:60)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handle(CombinedResponseHandler.java:41)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.HandleResponseStage.execute(HandleResponseStage.java:40)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.HandleResponseStage.execute(HandleResponseStage.java:30)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptTimeoutTrackingStage.execute(ApiCallAttemptTimeoutTrackingStage.java:73)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptTimeoutTrackingStage.execute(ApiCallAttemptTimeoutTrackingStage.java:42)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.TimeoutExceptionHandlingStage.execute(TimeoutExceptionHandlingStage.java:78)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.TimeoutExceptionHandlingStage.execute(TimeoutExceptionHandlingStage.java:40)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptMetricCollectionStage.execute(ApiCallAttemptMetricCollectionStage.java:50)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptMetricCollectionStage.execute(ApiCallAttemptMetricCollectionStage.java:36)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.RetryableStage.execute(RetryableStage.java:81)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.RetryableStage.execute(RetryableStage.java:36)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.StreamManagingStage.execute(StreamManagingStage.java:56)\n\tat software.amazon.awssdk.core.internal.http.StreamManagingStage.execute(StreamManagingStage.java:36)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallTimeoutTrackingStage.executeWithTimer(ApiCallTimeoutTrackingStage.java:80)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallTimeoutTrackingStage.execute(ApiCallTimeoutTrackingStage.java:60)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallTimeoutTrackingStage.execute(ApiCallTimeoutTrackingStage.java:42)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallMetricCollectionStage.execute(ApiCallMetricCollectionStage.java:48)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallMetricCollectionStage.execute(ApiCallMetricCollectionStage.java:31)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ExecutionFailureExceptionReportingStage.execute(ExecutionFailureExceptionReportingStage.java:37)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ExecutionFailureExceptionReportingStage.execute(ExecutionFailureExceptionReportingStage.java:26)\n\tat software.amazon.awssdk.core.internal.http.AmazonSyncHttpClient$RequestExecutionBuilderImpl.execute(AmazonSyncHttpClient.java:193)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.invoke(BaseSyncClientHandler.java:103)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.doExecute(BaseSyncClientHandler.java:171)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.lambda$execute$1(BaseSyncClientHandler.java:82)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.measureApiCallSuccess(BaseSyncClientHandler.java:179)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.execute(BaseSyncClientHandler.java:76)\n\tat software.amazon.awssdk.core.client.handler.SdkSyncClientHandler.execute(SdkSyncClientHandler.java:45)\n\tat software.amazon.awssdk.awscore.client.handler.AwsSyncClientHandler.execute(AwsSyncClientHandler.java:56)\n\tat software.amazon.awssdk.services.dynamodb.DefaultDynamoDbClient.getItem(DefaultDynamoDbClient.java:3242)\n\tat ai.asserts.aws.OTELAWSInstrumentationTests.invokeAWSServices(OTELAWSInstrumentationTests.java:79)\n\tat sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)\n\tat sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)\n\tat sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\n\tat java.lang.reflect.Method.invoke(Method.java:498)\n\tat org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:84)\n\tat io.opentelemetry.javaagent.instrumentation.spring.scheduling.SpringSchedulingRunnableWrapper.run(SpringSchedulingRunnableWrapper.java:35)\n\tat org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54)\n\tat java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511)\n\tat java.util.concurrent.FutureTask.runAndReset(FutureTask.java:308)\n\tat java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$301(ScheduledThreadPoolExecutor.java:180)\n\tat java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:294)\n\tat java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)\n\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)\n\tat java.lang.Thread.run(Thread.java:748)\n"
+                },
+                {
+                  "key": "exception.type",
+                  "type": "string",
+                  "value": "software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException"
+                }
+              ]
+            }
+          ],
+          "processID": "p1",
+          "warnings": null
+        },
+        {
+          "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+          "spanID": "55fa24fe773a82fc",
+          "operationName": "OTELAWSInstrumentationTests.invokeAWSServices",
+          "references": [],
+          "startTime": 1677238821338000,
+          "duration": 2704107,
+          "tags": [
+            {
+              "key": "otel.library.name",
+              "type": "string",
+              "value": "io.opentelemetry.spring-scheduling-3.1"
+            },
+            {
+              "key": "otel.library.version",
+              "type": "string",
+              "value": "1.21.0-alpha"
+            },
+            {
+              "key": "code.namespace",
+              "type": "string",
+              "value": "ai.asserts.aws.OTELAWSInstrumentationTests"
+            },
+            {
+              "key": "thread.id",
+              "type": "int64",
+              "value": 44
+            },
+            {
+              "key": "code.function",
+              "type": "string",
+              "value": "invokeAWSServices"
+            },
+            {
+              "key": "thread.name",
+              "type": "string",
+              "value": "scheduling-1"
+            },
+            {
+              "key": "span.kind",
+              "type": "string",
+              "value": "internal"
+            },
+            {
+              "key": "otel.status_code",
+              "type": "string",
+              "value": "ERROR"
+            },
+            {
+              "key": "error",
+              "type": "bool",
+              "value": true
+            },
+            {
+              "key": "internal.span.format",
+              "type": "string",
+              "value": "proto"
+            }
+          ],
+          "logs": [
+            {
+              "timestamp": 1677238824042100,
+              "fields": [
+                {
+                  "key": "event",
+                  "type": "string",
+                  "value": "exception"
+                },
+                {
+                  "key": "exception.message",
+                  "type": "string",
+                  "value": "software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException: Requested resource not found (Service: DynamoDb, Status Code: 400, Request ID: BH6EFM4IIR7B6GVONEV9QJVGGBVV4KQNSO5AEMVJF66Q9ASUAAJG)"
+                },
+                {
+                  "key": "exception.stacktrace",
+                  "type": "string",
+                  "value": "java.lang.RuntimeException: software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException: Requested resource not found (Service: DynamoDb, Status Code: 400, Request ID: BH6EFM4IIR7B6GVONEV9QJVGGBVV4KQNSO5AEMVJF66Q9ASUAAJG)\n\tat ai.asserts.aws.OTELAWSInstrumentationTests.invokeAWSServices(OTELAWSInstrumentationTests.java:89)\n\tat sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)\n\tat sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)\n\tat sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\n\tat java.lang.reflect.Method.invoke(Method.java:498)\n\tat org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:84)\n\tat io.opentelemetry.javaagent.instrumentation.spring.scheduling.SpringSchedulingRunnableWrapper.run(SpringSchedulingRunnableWrapper.java:35)\n\tat org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54)\n\tat java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511)\n\tat java.util.concurrent.FutureTask.runAndReset(FutureTask.java:308)\n\tat java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.access$301(ScheduledThreadPoolExecutor.java:180)\n\tat java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:294)\n\tat java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)\n\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)\n\tat java.lang.Thread.run(Thread.java:748)\nCaused by: software.amazon.awssdk.services.dynamodb.model.ResourceNotFoundException: Requested resource not found (Service: DynamoDb, Status Code: 400, Request ID: BH6EFM4IIR7B6GVONEV9QJVGGBVV4KQNSO5AEMVJF66Q9ASUAAJG)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleErrorResponse(CombinedResponseHandler.java:125)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleResponse(CombinedResponseHandler.java:82)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handle(CombinedResponseHandler.java:60)\n\tat software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handle(CombinedResponseHandler.java:41)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.HandleResponseStage.execute(HandleResponseStage.java:40)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.HandleResponseStage.execute(HandleResponseStage.java:30)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptTimeoutTrackingStage.execute(ApiCallAttemptTimeoutTrackingStage.java:73)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptTimeoutTrackingStage.execute(ApiCallAttemptTimeoutTrackingStage.java:42)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.TimeoutExceptionHandlingStage.execute(TimeoutExceptionHandlingStage.java:78)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.TimeoutExceptionHandlingStage.execute(TimeoutExceptionHandlingStage.java:40)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptMetricCollectionStage.execute(ApiCallAttemptMetricCollectionStage.java:50)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallAttemptMetricCollectionStage.execute(ApiCallAttemptMetricCollectionStage.java:36)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.RetryableStage.execute(RetryableStage.java:81)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.RetryableStage.execute(RetryableStage.java:36)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.StreamManagingStage.execute(StreamManagingStage.java:56)\n\tat software.amazon.awssdk.core.internal.http.StreamManagingStage.execute(StreamManagingStage.java:36)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallTimeoutTrackingStage.executeWithTimer(ApiCallTimeoutTrackingStage.java:80)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallTimeoutTrackingStage.execute(ApiCallTimeoutTrackingStage.java:60)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallTimeoutTrackingStage.execute(ApiCallTimeoutTrackingStage.java:42)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallMetricCollectionStage.execute(ApiCallMetricCollectionStage.java:48)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ApiCallMetricCollectionStage.execute(ApiCallMetricCollectionStage.java:31)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.pipeline.RequestPipelineBuilder$ComposingRequestPipelineStage.execute(RequestPipelineBuilder.java:206)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ExecutionFailureExceptionReportingStage.execute(ExecutionFailureExceptionReportingStage.java:37)\n\tat software.amazon.awssdk.core.internal.http.pipeline.stages.ExecutionFailureExceptionReportingStage.execute(ExecutionFailureExceptionReportingStage.java:26)\n\tat software.amazon.awssdk.core.internal.http.AmazonSyncHttpClient$RequestExecutionBuilderImpl.execute(AmazonSyncHttpClient.java:193)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.invoke(BaseSyncClientHandler.java:103)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.doExecute(BaseSyncClientHandler.java:171)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.lambda$execute$1(BaseSyncClientHandler.java:82)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.measureApiCallSuccess(BaseSyncClientHandler.java:179)\n\tat software.amazon.awssdk.core.internal.handler.BaseSyncClientHandler.execute(BaseSyncClientHandler.java:76)\n\tat software.amazon.awssdk.core.client.handler.SdkSyncClientHandler.execute(SdkSyncClientHandler.java:45)\n\tat software.amazon.awssdk.awscore.client.handler.AwsSyncClientHandler.execute(AwsSyncClientHandler.java:56)\n\tat software.amazon.awssdk.services.dynamodb.DefaultDynamoDbClient.getItem(DefaultDynamoDbClient.java:3242)\n\tat ai.asserts.aws.OTELAWSInstrumentationTests.invokeAWSServices(OTELAWSInstrumentationTests.java:79)\n\t... 14 more\n"
+                },
+                {
+                  "key": "exception.type",
+                  "type": "string",
+                  "value": "java.lang.RuntimeException"
+                }
+              ]
+            }
+          ],
+          "processID": "p1",
+          "warnings": null
+        },
+        {
+          "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+          "spanID": "c154e9505c8620ee",
+          "operationName": "Sqs.SendMessageBatch",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+              "spanID": "55fa24fe773a82fc"
+            }
+          ],
+          "startTime": 1677238821480067,
+          "duration": 1032271,
+          "tags": [
+            {
+              "key": "otel.library.name",
+              "type": "string",
+              "value": "io.opentelemetry.aws-sdk-2.2"
+            },
+            {
+              "key": "otel.library.version",
+              "type": "string",
+              "value": "1.21.0-alpha"
+            },
+            {
+              "key": "thread.id",
+              "type": "int64",
+              "value": 44
+            },
+            {
+              "key": "net.transport",
+              "type": "string",
+              "value": "ip_tcp"
+            },
+            {
+              "key": "http.flavor",
+              "type": "string",
+              "value": "1.1"
+            },
+            {
+              "key": "rpc.service",
+              "type": "string",
+              "value": "Sqs"
+            },
+            {
+              "key": "http.url",
+              "type": "string",
+              "value": "https://sqs.us-west-2.amazonaws.com?Action=SendMessageBatch\u0026Version=2012-11-05\u0026QueueUrl=https%3A%2F%2Fsqs.us-west-2.amazonaws.com%2F342994379019%2FNodeJSPerf-WithLayer\u0026SendMessageBatchRequestEntry.1.Id=a3b0484b-12b9-48c0-94a8-d131d2dab61e\u0026SendMessageBatchRequestEntry.1.MessageBody=%7B%22problem%22%3A%22normal%22%2C%22measure%22%3A0.0%7D\u0026SendMessageBatchRequestEntry.2.Id=23f7b93e-fa63-40cc-970d-5c1f0d68e62a\u0026SendMessageBatchRequestEntry.2.MessageBody=%7B%22problem%22%3A%22normal%22%2C%22measure%22%3A0.0%7D\u0026SendMessageBatchRequestEntry.3.Id=8c90100c-7c63-4caa-83a0-5f2578756130\u0026SendMessageBatchRequestEntry.3.MessageBody=%7B%22problem%22%3A%22normal%22%2C%22measure%22%3A0.0%7D\u0026SendMessageBatchRequestEntry.4.Id=1e73aa43-c4e8-481e-8fc1-3642cb5b8404\u0026SendMessageBatchRequestEntry.4.MessageBody=%7B%22problem%22%3A%22normal%22%2C%22measure%22%3A0.0%7D\u0026SendMessageBatchRequestEntry.5.Id=286840b2-589c-408f-88fd-47c43beeb0b8\u0026SendMessageBatchRequestEntry.5.MessageBody=%7B%22problem%22%3A%22normal%22%2C%22measure%22%3A0.0%7D"
+            },
+            {
+              "key": "aws.queue.url",
+              "type": "string",
+              "value": "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer"
+            },
+            {
+              "key": "http.response_content_length",
+              "type": "int64",
+              "value": 1430
+            },
+            {
+              "key": "http.status_code",
+              "type": "int64",
+              "value": 200
+            },
+            {
+              "key": "rpc.system",
+              "type": "string",
+              "value": "aws-api"
+            },
+            {
+              "key": "thread.name",
+              "type": "string",
+              "value": "scheduling-1"
+            },
+            {
+              "key": "http.request_content_length",
+              "type": "int64",
+              "value": 986
+            },
+            {
+              "key": "net.peer.name",
+              "type": "string",
+              "value": "sqs.us-west-2.amazonaws.com"
+            },
+            {
+              "key": "rpc.method",
+              "type": "string",
+              "value": "SendMessageBatch"
+            },
+            {
+              "key": "http.user_agent",
+              "type": "string",
+              "value": "aws-sdk-java/2.19.8 Mac_OS_X/10.16 Java_HotSpot_TM__64-Bit_Server_VM/25.261-b12 Java/1.8.0_261 vendor/Oracle_Corporation io/sync http/Apache cfg/retry-mode/legacy"
+            },
+            {
+              "key": "http.method",
+              "type": "string",
+              "value": "POST"
+            },
+            {
+              "key": "span.kind",
+              "type": "string",
+              "value": "client"
+            },
+            {
+              "key": "internal.span.format",
+              "type": "string",
+              "value": "proto"
+            }
+          ],
+          "logs": [],
+          "processID": "p1",
+          "warnings": null
+        },
+        {
+          "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+          "spanID": "076212ca51b13e08",
+          "operationName": "DynamoDb.GetItem",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "63f8a22520aee824fb737cf8c6a77e6d",
+              "spanID": "55fa24fe773a82fc"
+            }
+          ],
+          "startTime": 1677238822703915,
+          "duration": 1066337,
+          "tags": [
+            {
+              "key": "otel.library.name",
+              "type": "string",
+              "value": "io.opentelemetry.aws-sdk-2.2"
+            },
+            {
+              "key": "otel.library.version",
+              "type": "string",
+              "value": "1.21.0-alpha"
+            },
+            {
+              "key": "thread.id",
+              "type": "int64",
+              "value": 44
+            },
+            {
+              "key": "net.transport",
+              "type": "string",
+              "value": "ip_tcp"
+            },
+            {
+              "key": "http.flavor",
+              "type": "string",
+              "value": "1.1"
+            },
+            {
+              "key": "rpc.service",
+              "type": "string",
+              "value": "DynamoDb"
+            },
+            {
+              "key": "http.url",
+              "type": "string",
+              "value": "https://dynamodb.us-west-2.amazonaws.com/"
+            },
+            {
+              "key": "aws.table.name",
+              "type": "string",
+              "value": "ride-bookings"
+            },
+            {
+              "key": "db.operation",
+              "type": "string",
+              "value": "GetItem"
+            },
+            {
+              "key": "http.response_content_length",
+              "type": "int64",
+              "value": 2339
+            },
+            {
+              "key": "http.status_code",
+              "type": "int64",
+              "value": 200
+            },
+            {
+              "key": "rpc.system",
+              "type": "string",
+              "value": "aws-api"
+            },
+            {
+              "key": "thread.name",
+              "type": "string",
+              "value": "scheduling-1"
+            },
+            {
+              "key": "http.request_content_length",
+              "type": "int64",
+              "value": 87
+            },
+            {
+              "key": "net.peer.name",
+              "type": "string",
+              "value": "dynamodb.us-west-2.amazonaws.com"
+            },
+            {
+              "key": "rpc.method",
+              "type": "string",
+              "value": "GetItem"
+            },
+            {
+              "key": "db.system",
+              "type": "string",
+              "value": "dynamodb"
+            },
+            {
+              "key": "http.user_agent",
+              "type": "string",
+              "value": "aws-sdk-java/2.19.8 Mac_OS_X/10.16 Java_HotSpot_TM__64-Bit_Server_VM/25.261-b12 Java/1.8.0_261 vendor/Oracle_Corporation io/sync http/Apache cfg/retry-mode/legacy"
+            },
+            {
+              "key": "http.method",
+              "type": "string",
+              "value": "POST"
+            },
+            {
+              "key": "span.kind",
+              "type": "string",
+              "value": "client"
+            },
+            {
+              "key": "internal.span.format",
+              "type": "string",
+              "value": "proto"
+            }
+          ],
+          "logs": [],
+          "processID": "p1",
+          "warnings": null
+        }
+      ],
+      "processes": {
+        "p1": {
+          "serviceName": "aws-exporter",
+          "tags": [
+            {
+              "key": "host.arch",
+              "type": "string",
+              "value": "x86_64"
+            },
+            {
+              "key": "host.name",
+              "type": "string",
+              "value": "192.168.1.19"
+            },
+            {
+              "key": "os.description",
+              "type": "string",
+              "value": "Mac OS X 10.16"
+            },
+            {
+              "key": "os.type",
+              "type": "string",
+              "value": "darwin"
+            },
+            {
+              "key": "process.command_line",
+              "type": "string",
+              "value": "/Library/Java/JavaVirtualMachines/jdk1.8.0_261.jdk/Contents/Home/jre/bin/java -Dotel.resource.attributes=service.name=aws-exporter,service.namespace=aws-integration -javaagent:/Users/radhakrishnanj/asserts/github/aws-cloudwatch-exporter/aws-opentelemetry-agent.jar -Xverify:none -XX:TieredStopAtLevel=1 -Dfile.encoding=UTF-8 -Duser.country=US -Duser.language=en -Duser.variant"
+            },
+            {
+              "key": "process.executable.path",
+              "type": "string",
+              "value": "/Library/Java/JavaVirtualMachines/jdk1.8.0_261.jdk/Contents/Home/jre/bin/java"
+            },
+            {
+              "key": "process.pid",
+              "type": "int64",
+              "value": 88625
+            },
+            {
+              "key": "process.runtime.description",
+              "type": "string",
+              "value": "Oracle Corporation Java HotSpot(TM) 64-Bit Server VM 25.261-b12"
+            },
+            {
+              "key": "process.runtime.name",
+              "type": "string",
+              "value": "Java(TM) SE Runtime Environment"
+            },
+            {
+              "key": "process.runtime.version",
+              "type": "string",
+              "value": "1.8.0_261-b12"
+            },
+            {
+              "key": "service.namespace",
+              "type": "string",
+              "value": "aws-integration"
+            },
+            {
+              "key": "telemetry.auto.version",
+              "type": "string",
+              "value": "1.21.0-aws"
+            },
+            {
+              "key": "telemetry.sdk.language",
+              "type": "string",
+              "value": "java"
+            },
+            {
+              "key": "telemetry.sdk.name",
+              "type": "string",
+              "value": "opentelemetry"
+            },
+            {
+              "key": "telemetry.sdk.version",
+              "type": "string",
+              "value": "1.21.0"
+            }
+          ]
+        }
+      },
+      "warnings": null
+    }
+  ],
+  "total": 0,
+  "limit": 0,
+  "offset": 0,
+  "errors": null
+}
