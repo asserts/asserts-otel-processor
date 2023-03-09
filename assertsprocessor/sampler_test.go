@@ -31,12 +31,6 @@ var th = thresholdHelper{
 	thresholds: &sync.Map{},
 }
 
-var entityKey = EntityKeyDto{
-	Type: "Service", Name: "api-server", Scope: map[string]string{
-		"env": "dev", "site": "us-west-2", "namespace": "platform",
-	},
-}
-
 func TestLatencyIsHighTrue(t *testing.T) {
 	var s = sampler{
 		logger:          logger,
@@ -65,28 +59,6 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	assert.False(t, s.isSlow("platform", "api-server", testSpan, "/api"))
 }
 
-func TestGetTracesQueue(t *testing.T) {
-	cache := sync.Map{}
-	compile, err := regexp.Compile("https?://.+?(/.+?)\\??")
-	assert.Nil(t, err)
-	var s = sampler{
-		logger:          logger,
-		config:          &config,
-		thresholdHelper: &th,
-		topTracesMap:    &cache,
-		requestRegexps: &map[string]*regexp.Regexp{
-			"http.url": compile,
-		},
-	}
-
-	queues := s.getTraceQueues(RequestKey{
-		entityKey: entityKey, request: "request",
-	})
-	assert.NotNil(t, queues)
-	assert.NotNil(t, queues.errorQueue)
-	assert.NotNil(t, queues.slowQueue)
-}
-
 //func TestSampleTraceWithError(t *testing.T) {
 //	cache := sync.Map{}
 //	compile, err := regexp.Compile("https?://.+?(/.+)")
@@ -95,7 +67,7 @@ func TestGetTracesQueue(t *testing.T) {
 //		logger:          logger,
 //		config:          &config,
 //		thresholdHelper: &th,
-//		topTracesMap:    &cache,
+//		topTracesByService:    &cache,
 //		requestRegexps: &map[string]regexp.Regexp{
 //			"http.url": *compile,
 //		},
@@ -131,9 +103,9 @@ func TestGetTracesQueue(t *testing.T) {
 //		resourceAttributes: &attributes,
 //	})
 //
-//	s.topTracesMap.Range(func(key any, value any) bool {
+//	s.topTracesByService.Range(func(key any, value any) bool {
 //		stringKey := key.(string)
-//		traceQueue := *value.(*traceQueues)
+//		traceQueue := *value.(*traceSampler)
 //		assert.Equal(t, "{, env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
 //		assert.Equal(t, 0, traceQueue.slowTraceCount())
 //		assert.Equal(t, 1, traceQueue.errorTraceCount())
@@ -150,14 +122,13 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	compile, err := regexp.Compile("https?://.+?(/.+)")
 	assert.Nil(t, err)
 	var s = sampler{
-		logger:          logger,
-		config:          &config,
-		thresholdHelper: &th,
-		topTracesMap:    &cache,
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
 		requestRegexps: &map[string]*regexp.Regexp{
 			"http.url": compile,
 		},
-		healthySamplingState: &sync.Map{},
 	}
 
 	ctx := context.Background()
@@ -188,13 +159,15 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		resourceAttributes: &attributes,
 	})
 
-	s.topTracesMap.Range(func(key any, value any) bool {
+	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
-		traceQueue := *value.(*traceQueues)
-		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
-		assert.Equal(t, 1, traceQueue.slowTraceCount())
-		assert.Equal(t, 0, traceQueue.errorTraceCount())
-		item := *traceQueue.slowQueue.priorityQueue[0]
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
+		assert.Equal(t, 1, serviceQueue.requestCount)
+		assert.NotNil(t, serviceQueue.getRequestState("/api-server/v4/rules"))
+		assert.NotNil(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
+		assert.NotNil(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
+		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.Equal(t, testTrace, *item.trace)
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.7, item.latency)
@@ -207,14 +180,13 @@ func TestSampleNormalTrace(t *testing.T) {
 	compile, err := regexp.Compile("https?://.+?(/.+)")
 	assert.Nil(t, err)
 	var s = sampler{
-		logger:          logger,
-		config:          &config,
-		thresholdHelper: &th,
-		topTracesMap:    &cache,
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
 		requestRegexps: &map[string]*regexp.Regexp{
 			"http.url": compile,
 		},
-		healthySamplingState: &sync.Map{},
 	}
 
 	ctx := context.Background()
@@ -245,13 +217,15 @@ func TestSampleNormalTrace(t *testing.T) {
 		resourceAttributes: &attributes,
 	})
 
-	s.topTracesMap.Range(func(key any, value any) bool {
+	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
-		traceQueue := *value.(*traceQueues)
-		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
-		assert.Equal(t, 1, traceQueue.slowTraceCount())
-		assert.Equal(t, 0, traceQueue.errorTraceCount())
-		item := *traceQueue.slowQueue.priorityQueue[0]
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
+		assert.Equal(t, 1, serviceQueue.requestCount)
+		assert.NotNil(t, serviceQueue.getRequestState("/api-server/v4/rules"))
+		assert.NotNil(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
+		assert.NotNil(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
+		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.Equal(t, testTrace, *item.trace)
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.4, item.latency)
@@ -269,17 +243,16 @@ func TestFlushTraces(t *testing.T) {
 		items: make([]*Item, 0),
 	}
 	var s = sampler{
-		logger:          logger,
-		config:          &config,
-		thresholdHelper: &th,
-		topTracesMap:    &cache,
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
 		requestRegexps: &map[string]*regexp.Regexp{
 			"http.url": compile,
 		},
-		traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Second),
-		nextConsumer:         dConsumer,
-		stop:                 make(chan bool, 5),
-		healthySamplingState: &sync.Map{},
+		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Second),
+		nextConsumer:     dConsumer,
+		stop:             make(chan bool, 5),
 	}
 
 	latencyTrace := ptrace.NewTraces()
@@ -344,7 +317,7 @@ func TestFlushTraces(t *testing.T) {
 	})
 
 	counter := atomic.Int32{}
-	s.topTracesMap.Range(func(key any, value any) bool {
+	s.topTracesByService.Range(func(key any, value any) bool {
 		counter.Inc()
 		return true
 	})
@@ -353,7 +326,7 @@ func TestFlushTraces(t *testing.T) {
 	counter = atomic.Int32{}
 	go func() { s.startTraceFlusher() }()
 	time.Sleep(2 * time.Second)
-	s.topTracesMap.Range(func(key any, value any) bool {
+	s.topTracesByService.Range(func(key any, value any) bool {
 		counter.Inc()
 		return true
 	})

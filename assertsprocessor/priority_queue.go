@@ -22,13 +22,14 @@ type PriorityQueue []*Item
 type TraceQueue struct {
 	priorityQueue PriorityQueue
 	maxSize       int
-	mutex         sync.Mutex
+	mutex         *sync.Mutex
 }
 
 func NewTraceQueue(maxSize int) *TraceQueue {
 	traceQueue := TraceQueue{
 		priorityQueue: make(PriorityQueue, 0),
 		maxSize:       maxSize,
+		mutex:         &sync.Mutex{},
 	}
 	return &traceQueue
 }

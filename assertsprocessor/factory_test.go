@@ -77,6 +77,6 @@ func TestDefaultConfig(t *testing.T) {
 //	assert.NotNil(t, _assertsProcessor.sampler.stop)
 //	assert.Equal(t, nextConsumer, _assertsProcessor.sampler.nextConsumer)
 //	assert.Equal(t, _assertsProcessor.thresholdsHelper, _assertsProcessor.sampler.thresholdHelper)
-//	assert.NotNil(t, _assertsProcessor.sampler.topTracesMap)
+//	assert.NotNil(t, _assertsProcessor.sampler.topTracesByService)
 //	assert.NotNil(t, _assertsProcessor.sampler.traceFlushTicker)
 //}
