@@ -33,24 +33,25 @@ func (sq *serviceQueues) getRequestState(request string) *traceSampler {
 	if sq.hasRoom() {
 		sq.rwMutex.Lock()
 		defer sq.rwMutex.Unlock()
+
+		// If entry is already created, return it
 		entry, found = sq.requestStates.Load(request)
 		if found {
 			return entry.(*traceSampler)
 		}
-		currentSize := sq.requestCount
-		if currentSize < sq.config.LimitPerService {
-			perRequestLimit := int(math.Min(5, float64(sq.config.LimitPerRequestPerService)))
-			result = &traceSampler{
-				slowQueue:  NewTraceQueue(perRequestLimit),
-				errorQueue: NewTraceQueue(perRequestLimit),
-				samplingState: &periodicSamplingState{
-					lastSampleTime: 0,
-					rwMutex:        &sync.RWMutex{},
-				},
-			}
-			sq.requestStates.Store(request, result)
-			sq.requestCount = sq.requestCount + 1
+
+		// Need to create the entry
+		perRequestLimit := int(math.Min(5, float64(sq.config.LimitPerRequestPerService)))
+		result = &traceSampler{
+			slowQueue:  NewTraceQueue(perRequestLimit),
+			errorQueue: NewTraceQueue(perRequestLimit),
+			samplingState: &periodicSamplingState{
+				lastSampleTime: 0,
+				rwMutex:        &sync.RWMutex{},
+			},
 		}
+		sq.requestStates.Store(request, result)
+		sq.requestCount = sq.requestCount + 1
 	}
 	return result
 }
