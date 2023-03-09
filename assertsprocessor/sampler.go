@@ -25,6 +25,10 @@ func (tS *traceSampler) slowTraceCount() int {
 	return len(tS.slowQueue.priorityQueue)
 }
 
+func (ts *traceSampler) sample(config *Config) bool {
+	return ts.samplingState.sample(config.NormalSamplingFrequencyMinutes)
+}
+
 type sampler struct {
 	logger             *zap.Logger
 	config             *Config
@@ -89,18 +93,13 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		entry, _ := s.topTracesByService.LoadOrStore(summary.requestKey.entityKey.AsString(), NewServiceQueues(s.config))
 		perService := entry.(*serviceQueues)
 		requestState := perService.getRequestState(summary.requestKey.request)
-		if requestState != nil && requestState.samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
+		if requestState != nil && requestState.sample(s.config) {
 			s.logger.Debug("Capturing normal trace",
 				zap.String("traceId", traceId),
 				zap.Float64("latency", summary.latency))
 
-			traceQueue := perService.getRequestState(summary.requestKey.request)
-
-			// If there are too many requests, we may not get a queue due to constraints
-			if traceQueue != nil {
-				// Push to the latency queue to prioritize the healthy sample too
-				traceQueue.slowQueue.push(&item)
-			}
+			// Push to the latency queue to prioritize the healthy sample too
+			requestState.slowQueue.push(&item)
 		}
 	}
 }
