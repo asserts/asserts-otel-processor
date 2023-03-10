@@ -77,15 +77,14 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	traceSampler := sampler{
-		logger:               logger,
-		config:               pConfig,
-		thresholdHelper:      &thresholdsHelper,
-		topTracesMap:         &sync.Map{},
-		healthySamplingState: &sync.Map{},
-		traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Minute),
-		nextConsumer:         nextConsumer,
-		requestRegexps:       regexps,
-		stop:                 make(chan bool),
+		logger:             logger,
+		config:             pConfig,
+		thresholdHelper:    &thresholdsHelper,
+		topTracesByService: &sync.Map{},
+		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
+		nextConsumer:       nextConsumer,
+		requestRegexps:     regexps,
+		stop:               make(chan bool),
 	}
 
 	p := &assertsProcessorImpl{
