@@ -2,16 +2,18 @@ package assertsprocessor
 
 import (
 	"context"
+	"fmt"
+	"regexp"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
-	"regexp"
-	"sync"
-	"testing"
-	"time"
 )
 
 var logger, _ = zap.NewProduction()
@@ -165,8 +167,8 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
 		assert.Equal(t, 1, serviceQueue.requestCount)
 		assert.NotNil(t, serviceQueue.getRequestState("/api-server/v4/rules"))
-		assert.NotNil(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
-		assert.NotNil(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
+		assert.Equal(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
+		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.Equal(t, testTrace, *item.trace)
 		assert.Equal(t, ctx, *item.ctx)
@@ -223,8 +225,8 @@ func TestSampleNormalTrace(t *testing.T) {
 		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
 		assert.Equal(t, 1, serviceQueue.requestCount)
 		assert.NotNil(t, serviceQueue.getRequestState("/api-server/v4/rules"))
-		assert.NotNil(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
-		assert.NotNil(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
+		assert.Equal(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
+		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.Equal(t, testTrace, *item.trace)
 		assert.Equal(t, ctx, *item.ctx)
@@ -309,7 +311,7 @@ func TestFlushTraces(t *testing.T) {
 	normalSpan.SetStartTimestamp(1e9)
 	normalSpan.SetEndTimestamp(1e9 + 3e8)
 
-	s.sampleTrace(ctx, errorTrace, "", &resourceSpanGroup{
+	s.sampleTrace(ctx, normalTrace, "", &resourceSpanGroup{
 		namespace: "platform", service: "api-server",
 		rootSpans:          []ptrace.Span{normalSpan},
 		nestedSpans:        []ptrace.Span{},
@@ -327,10 +329,16 @@ func TestFlushTraces(t *testing.T) {
 	go func() { s.startTraceFlusher() }()
 	time.Sleep(2 * time.Second)
 	s.topTracesByService.Range(func(key any, value any) bool {
+		stringKey := key.(string)
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
+		assert.Equal(t, 0, serviceQueue.requestCount)
+		assert.Equal(t, fmt.Sprint(&sync.Map{}), fmt.Sprint(serviceQueue.requestStates))
+		assert.NotEqual(t, fmt.Sprint(&sync.Map{}), fmt.Sprint(serviceQueue.periodicSamplingStates))
 		counter.Inc()
 		return true
 	})
-	assert.Equal(t, int32(0), counter.Load())
+	assert.Equal(t, int32(1), counter.Load())
 	s.stopProcessing()
 	time.Sleep(1 * time.Second)
 }

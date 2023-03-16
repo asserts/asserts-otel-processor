@@ -2,19 +2,19 @@ package assertsprocessor
 
 import (
 	"context"
+	"math"
+	"regexp"
+	"sync"
+
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
-	"math"
-	"regexp"
-	"sync"
 )
 
 type traceSampler struct {
-	slowQueue     *TraceQueue
-	errorQueue    *TraceQueue
-	samplingState *periodicSamplingState
+	slowQueue  *TraceQueue
+	errorQueue *TraceQueue
 }
 
 func (tS *traceSampler) errorTraceCount() int {
@@ -23,10 +23,6 @@ func (tS *traceSampler) errorTraceCount() int {
 
 func (tS *traceSampler) slowTraceCount() int {
 	return len(tS.slowQueue.priorityQueue)
-}
-
-func (ts *traceSampler) sample(config *Config) bool {
-	return ts.samplingState.sample(config.NormalSamplingFrequencyMinutes)
 }
 
 type sampler struct {
@@ -93,7 +89,11 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		entry, _ := s.topTracesByService.LoadOrStore(summary.requestKey.entityKey.AsString(), NewServiceQueues(s.config))
 		perService := entry.(*serviceQueues)
 		requestState := perService.getRequestState(summary.requestKey.request)
-		if requestState != nil && requestState.sample(s.config) {
+		samplingState, _ := perService.periodicSamplingStates.LoadOrStore(summary.requestKey.AsString(), &periodicSamplingState{
+			lastSampleTime: 0,
+			rwMutex:        &sync.RWMutex{},
+		})
+		if requestState != nil && samplingState.(*periodicSamplingState).sample(s.config.NormalSamplingFrequencyMinutes) {
 			s.logger.Debug("Capturing normal trace",
 				zap.String("traceId", traceId),
 				zap.Float64("latency", summary.latency))
@@ -154,13 +154,11 @@ func (s *sampler) startTraceFlusher() {
 				s.logger.Info("Trace flush background routine stopped")
 				return
 			case <-s.traceFlushTicker.C:
-				var previousTraces = s.topTracesByService
-				s.topTracesByService = &sync.Map{}
-				previousTraces.Range(func(key any, value any) bool {
+				s.topTracesByService.Range(func(key any, value any) bool {
 					var entityKey = key.(string)
 					var sq = value.(*serviceQueues)
 
-					sq.requestStates.Range(func(key1 any, value1 any) bool {
+					sq.clearRequestStates().Range(func(key1 any, value1 any) bool {
 						var requestKey = key1.(string)
 						var _sampler = value1.(*traceSampler)
 

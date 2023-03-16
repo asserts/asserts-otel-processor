@@ -1,8 +1,9 @@
 package assertsprocessor
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewServiceQueues(t *testing.T) {
@@ -48,9 +49,6 @@ func TestNewServiceQueues_Limit_One(t *testing.T) {
 	assert.NotNil(t, queue.slowQueue.mutex)
 	assert.Equal(t, 5, queue.slowQueue.maxSize)
 
-	assert.NotNil(t, queue.samplingState)
-	assert.True(t, queue.samplingState.sample(1))
-
 	queue = sq.getRequestState("/request2")
 	assert.Equal(t, 1, sq.requestCount)
 	assert.Nil(t, queue)
@@ -77,9 +75,6 @@ func TestNewServiceQueues_Limit_Two(t *testing.T) {
 	assert.NotNil(t, queue.slowQueue.priorityQueue)
 	assert.NotNil(t, queue.slowQueue.mutex)
 	assert.Equal(t, 5, queue.slowQueue.maxSize)
-
-	assert.NotNil(t, queue.samplingState)
-	assert.True(t, queue.samplingState.sample(1))
 
 	queue = sq.getRequestState("/request2")
 	assert.NotNil(t, queue)
