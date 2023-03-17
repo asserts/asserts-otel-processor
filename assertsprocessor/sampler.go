@@ -186,10 +186,14 @@ func (s *sampler) startTraceFlusher() {
 									ctx context.Context, trace ptrace.Traces, traceId string, spanSet *resourceSpanGroup) error {
 									for _, span := range spanSet.rootSpans {
 										requestContext := getRequest(s.requestRegexps, span)
+										(*s).logger.Info("Adding request context to root span",
+											zap.String("request context", requestContext))
 										span.Attributes().PutStr("asserts.request.context", requestContext)
 									}
 									for _, span := range spanSet.exitSpans {
 										requestContext := getRequest(s.requestRegexps, span)
+										(*s).logger.Info("Adding request context to client span",
+											zap.String("request context", requestContext))
 										span.Attributes().PutStr("asserts.request.context", requestContext)
 									}
 									return nil
