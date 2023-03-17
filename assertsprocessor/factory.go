@@ -39,7 +39,7 @@ func createDefaultConfig() component.Config {
 		DefaultLatencyThreshold:        3,
 		LimitPerService:                100,
 		LimitPerRequestPerService:      3,
-		NormalSamplingFrequencyMinutes: 3,
+		NormalSamplingFrequencyMinutes: 5,
 		PrometheusExporterPort:         9465,
 		TraceFlushFrequencySeconds:     30,
 	}
