@@ -12,6 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	AssertsRequestContextAttribute = "asserts.request.context"
+)
+
 type traceSampler struct {
 	slowQueue  *TraceQueue
 	errorQueue *TraceQueue
@@ -74,11 +78,26 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		// If there are too many requests, we may not get a queue due to constraints
 		if requestState != nil {
 			if summary.hasError {
+				// For all the spans which have error, add the request context
+				for _, span := range spanSet.rootSpans {
+					if spanHasError(span) {
+						span.Attributes().PutStr(AssertsRequestContextAttribute, getRequest(s.requestRegexps, span))
+					}
+				}
+
+				for _, span := range spanSet.exitSpans {
+					if spanHasError(span) {
+						span.Attributes().PutStr(AssertsRequestContextAttribute, getRequest(s.requestRegexps, span))
+					}
+				}
+
 				s.logger.Debug("Capturing error trace",
 					zap.String("traceId", traceId),
 					zap.Float64("latency", summary.latency))
 				requestState.errorQueue.push(&item)
 			} else {
+				summary.slowestRootSpan.Attributes().PutStr(AssertsRequestContextAttribute,
+					getRequest(s.requestRegexps, summary.slowestRootSpan))
 				s.logger.Debug("Capturing slow trace",
 					zap.String("traceId", traceId),
 					zap.Float64("latency", summary.latency))
@@ -99,7 +118,9 @@ func (s *sampler) sampleTrace(ctx context.Context,
 				zap.String("traceId", traceId),
 				zap.Float64("latency", summary.latency))
 
-			// Push to the latency queue to prioritize the healthy sample too
+			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
+			summary.slowestRootSpan.Attributes().PutStr(AssertsRequestContextAttribute,
+				getRequest(s.requestRegexps, summary.slowestRootSpan))
 			requestState.slowQueue.push(&item)
 		}
 	}
