@@ -6,18 +6,29 @@ import (
 )
 
 type serviceQueues struct {
-	config        *Config
-	requestStates *sync.Map
-	requestCount  int
-	rwMutex       *sync.RWMutex
+	config                 *Config
+	requestStates          *sync.Map
+	periodicSamplingStates *sync.Map
+	requestCount           int
+	rwMutex                *sync.RWMutex
 }
 
 func NewServiceQueues(config *Config) *serviceQueues {
 	return &serviceQueues{
-		config:        config,
-		requestStates: &sync.Map{},
-		rwMutex:       &sync.RWMutex{},
+		config:                 config,
+		requestStates:          &sync.Map{},
+		periodicSamplingStates: &sync.Map{},
+		rwMutex:                &sync.RWMutex{},
 	}
+}
+
+func (sq *serviceQueues) clearRequestStates() *sync.Map {
+	sq.rwMutex.Lock()
+	defer sq.rwMutex.Unlock()
+	previousRequestStates := sq.requestStates
+	sq.requestStates = &sync.Map{}
+	sq.requestCount = 0
+	return previousRequestStates
 }
 
 func (sq *serviceQueues) getRequestState(request string) *traceSampler {
@@ -43,10 +54,6 @@ func (sq *serviceQueues) getRequestState(request string) *traceSampler {
 			result = &traceSampler{
 				slowQueue:  NewTraceQueue(perRequestLimit),
 				errorQueue: NewTraceQueue(perRequestLimit),
-				samplingState: &periodicSamplingState{
-					lastSampleTime: 0,
-					rwMutex:        &sync.RWMutex{},
-				},
 			}
 			sq.requestStates.Store(request, result)
 			sq.requestCount = sq.requestCount + 1
