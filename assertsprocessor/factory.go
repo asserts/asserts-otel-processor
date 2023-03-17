@@ -2,14 +2,15 @@ package assertsprocessor
 
 import (
 	"context"
+	"regexp"
+	"sync"
+	"time"
+
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/processor"
 	"go.uber.org/zap"
-	"regexp"
-	"sync"
-	"time"
 )
 
 const (
@@ -35,7 +36,7 @@ func createDefaultConfig() component.Config {
 		},
 		Env:                            "dev",
 		Site:                           "us-west-2",
-		DefaultLatencyThreshold:        0.5,
+		DefaultLatencyThreshold:        3,
 		LimitPerService:                100,
 		LimitPerRequestPerService:      5,
 		NormalSamplingFrequencyMinutes: 5,

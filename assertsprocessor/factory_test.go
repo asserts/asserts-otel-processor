@@ -2,10 +2,11 @@ package assertsprocessor
 
 import (
 	"context"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	"testing"
 )
 
 type dummyConsumer struct {
@@ -33,7 +34,7 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, "dev", pConfig.Env)
 	assert.Equal(t, "us-west-2", pConfig.Site)
 	assert.Equal(t, 100, pConfig.LimitPerService)
-	assert.Equal(t, 0.5, pConfig.DefaultLatencyThreshold)
+	assert.Equal(t, float64(3), pConfig.DefaultLatencyThreshold)
 }
 
 //func TestCreateProcessor(t *testing.T) {
