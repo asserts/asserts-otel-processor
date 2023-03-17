@@ -98,10 +98,11 @@ func TestSpanIterator(t *testing.T) {
 	nestedSpan1.SetParentSpanID(rootSpan.SpanID())
 	nestedSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	nestedSpan2 := scopeSpans.Spans().AppendEmpty()
-	nestedSpan2.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
-	nestedSpan2.SetParentSpanID(rootSpan.SpanID())
-	nestedSpan2.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+	exitSpan := scopeSpans.Spans().AppendEmpty()
+	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
+	exitSpan.SetKind(ptrace.SpanKindClient)
+	exitSpan.SetParentSpanID(rootSpan.SpanID())
+	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	production, _ := zap.NewProduction()
 	err := spanIterator(production, ctx, testTrace,
@@ -110,9 +111,8 @@ func TestSpanIterator(t *testing.T) {
 			assert.Equal(t, "api-server", spanStructs.service)
 			assert.Equal(t, 1, len(spanStructs.rootSpans))
 			assert.Equal(t, &rootSpan, spanStructs.rootSpans[0])
-			assert.Equal(t, 2, len(spanStructs.nestedSpans))
-			assert.Equal(t, &nestedSpan1, spanStructs.nestedSpans[0])
-			assert.Equal(t, &nestedSpan2, spanStructs.nestedSpans[1])
+			assert.Equal(t, 1, len(spanStructs.exitSpans))
+			assert.Equal(t, &exitSpan, spanStructs.exitSpans[0])
 			return nil
 		})
 	assert.Nil(t, err)

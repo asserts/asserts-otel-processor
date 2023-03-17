@@ -21,7 +21,7 @@ type assertsProcessorImpl struct {
 // Capabilities implements the consumer.Traces interface.
 func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 	p.logger.Info("consumer.Capabilities callback")
-	return consumer.Capabilities{MutatesData: false}
+	return consumer.Capabilities{MutatesData: true}
 }
 
 // Start implements the component.Component interface.
@@ -56,7 +56,7 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context,
 		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, _span)
 	}
 
-	for _, _span := range spanSet.nestedSpans {
+	for _, _span := range spanSet.exitSpans {
 		p.metricBuilder.captureMetrics(spanSet.namespace, spanSet.service, _span)
 	}
 	return nil

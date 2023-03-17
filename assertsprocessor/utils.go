@@ -59,7 +59,7 @@ func spanHasError(span *ptrace.Span) bool {
 type resourceSpanGroup struct {
 	resourceAttributes *pcommon.Map
 	rootSpans          []*ptrace.Span
-	nestedSpans        []*ptrace.Span
+	exitSpans          []*ptrace.Span
 	namespace          string
 	service            string
 }
@@ -71,7 +71,7 @@ func (ss *resourceSpanGroup) hasError() bool {
 		}
 	}
 
-	for _, span := range ss.nestedSpans {
+	for _, span := range ss.exitSpans {
 		if spanHasError(span) {
 			return true
 		}
@@ -110,10 +110,10 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				traceID = span.TraceID().String()
-				if span.ParentSpanID().IsEmpty() {
+				if isRootSpan(span) {
 					spanSet.rootSpans = append(spanSet.rootSpans, &span)
-				} else {
-					spanSet.nestedSpans = append(spanSet.nestedSpans, &span)
+				} else if isExitSpan(span) {
+					spanSet.exitSpans = append(spanSet.exitSpans, &span)
 				}
 			}
 		}
@@ -121,6 +121,14 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 	logger.Debug("Span Group",
 		zap.String("Trace Id", traceID),
 		zap.Int("Root Spans", len(spanSet.rootSpans)),
-		zap.Int("Nested Spans", len(spanSet.nestedSpans)))
+		zap.Int("Exit Spans", len(spanSet.exitSpans)))
 	return callback(ctx, traces, traceID, spanSet)
+}
+
+func isExitSpan(span ptrace.Span) bool {
+	return span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer
+}
+
+func isRootSpan(span ptrace.Span) bool {
+	return span.ParentSpanID().IsEmpty()
 }
