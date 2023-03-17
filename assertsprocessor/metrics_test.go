@@ -32,17 +32,17 @@ func TestShouldCaptureMetrics(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
-	assert.True(t, p.shouldCaptureMetrics(testSpan))
+	assert.True(t, p.shouldCaptureMetrics(&testSpan))
 
 	testSpan.Attributes().PutStr("rpc.service", "Sqs")
-	assert.True(t, p.shouldCaptureMetrics(testSpan))
+	assert.True(t, p.shouldCaptureMetrics(&testSpan))
 
 	testSpan.Attributes().PutStr("rpc.system", "kafka")
-	assert.False(t, p.shouldCaptureMetrics(testSpan))
+	assert.False(t, p.shouldCaptureMetrics(&testSpan))
 
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "Ecs")
-	assert.False(t, p.shouldCaptureMetrics(testSpan))
+	assert.False(t, p.shouldCaptureMetrics(&testSpan))
 }
 
 func TestBuildLabels(t *testing.T) {
@@ -80,7 +80,7 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels["aws_queue_url"] = ""
 	expectedLabels["rpc_system"] = "aws-api"
 
-	actualLabels := p.buildLabels("ride-services", "payment", testSpan)
+	actualLabels := p.buildLabels("ride-services", "payment", &testSpan)
 	assert.True(t, cmp.Equal(&expectedLabels, &actualLabels))
 }
 
@@ -122,7 +122,7 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels["aws_queue_url"] = ""
 	expectedLabels["rpc_system"] = "aws-api"
 
-	p.captureMetrics("ride-services", "payment", testSpan)
+	p.captureMetrics("ride-services", "payment", &testSpan)
 	metric, err := p.latencyHistogram.GetMetricWith(expectedLabels)
 	assert.Nil(t, err)
 	assert.NotNil(t, metric)
