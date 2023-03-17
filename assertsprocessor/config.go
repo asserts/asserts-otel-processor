@@ -23,6 +23,7 @@ type Config struct {
 	LimitPerRequestPerService      int                `mapstructure:"trace_rate_limit_per_service_per_request"`
 	NormalSamplingFrequencyMinutes int                `mapstructure:"normal_trace_sampling_rate_minutes"`
 	PrometheusExporterPort         uint64             `mapstructure:"prometheus_exporter_port"`
+	TraceFlushFrequencySeconds     int                `mapstructure:"trace_flush_frequency_seconds"`
 }
 
 // Validate implements the component.ConfigValidator interface.
