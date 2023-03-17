@@ -145,12 +145,14 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 			summary.latency = maxLatency
 		}
 	}
-	s.logger.Debug("Trace summary",
-		zap.String("traceId", traceId),
-		zap.String("request", summary.requestKey.AsString()),
-		zap.Bool("slow", summary.isSlow),
-		zap.Bool("error", summary.hasError),
-		zap.Float64("latency", summary.latency))
+	if summary.requestKey != nil {
+		s.logger.Debug("Trace summary",
+			zap.String("traceId", traceId),
+			zap.String("request", summary.requestKey.AsString()),
+			zap.Bool("slow", summary.isSlow),
+			zap.Bool("error", summary.hasError),
+			zap.Float64("latency", summary.latency))
+	}
 	return &summary
 }
 
