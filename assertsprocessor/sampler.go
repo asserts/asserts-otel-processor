@@ -61,7 +61,7 @@ func (s *sampler) stopProcessing() {
 func (s *sampler) sampleTrace(ctx context.Context,
 	trace ptrace.Traces, traceId string, spanSet *resourceSpanGroup) {
 	summary := s.getSummary(traceId, spanSet)
-	if summary == nil {
+	if summary == nil || summary.requestKey == nil {
 		return
 	}
 	item := Item{
