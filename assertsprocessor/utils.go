@@ -121,7 +121,7 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 	logger.Debug("Span Group",
 		zap.String("Trace Id", traceID),
 		zap.Int("Root Spans", len(spanSet.rootSpans)),
-		zap.Int("Nested Spans", len(spanSet.exitSpans)))
+		zap.Int("Exit Spans", len(spanSet.exitSpans)))
 	return callback(ctx, traces, traceID, spanSet)
 }
 
