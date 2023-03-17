@@ -19,7 +19,7 @@ func buildEntityKey(config *Config, namespace string, service string) EntityKeyD
 	}
 }
 
-func computeLatency(span ptrace.Span) float64 {
+func computeLatency(span *ptrace.Span) float64 {
 	return float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9
 }
 
@@ -39,7 +39,7 @@ func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*map[stri
 	return &exps, nil
 }
 
-func getRequest(exps *map[string]*regexp.Regexp, span ptrace.Span) string {
+func getRequest(exps *map[string]*regexp.Regexp, span *ptrace.Span) string {
 	for attName, regExp := range *exps {
 		value, found := span.Attributes().Get(attName)
 		if found {
@@ -52,14 +52,15 @@ func getRequest(exps *map[string]*regexp.Regexp, span ptrace.Span) string {
 	return span.Name()
 }
 
-func spanHasError(span ptrace.Span) bool {
+func spanHasError(span *ptrace.Span) bool {
 	return span.Status().Code() == ptrace.StatusCodeError
 }
 
 type resourceSpanGroup struct {
 	resourceAttributes *pcommon.Map
-	rootSpans          []ptrace.Span
-	nestedSpans        []ptrace.Span
+	rootSpans          []*ptrace.Span
+	exitSpans          []*ptrace.Span
+	nestedSpans        []*ptrace.Span
 	namespace          string
 	service            string
 }
@@ -111,9 +112,11 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 				span := spans.At(k)
 				traceID = span.TraceID().String()
 				if span.ParentSpanID().IsEmpty() {
-					spanSet.rootSpans = append(spanSet.rootSpans, span)
+					spanSet.rootSpans = append(spanSet.rootSpans, &span)
+				} else if span.Kind() == ptrace.SpanKindClient {
+					spanSet.exitSpans = append(spanSet.rootSpans, &span)
 				} else {
-					spanSet.nestedSpans = append(spanSet.nestedSpans, span)
+					spanSet.nestedSpans = append(spanSet.nestedSpans, &span)
 				}
 			}
 		}

@@ -51,7 +51,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
-	regexps, err := compileRequestContextRegexps(logger, pConfig)
+	requestContextRegexps, err := compileRequestContextRegexps(logger, pConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		topTracesByService: &sync.Map{},
 		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 		nextConsumer:       nextConsumer,
-		requestRegexps:     regexps,
+		requestRegexps:     requestContextRegexps,
 		stop:               make(chan bool),
 	}
 

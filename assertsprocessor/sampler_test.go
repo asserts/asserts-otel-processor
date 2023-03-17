@@ -42,7 +42,7 @@ func TestLatencyIsHighTrue(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 
-	assert.True(t, s.isSlow("platform", "api-server", testSpan, "/api"))
+	assert.True(t, s.isSlow("platform", "api-server", &testSpan, "/api"))
 }
 
 func TestLatencyIsHighFalse(t *testing.T) {
@@ -56,7 +56,7 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
 
-	assert.False(t, s.isSlow("platform", "api-server", testSpan, "/api"))
+	assert.False(t, s.isSlow("platform", "api-server", &testSpan, "/api"))
 }
 
 //func TestSampleTraceWithError(t *testing.T) {
@@ -154,8 +154,8 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 
 	s.sampleTrace(ctx, testTrace, "", &resourceSpanGroup{
 		namespace: "platform", service: "api-server",
-		rootSpans:          []ptrace.Span{rootSpan},
-		nestedSpans:        []ptrace.Span{childSpan},
+		rootSpans:          []*ptrace.Span{&rootSpan},
+		nestedSpans:        []*ptrace.Span{&childSpan},
 		resourceAttributes: &attributes,
 	})
 
@@ -212,8 +212,8 @@ func TestSampleNormalTrace(t *testing.T) {
 
 	s.sampleTrace(ctx, testTrace, "", &resourceSpanGroup{
 		namespace: "platform", service: "api-server",
-		rootSpans:          []ptrace.Span{rootSpan},
-		nestedSpans:        []ptrace.Span{childSpan},
+		rootSpans:          []*ptrace.Span{&rootSpan},
+		nestedSpans:        []*ptrace.Span{&childSpan},
 		resourceAttributes: &attributes,
 	})
 
@@ -270,8 +270,8 @@ func TestFlushTraces(t *testing.T) {
 
 	s.sampleTrace(ctx, latencyTrace, "", &resourceSpanGroup{
 		namespace: "platform", service: "api-server",
-		rootSpans:          []ptrace.Span{latencySpan},
-		nestedSpans:        []ptrace.Span{},
+		rootSpans:          []*ptrace.Span{&latencySpan},
+		nestedSpans:        []*ptrace.Span{},
 		resourceAttributes: &attributes,
 	})
 
@@ -291,8 +291,8 @@ func TestFlushTraces(t *testing.T) {
 
 	s.sampleTrace(ctx, errorTrace, "", &resourceSpanGroup{
 		namespace: "platform", service: "api-server",
-		rootSpans:          []ptrace.Span{errorSpan},
-		nestedSpans:        []ptrace.Span{},
+		rootSpans:          []*ptrace.Span{&errorSpan},
+		nestedSpans:        []*ptrace.Span{},
 		resourceAttributes: &attributes,
 	})
 
@@ -311,8 +311,8 @@ func TestFlushTraces(t *testing.T) {
 
 	s.sampleTrace(ctx, errorTrace, "", &resourceSpanGroup{
 		namespace: "platform", service: "api-server",
-		rootSpans:          []ptrace.Span{normalSpan},
-		nestedSpans:        []ptrace.Span{},
+		rootSpans:          []*ptrace.Span{&normalSpan},
+		nestedSpans:        []*ptrace.Span{},
 		resourceAttributes: &attributes,
 	})
 

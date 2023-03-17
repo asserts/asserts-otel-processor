@@ -23,7 +23,7 @@ func TestComputeLatency(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
-	assert.Equal(t, 0.4, computeLatency(testSpan))
+	assert.Equal(t, 0.4, computeLatency(&testSpan))
 }
 
 func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
@@ -65,7 +65,7 @@ func TestGetExpMatch(t *testing.T) {
 	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
 	value := getRequest(&map[string]*regexp.Regexp{
 		"http.url": compile,
-	}, testSpan)
+	}, &testSpan)
 	assert.Equal(t, "/342994379019/NodeJSPerf-WithLayer", value)
 }
 
@@ -77,7 +77,7 @@ func TestGetExpNoMatch(t *testing.T) {
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")
 	value := getRequest(&map[string]*regexp.Regexp{
 		"http.url": compile,
-	}, testSpan)
+	}, &testSpan)
 	assert.Equal(t, "BackgroundJob", value)
 }
 
@@ -109,10 +109,10 @@ func TestSpanIterator(t *testing.T) {
 			assert.Equal(t, "platform", spanStructs.namespace)
 			assert.Equal(t, "api-server", spanStructs.service)
 			assert.Equal(t, 1, len(spanStructs.rootSpans))
-			assert.Equal(t, rootSpan, spanStructs.rootSpans[0])
+			assert.Equal(t, &rootSpan, spanStructs.rootSpans[0])
 			assert.Equal(t, 2, len(spanStructs.nestedSpans))
-			assert.Equal(t, nestedSpan1, spanStructs.nestedSpans[0])
-			assert.Equal(t, nestedSpan2, spanStructs.nestedSpans[1])
+			assert.Equal(t, &nestedSpan1, spanStructs.nestedSpans[0])
+			assert.Equal(t, &nestedSpan2, spanStructs.nestedSpans[1])
 			return nil
 		})
 	assert.Nil(t, err)

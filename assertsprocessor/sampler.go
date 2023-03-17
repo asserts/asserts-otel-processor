@@ -43,8 +43,8 @@ type sampler struct {
 type traceSummary struct {
 	hasError        bool
 	isSlow          bool
-	slowestRootSpan ptrace.Span
-	requestKey      RequestKey
+	slowestRootSpan *ptrace.Span
+	requestKey      *RequestKey
 	latency         float64
 }
 
@@ -116,7 +116,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 		if max > maxLatency {
 			maxLatency = max
 			summary.slowestRootSpan = rootSpan
-			summary.requestKey = RequestKey{
+			summary.requestKey = &RequestKey{
 				entityKey: entityKey,
 				request:   request,
 			}
@@ -132,7 +132,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 	return &summary
 }
 
-func (s *sampler) isSlow(namespace string, serviceName string, rootSpan ptrace.Span, request string) bool {
+func (s *sampler) isSlow(namespace string, serviceName string, rootSpan *ptrace.Span, request string) bool {
 	spanDuration := computeLatency(rootSpan)
 	threshold := s.thresholdHelper.getThreshold(namespace, serviceName, request)
 	s.logger.Debug("Slow check ",
@@ -182,7 +182,20 @@ func (s *sampler) startTraceFlusher() {
 								zap.String("Request", requestKey),
 								zap.Int("Count", len(_sampler.slowQueue.priorityQueue)))
 							for _, item := range _sampler.slowQueue.priorityQueue {
-								_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+								if spanIterator((*s).logger, *item.ctx, *item.trace, func(
+									ctx context.Context, trace ptrace.Traces, traceId string, spanSet *resourceSpanGroup) error {
+									for _, span := range spanSet.rootSpans {
+										requestContext := getRequest(s.requestRegexps, span)
+										span.Attributes().PutStr("asserts.request.context", requestContext)
+									}
+									for _, span := range spanSet.exitSpans {
+										requestContext := getRequest(s.requestRegexps, span)
+										span.Attributes().PutStr("asserts.request.context", requestContext)
+									}
+									return nil
+								}) != nil {
+									_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
+								}
 							}
 						}
 						return true
