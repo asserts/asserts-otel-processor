@@ -32,15 +32,16 @@ func NewFactory() processor.Factory {
 func createDefaultConfig() component.Config {
 	return &Config{
 		AssertsServer: &map[string]string{
-			"endpoint": "https://demo.app.asserts.ai",
+			"endpoint": "https://chief.app.dev.asserts.ai",
 		},
 		Env:                            "dev",
 		Site:                           "us-west-2",
 		DefaultLatencyThreshold:        3,
 		LimitPerService:                100,
-		LimitPerRequestPerService:      5,
+		LimitPerRequestPerService:      3,
 		NormalSamplingFrequencyMinutes: 5,
 		PrometheusExporterPort:         9465,
+		TraceFlushFrequencySeconds:     30,
 	}
 }
 
@@ -82,7 +83,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		config:             pConfig,
 		thresholdHelper:    &thresholdsHelper,
 		topTracesByService: &sync.Map{},
-		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
+		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Duration(pConfig.TraceFlushFrequencySeconds) * time.Second),
 		nextConsumer:       nextConsumer,
 		requestRegexps:     regexps,
 		stop:               make(chan bool),
