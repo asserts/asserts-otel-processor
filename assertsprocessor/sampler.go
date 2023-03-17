@@ -65,10 +65,10 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		ctx:     &ctx,
 		latency: summary.latency,
 	}
-	serviceKey := summary.requestKey.entityKey.AsString()
+	entityKey := summary.requestKey.entityKey.AsString()
 	if summary.hasError || summary.isSlow {
 		// Get the trace queue for the entity and request
-		perService, _ := s.topTracesByService.LoadOrStore(serviceKey, NewServiceQueues(s.config))
+		perService, _ := s.topTracesByService.LoadOrStore(entityKey, NewServiceQueues(s.config))
 		requestState := perService.(*serviceQueues).getRequestState(summary.requestKey.request)
 
 		// If there are too many requests, we may not get a queue due to constraints
@@ -87,10 +87,10 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		}
 	} else if len(spanSet.rootSpans) > 0 && summary.requestKey.AsString() != "" {
 		// Capture healthy samples based on configured sampling rate
-		entry, _ := s.topTracesByService.LoadOrStore(serviceKey, NewServiceQueues(s.config))
+		entry, _ := s.topTracesByService.LoadOrStore(entityKey, NewServiceQueues(s.config))
 		perService := entry.(*serviceQueues)
 		requestState := perService.getRequestState(summary.requestKey.request)
-		samplingState, _ := perService.periodicSamplingStates.LoadOrStore(serviceKey, &periodicSamplingState{
+		samplingState, _ := perService.periodicSamplingStates.LoadOrStore(entityKey, &periodicSamplingState{
 			lastSampleTime: 0,
 			rwMutex:        &sync.RWMutex{},
 		})
@@ -168,7 +168,7 @@ func (s *sampler) startTraceFlusher() {
 							s.logger.Debug("Flushing Error Traces for",
 								zap.String("Service", entityKey),
 								zap.String("Request", requestKey),
-								zap.Int("Count", _sampler.errorQueue.priorityQueue.Len()))
+								zap.Int("Count", len(_sampler.errorQueue.priorityQueue)))
 							for _, item := range _sampler.errorQueue.priorityQueue {
 								_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
 							}
@@ -179,7 +179,7 @@ func (s *sampler) startTraceFlusher() {
 							s.logger.Debug("Flushing Slow Traces for",
 								zap.String("Service", entityKey),
 								zap.String("Request", requestKey),
-								zap.Int("Count", _sampler.slowQueue.priorityQueue.Len()))
+								zap.Int("Count", len(_sampler.slowQueue.priorityQueue)))
 							for _, item := range _sampler.slowQueue.priorityQueue {
 								_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *item.trace)
 							}
