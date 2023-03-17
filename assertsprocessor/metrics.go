@@ -35,7 +35,7 @@ func (p *metricHelper) compileSpanFilterRegexps() error {
 }
 
 // Returns true if a span matches the span selection criteria
-func (p *metricHelper) shouldCaptureMetrics(span ptrace.Span) bool {
+func (p *metricHelper) shouldCaptureMetrics(span *ptrace.Span) bool {
 	if len(*p.attributeValueRegExps) > 0 {
 		spanAttributes := span.Attributes()
 		for attName, matchExp := range *p.attributeValueRegExps {
@@ -54,7 +54,7 @@ func (p *metricHelper) shouldCaptureMetrics(span ptrace.Span) bool {
 	}
 }
 
-func (p *metricHelper) captureMetrics(namespace string, service string, span ptrace.Span) {
+func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span) {
 	if p.shouldCaptureMetrics(span) {
 		labels := p.buildLabels(namespace, service, span)
 		latencySeconds := computeLatency(span)
@@ -62,7 +62,7 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span ptr
 	}
 }
 
-func (p *metricHelper) buildLabels(namespace string, service string, span ptrace.Span) prometheus.Labels {
+func (p *metricHelper) buildLabels(namespace string, service string, span *ptrace.Span) prometheus.Labels {
 	labels := prometheus.Labels{
 		"asserts_env":  p.config.Env,
 		"asserts_site": p.config.Site,

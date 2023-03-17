@@ -39,8 +39,8 @@ type sampler struct {
 type traceSummary struct {
 	hasError        bool
 	isSlow          bool
-	slowestRootSpan ptrace.Span
-	requestKey      RequestKey
+	slowestRootSpan *ptrace.Span
+	requestKey      *RequestKey
 	latency         float64
 }
 
@@ -117,7 +117,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 		if max > maxLatency {
 			maxLatency = max
 			summary.slowestRootSpan = rootSpan
-			summary.requestKey = RequestKey{
+			summary.requestKey = &RequestKey{
 				entityKey: entityKey,
 				request:   request,
 			}
@@ -133,7 +133,7 @@ func (s *sampler) getSummary(traceId string, spanSet *resourceSpanGroup) *traceS
 	return &summary
 }
 
-func (s *sampler) isSlow(namespace string, serviceName string, rootSpan ptrace.Span, request string) bool {
+func (s *sampler) isSlow(namespace string, serviceName string, rootSpan *ptrace.Span, request string) bool {
 	spanDuration := computeLatency(rootSpan)
 	threshold := s.thresholdHelper.getThreshold(namespace, serviceName, request)
 	s.logger.Debug("Slow check ",
