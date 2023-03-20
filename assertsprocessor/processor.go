@@ -52,7 +52,9 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourc
 	p.sampler.sampleTraces(ctx, traces)
 
 	for _, aTrace := range *traces.traceById {
-		p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan)
+		if aTrace.rootSpan != nil {
+			p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan)
+		}
 
 		for _, exitSpan := range aTrace.exitSpans {
 			p.metricBuilder.captureMetrics(traces.namespace, traces.service, exitSpan)
