@@ -31,15 +31,28 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 	var entityKey = buildEntityKey(th.config, ns, service)
 	th.entityKeys.LoadOrStore(entityKey.AsString(), entityKey)
 	var thresholds, _ = th.thresholds.Load(entityKey.AsString())
+
+	thresholdFound := th.config.DefaultLatencyThreshold
 	if thresholds != nil {
 		thresholdMap := thresholds.(map[string]*ThresholdDto)
+
 		if thresholdMap[request] != nil {
-			return (*thresholdMap[request]).LatencyUpperBound
+			thresholdFound = (*thresholdMap[request]).LatencyUpperBound
 		} else if thresholdMap[""] != nil {
-			return (*thresholdMap[""]).LatencyUpperBound
+			thresholdFound = (*thresholdMap[""]).LatencyUpperBound
 		}
+
+		thresholdPointers := make([]*ThresholdDto, 0)
+		for _, value := range thresholdMap {
+			thresholdPointers = append(thresholdPointers, value)
+		}
+		th.logThresholds(entityKey, thresholdPointers)
+		th.logger.Info("Found threshold",
+			zap.String("service", service),
+			zap.String("request context", request),
+			zap.Float64("threshold", thresholdFound))
 	}
-	return th.config.DefaultLatencyThreshold
+	return thresholdFound
 }
 
 func (th *thresholdHelper) stopUpdates() {
@@ -142,13 +155,21 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	if response != nil && response.Body != nil {
 		err = response.Body.Close()
 	}
+	thresholdPointers := make([]*ThresholdDto, 0)
+	for _, value := range thresholds {
+		thresholdPointers = append(thresholdPointers, &value)
+	}
+	th.logThresholds(entityKey, thresholdPointers)
+	return thresholds, err
+}
+
+func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []*ThresholdDto) {
 	var fields = make([]zap.Field, 0)
 	fields = append(fields, zap.String("Entity", entityKey.AsString()))
 	for _, threshold := range thresholds {
 		fields = append(fields, zap.Float64(threshold.RequestContext, threshold.LatencyUpperBound))
 	}
 	th.logger.Debug("Got thresholds ", fields...)
-	return thresholds, err
 }
 
 func basicAuth(username string, password string) string {
