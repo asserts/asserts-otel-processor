@@ -62,13 +62,14 @@ type resourceTraces struct {
 }
 
 type traceStruct struct {
-	resourceSpan  *ptrace.ResourceSpans
-	requestKey    *RequestKey
-	latency       float64
-	isSlow        bool
-	rootSpan      *ptrace.Span
-	internalSpans []*ptrace.Span
-	exitSpans     []*ptrace.Span
+	resourceSpan     *ptrace.ResourceSpans
+	requestKey       *RequestKey
+	latency          float64
+	isSlow           bool
+	latencyThreshold float64
+	rootSpan         *ptrace.Span
+	internalSpans    []*ptrace.Span
+	exitSpans        []*ptrace.Span
 }
 
 func (t *traceStruct) hasError() bool {
@@ -87,8 +88,8 @@ func (t *traceStruct) hasError() bool {
 func spanIterator(ctx context.Context, traces ptrace.Traces,
 	callback func(context.Context, *resourceTraces) error) error {
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
-		resourceSpans := traces.ResourceSpans().At(i)
-		resourceAttributes := resourceSpans.Resource().Attributes()
+		resources := traces.ResourceSpans().At(i)
+		resourceAttributes := resources.Resource().Attributes()
 
 		// service is a required attribute
 		serviceAttr, found := resourceAttributes.Get(conventions.AttributeServiceName)
@@ -108,17 +109,17 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 		tracesInResource.traceById = &map[string]*traceStruct{}
 		tracesInResource.namespace = namespace
 		tracesInResource.service = serviceName
-		ilsSlice := resourceSpans.ScopeSpans()
-		for j := 0; j < ilsSlice.Len(); j++ {
-			ils := ilsSlice.At(j)
-			spans := ils.Spans()
+		scopes := resources.ScopeSpans()
+		for j := 0; j < scopes.Len(); j++ {
+			scope := scopes.At(j)
+			spans := scope.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				traceID := span.TraceID().String()
 				t := (*tracesInResource.traceById)[traceID]
 				if t == nil {
 					t = &traceStruct{
-						resourceSpan: &resourceSpans,
+						resourceSpan: &resources,
 					}
 					(*tracesInResource.traceById)[traceID] = t
 				}
