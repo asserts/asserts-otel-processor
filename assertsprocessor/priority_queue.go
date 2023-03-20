@@ -9,7 +9,7 @@ import (
 
 // An Item is something we manage in a latency queue.
 type Item struct {
-	trace   *ptrace.Traces // The value of the item; arbitrary.
+	trace   *traceStruct // The value of the item; arbitrary.
 	ctx     *context.Context
 	latency float64 // The latency of the item in the queue.
 	// The index is needed by update and is maintained by the heap.Interface methods.

@@ -3,7 +3,6 @@ package assertsprocessor
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
-	"go.opentelemetry.io/collector/pdata/ptrace"
 	"testing"
 )
 
@@ -13,7 +12,7 @@ func TestPush(t *testing.T) {
 	queueWrapper := NewTraceQueue(1)
 
 	ctx1 := context.Background()
-	trace1 := ptrace.NewTraces()
+	trace1 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace1, ctx: &ctx1, latency: 0.3,
 	})
@@ -26,7 +25,7 @@ func TestPriority(t *testing.T) {
 	queueWrapper := NewTraceQueue(2)
 
 	ctx1 := context.Background()
-	trace1 := ptrace.NewTraces()
+	trace1 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace1, ctx: &ctx1, latency: 0.3,
 	})
@@ -35,7 +34,7 @@ func TestPriority(t *testing.T) {
 	assert.Equal(t, 0.3, queueWrapper.priorityQueue[0].latency)
 
 	ctx2 := context.Background()
-	trace2 := ptrace.NewTraces()
+	trace2 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace2, ctx: &ctx2, latency: 0.2,
 	})
@@ -56,7 +55,7 @@ func TestEviction(t *testing.T) {
 	queueWrapper := NewTraceQueue(2)
 
 	ctx1 := context.Background()
-	trace1 := ptrace.NewTraces()
+	trace1 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace1, ctx: &ctx1, latency: 0.3,
 	})
@@ -65,7 +64,7 @@ func TestEviction(t *testing.T) {
 	assert.Equal(t, 0.3, queueWrapper.priorityQueue[0].latency)
 
 	ctx2 := context.Background()
-	trace2 := ptrace.NewTraces()
+	trace2 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace2, ctx: &ctx2, latency: 0.2,
 	})
@@ -74,7 +73,7 @@ func TestEviction(t *testing.T) {
 	assert.Equal(t, 0.2, queueWrapper.priorityQueue[0].latency)
 
 	ctx3 := context.Background()
-	trace3 := ptrace.NewTraces()
+	trace3 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace3, ctx: &ctx3, latency: 0.4,
 	})
@@ -94,7 +93,7 @@ func TestRejection(t *testing.T) {
 	queueWrapper := NewTraceQueue(2)
 
 	ctx1 := context.Background()
-	trace1 := ptrace.NewTraces()
+	trace1 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace1, ctx: &ctx1, latency: 0.3,
 	})
@@ -103,7 +102,7 @@ func TestRejection(t *testing.T) {
 	assert.Equal(t, 0.3, queueWrapper.priorityQueue[0].latency)
 
 	ctx2 := context.Background()
-	trace2 := ptrace.NewTraces()
+	trace2 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace2, ctx: &ctx2, latency: 0.2,
 	})
@@ -112,7 +111,7 @@ func TestRejection(t *testing.T) {
 	assert.Equal(t, 0.2, queueWrapper.priorityQueue[0].latency)
 
 	ctx3 := context.Background()
-	trace3 := ptrace.NewTraces()
+	trace3 := traceStruct{}
 	queueWrapper.push(&Item{
 		trace: &trace3, ctx: &ctx3, latency: 0.1,
 	})

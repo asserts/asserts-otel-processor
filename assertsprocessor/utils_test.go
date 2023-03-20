@@ -90,30 +90,71 @@ func TestSpanIterator(t *testing.T) {
 	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
 
 	rootSpan := scopeSpans.Spans().AppendEmpty()
+	rootSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
 	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 	rootSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	nestedSpan1 := scopeSpans.Spans().AppendEmpty()
+	nestedSpan1.SetTraceID(rootSpan.TraceID())
 	nestedSpan1.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
 	nestedSpan1.SetParentSpanID(rootSpan.SpanID())
 	nestedSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	exitSpan := scopeSpans.Spans().AppendEmpty()
+	exitSpan.SetTraceID(rootSpan.TraceID())
 	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
 	exitSpan.SetKind(ptrace.SpanKindClient)
 	exitSpan.SetParentSpanID(rootSpan.SpanID())
 	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	production, _ := zap.NewProduction()
-	err := spanIterator(production, ctx, testTrace,
-		func(context context.Context, trace ptrace.Traces, traceId string, spanStructs *resourceSpanGroup) error {
+	err := spanIterator(ctx, testTrace,
+		func(context context.Context, spanStructs *resourceTraces) error {
 			assert.Equal(t, "platform", spanStructs.namespace)
 			assert.Equal(t, "api-server", spanStructs.service)
-			assert.Equal(t, 1, len(spanStructs.rootSpans))
-			assert.Equal(t, &rootSpan, spanStructs.rootSpans[0])
-			assert.Equal(t, 1, len(spanStructs.exitSpans))
-			assert.Equal(t, &exitSpan, spanStructs.exitSpans[0])
+			assert.Equal(t, 1, len(*spanStructs.traceById))
+
+			traceIdAsString := rootSpan.TraceID().String()
+			trace := (*spanStructs.traceById)[traceIdAsString]
+			assert.NotNil(t, trace)
+			assert.Equal(t, &rootSpan, trace.rootSpan)
+			assert.Equal(t, 1, len(trace.exitSpans))
+			assert.Equal(t, 1, len(trace.internalSpans))
+			assert.Equal(t, &exitSpan, trace.exitSpans[0])
+			assert.Equal(t, &nestedSpan1, trace.internalSpans[0])
 			return nil
 		})
 	assert.Nil(t, err)
+}
+
+func TestBuildTrace(t *testing.T) {
+	expectedTrace := ptrace.NewTraces()
+	resourceSpans := expectedTrace.ResourceSpans().AppendEmpty()
+	resourceSpans.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
+	resourceSpans.Resource().Attributes().PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
+
+	rootSpan := scopeSpans.Spans().AppendEmpty()
+	rootSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	nestedSpan1 := scopeSpans.Spans().AppendEmpty()
+	nestedSpan1.SetTraceID(rootSpan.TraceID())
+	nestedSpan1.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
+	nestedSpan1.SetParentSpanID(rootSpan.SpanID())
+	nestedSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	exitSpan := scopeSpans.Spans().AppendEmpty()
+	exitSpan.SetTraceID(rootSpan.TraceID())
+	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
+	exitSpan.SetKind(ptrace.SpanKindClient)
+	exitSpan.SetParentSpanID(rootSpan.SpanID())
+	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	assert.Equal(t, &expectedTrace, buildTrace(&traceStruct{
+		resourceSpan:  &resourceSpans,
+		rootSpan:      &rootSpan,
+		internalSpans: []*ptrace.Span{&nestedSpan1},
+		exitSpans:     []*ptrace.Span{&exitSpan},
+	}))
 }
