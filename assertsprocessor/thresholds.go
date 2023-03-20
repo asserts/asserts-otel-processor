@@ -48,7 +48,7 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 		}
 		th.logThresholds(entityKey, thresholdPointers)
 		th.logger.Info("Found threshold",
-			zap.String("service", service),
+			zap.String("entity", entityKey.AsString()),
 			zap.String("request context", request),
 			zap.Float64("threshold", thresholdFound))
 	}
