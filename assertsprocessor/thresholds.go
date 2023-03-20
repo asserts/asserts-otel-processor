@@ -88,8 +88,8 @@ func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
 		thresholds, err := th.getThresholds(entityKey)
 		if err == nil {
 			var latestThresholds = map[string]*ThresholdDto{}
-			for _, threshold := range thresholds {
-				latestThresholds[threshold.RequestContext] = &threshold
+			for i, threshold := range thresholds {
+				latestThresholds[threshold.RequestContext] = &thresholds[i]
 			}
 			th.thresholds.Store(entityKey.AsString(), latestThresholds)
 		}
