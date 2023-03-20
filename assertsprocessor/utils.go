@@ -2,7 +2,6 @@ package assertsprocessor
 
 import (
 	"context"
-	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
@@ -56,22 +55,29 @@ func spanHasError(span *ptrace.Span) bool {
 	return span.Status().Code() == ptrace.StatusCodeError
 }
 
-type resourceSpanGroup struct {
-	resourceAttributes *pcommon.Map
-	rootSpans          []*ptrace.Span
-	exitSpans          []*ptrace.Span
-	namespace          string
-	service            string
+type resourceTraces struct {
+	traceById *map[string]*traceStruct
+	namespace string
+	service   string
 }
 
-func (ss *resourceSpanGroup) hasError() bool {
-	for _, span := range ss.rootSpans {
-		if spanHasError(span) {
-			return true
-		}
+type traceStruct struct {
+	resourceSpan     *ptrace.ResourceSpans
+	requestKey       *RequestKey
+	latency          float64
+	isSlow           bool
+	latencyThreshold float64
+	rootSpan         *ptrace.Span
+	internalSpans    []*ptrace.Span
+	exitSpans        []*ptrace.Span
+}
+
+func (t *traceStruct) hasError() bool {
+	if spanHasError(t.rootSpan) {
+		return true
 	}
 
-	for _, span := range ss.exitSpans {
+	for _, span := range t.exitSpans {
 		if spanHasError(span) {
 			return true
 		}
@@ -79,13 +85,11 @@ func (ss *resourceSpanGroup) hasError() bool {
 	return false
 }
 
-func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
-	callback func(context.Context, ptrace.Traces, string, *resourceSpanGroup) error) error {
-	var spanSet = &resourceSpanGroup{}
-	traceID := ""
+func spanIterator(ctx context.Context, traces ptrace.Traces,
+	callback func(context.Context, *resourceTraces) error) error {
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
-		resourceSpans := traces.ResourceSpans().At(i)
-		resourceAttributes := resourceSpans.Resource().Attributes()
+		resources := traces.ResourceSpans().At(i)
+		resourceAttributes := resources.Resource().Attributes()
 
 		// service is a required attribute
 		serviceAttr, found := resourceAttributes.Get(conventions.AttributeServiceName)
@@ -99,36 +103,69 @@ func spanIterator(logger *zap.Logger, ctx context.Context, traces ptrace.Traces,
 		if found {
 			namespace = namespaceAttr.Str()
 		}
-
 		serviceName := serviceAttr.Str()
-		spanSet.namespace = namespace
-		spanSet.service = serviceName
-		ilsSlice := resourceSpans.ScopeSpans()
-		for j := 0; j < ilsSlice.Len(); j++ {
-			ils := ilsSlice.At(j)
-			spans := ils.Spans()
+
+		var tracesInResource = resourceTraces{}
+		tracesInResource.traceById = &map[string]*traceStruct{}
+		tracesInResource.namespace = namespace
+		tracesInResource.service = serviceName
+		scopes := resources.ScopeSpans()
+		for j := 0; j < scopes.Len(); j++ {
+			scope := scopes.At(j)
+			spans := scope.Spans()
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
-				traceID = span.TraceID().String()
-				if isRootSpan(span) {
-					spanSet.rootSpans = append(spanSet.rootSpans, &span)
-				} else if isExitSpan(span) {
-					spanSet.exitSpans = append(spanSet.exitSpans, &span)
+				traceID := span.TraceID().String()
+				t := (*tracesInResource.traceById)[traceID]
+				if t == nil {
+					t = &traceStruct{
+						resourceSpan: &resources,
+					}
+					(*tracesInResource.traceById)[traceID] = t
+				}
+				if isRootSpan(&span) {
+					t.rootSpan = &span
+				} else if isExitSpan(&span) {
+					t.exitSpans = append(t.exitSpans, &span)
+				} else {
+					t.internalSpans = append(t.internalSpans, &span)
 				}
 			}
 		}
+
+		if err := callback(ctx, &tracesInResource); err != nil {
+			return err
+		}
 	}
-	logger.Debug("Span Group",
-		zap.String("Trace Id", traceID),
-		zap.Int("Root Spans", len(spanSet.rootSpans)),
-		zap.Int("Exit Spans", len(spanSet.exitSpans)))
-	return callback(ctx, traces, traceID, spanSet)
+	return nil
 }
 
-func isExitSpan(span ptrace.Span) bool {
+func buildTrace(trace *traceStruct) *ptrace.Traces {
+	newTrace := ptrace.NewTraces()
+	rs := newTrace.ResourceSpans().AppendEmpty()
+	trace.resourceSpan.Resource().CopyTo(rs.Resource())
+	ils := rs.ScopeSpans().AppendEmpty()
+
+	rootSpan := ils.Spans().AppendEmpty()
+	trace.rootSpan.CopyTo(rootSpan)
+
+	for _, span := range trace.internalSpans {
+		sp := ils.Spans().AppendEmpty()
+		span.CopyTo(sp)
+	}
+
+	for _, span := range trace.exitSpans {
+		sp := ils.Spans().AppendEmpty()
+		span.CopyTo(sp)
+	}
+
+	return &newTrace
+}
+
+func isExitSpan(span *ptrace.Span) bool {
 	return span.Kind() == ptrace.SpanKindClient || span.Kind() == ptrace.SpanKindProducer
 }
 
-func isRootSpan(span ptrace.Span) bool {
+func isRootSpan(span *ptrace.Span) bool {
 	return span.ParentSpanID().IsEmpty()
 }

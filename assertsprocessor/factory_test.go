@@ -16,8 +16,7 @@ type dummyConsumer struct {
 
 func (dC dummyConsumer) ConsumeTraces(ctx context.Context, trace ptrace.Traces) error {
 	dC.items = append(dC.items, &Item{
-		ctx:   &ctx,
-		trace: &trace,
+		ctx: &ctx,
 	})
 	return nil
 }
