@@ -51,6 +51,9 @@ func (s *sampler) stopProcessing() {
 
 func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 	for _, traceStruct := range *traces.traceById {
+		if traceStruct.rootSpan == nil {
+			continue
+		}
 		s.updateTrace(traces.namespace, traces.service, traceStruct)
 		entityKeyString := traceStruct.requestKey.entityKey.AsString()
 
