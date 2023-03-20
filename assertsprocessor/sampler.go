@@ -109,7 +109,7 @@ func (s *sampler) sampleTrace(ctx context.Context,
 		entry, _ := s.topTracesByService.LoadOrStore(entityKey, NewServiceQueues(s.config))
 		perService := entry.(*serviceQueues)
 		requestState := perService.getRequestState(summary.requestKey.request)
-		samplingState, _ := perService.periodicSamplingStates.LoadOrStore(entityKey, &periodicSamplingState{
+		samplingState, _ := perService.periodicSamplingStates.LoadOrStore(summary.requestKey.request, &periodicSamplingState{
 			lastSampleTime: 0,
 			rwMutex:        &sync.RWMutex{},
 		})
