@@ -145,19 +145,16 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	if response != nil && response.Body != nil {
 		err = response.Body.Close()
 	}
-	thresholdPointers := make([]*ThresholdDto, 0)
-	for _, value := range thresholds {
-		thresholdPointers = append(thresholdPointers, &value)
-	}
-	th.logThresholds(entityKey, thresholdPointers)
+
+	th.logThresholds(entityKey, thresholds)
 	return thresholds, err
 }
 
-func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []*ThresholdDto) {
+func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []ThresholdDto) {
 	var fields = make([]zap.Field, 0)
 	fields = append(fields, zap.String("Entity", entityKey.AsString()))
-	for _, threshold := range thresholds {
-		fields = append(fields, zap.Float64(threshold.RequestContext, threshold.LatencyUpperBound))
+	for i := range thresholds {
+		fields = append(fields, zap.Float64(thresholds[i].RequestContext, thresholds[i].LatencyUpperBound))
 	}
 	th.logger.Debug("Got thresholds ", fields...)
 }
