@@ -81,14 +81,14 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 				}
 			}
 
-			s.logger.Debug("Capturing error traceStruct",
+			s.logger.Debug("Capturing error trace",
 				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
 		} else if traceStruct.isSlow {
 			traceStruct.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, request)
 
-			s.logger.Debug("Capturing isSlow traceStruct",
+			s.logger.Debug("Capturing slow trace",
 				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.slowQueue.push(&item)
@@ -102,7 +102,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 				rwMutex:        &sync.RWMutex{},
 			})
 			if requestState != nil && samplingState.(*periodicSamplingState).sample(s.config.NormalSamplingFrequencyMinutes) {
-				s.logger.Debug("Capturing normal traceStruct",
+				s.logger.Debug("Capturing normal trace",
 					zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
 					zap.String("entity", entityKeyString),
 					zap.String("request", request),
