@@ -41,16 +41,6 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 		} else if thresholdMap[""] != nil {
 			thresholdFound = (*thresholdMap[""]).LatencyUpperBound
 		}
-
-		thresholdPointers := make([]*ThresholdDto, 0)
-		for _, value := range thresholdMap {
-			thresholdPointers = append(thresholdPointers, value)
-		}
-		th.logThresholds(entityKey, thresholdPointers)
-		th.logger.Info("Found threshold",
-			zap.String("entity", entityKey.AsString()),
-			zap.String("request context", request),
-			zap.Float64("threshold", thresholdFound))
 	}
 	return thresholdFound
 }
