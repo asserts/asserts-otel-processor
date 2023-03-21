@@ -127,8 +127,11 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		requestRegexps: &map[string]*regexp.Regexp{
-			"http.url": compile,
+		requestRegexps: &[]*Matcher{
+			{
+				attrName: "http.url",
+				regex:    compile,
+			},
 		},
 	}
 
@@ -197,8 +200,11 @@ func TestSampleNormalTrace(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		requestRegexps: &map[string]*regexp.Regexp{
-			"http.url": compile,
+		requestRegexps: &[]*Matcher{
+			{
+				attrName: "http.url",
+				regex:    compile,
+			},
 		},
 	}
 
@@ -270,8 +276,11 @@ func TestFlushTraces(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		requestRegexps: &map[string]*regexp.Regexp{
-			"http.url": compile,
+		requestRegexps: &[]*Matcher{
+			{
+				attrName: "http.url",
+				regex:    compile,
+			},
 		},
 		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Second),
 		nextConsumer:     dConsumer,

@@ -2,10 +2,11 @@ package assertsprocessor
 
 import (
 	"context"
+	"regexp"
+
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
-	"regexp"
 )
 
 func buildEntityKey(config *Config, namespace string, service string) EntityKeyDto {
@@ -22,27 +23,30 @@ func computeLatency(span *ptrace.Span) float64 {
 	return float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9
 }
 
-func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*map[string]*regexp.Regexp, error) {
+func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*[]*Matcher, error) {
 	logger.Info("consumer.Start compiling request context regexps")
-	var exps = map[string]*regexp.Regexp{}
+	var exps = make([]*Matcher, 0)
 	if config.RequestContextExps != nil {
-		for attName, matchExpString := range *config.RequestContextExps {
-			compile, err := regexp.Compile(matchExpString)
+		for _, matcher := range *config.RequestContextExps {
+			compile, err := regexp.Compile(matcher.regex)
 			if err != nil {
 				return nil, err
 			}
-			exps[attName] = compile
+			exps = append(exps, &Matcher{
+				attrName: matcher.attrName,
+				regex:    compile,
+			})
 		}
 	}
 	logger.Debug("consumer.Start compiled request context regexps successfully")
 	return &exps, nil
 }
 
-func getRequest(exps *map[string]*regexp.Regexp, span *ptrace.Span) string {
-	for attName, regExp := range *exps {
-		value, found := span.Attributes().Get(attName)
+func getRequest(exps *[]*Matcher, span *ptrace.Span) string {
+	for _, matcher := range *exps {
+		value, found := span.Attributes().Get(matcher.attrName)
 		if found {
-			subMatch := regExp.FindStringSubmatch(value.AsString())
+			subMatch := matcher.regex.FindStringSubmatch(value.AsString())
 			if len(subMatch) >= 1 {
 				return subMatch[1]
 			}

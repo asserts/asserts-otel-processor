@@ -28,6 +28,11 @@ func (tS *traceSampler) slowTraceCount() int {
 	return len(tS.slowQueue.priorityQueue)
 }
 
+type Matcher struct {
+	attrName string
+	regex    *regexp.Regexp
+}
+
 type sampler struct {
 	logger             *zap.Logger
 	config             *Config
@@ -36,7 +41,7 @@ type sampler struct {
 	traceFlushTicker   *clock.Ticker
 	nextConsumer       consumer.Traces
 	stop               chan bool
-	requestRegexps     *map[string]*regexp.Regexp
+	requestRegexps     *[]*Matcher
 }
 
 func (s *sampler) startProcessing() {

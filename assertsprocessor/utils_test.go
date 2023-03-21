@@ -2,12 +2,13 @@ package assertsprocessor
 
 import (
 	"context"
+	"regexp"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
-	"regexp"
-	"testing"
 )
 
 func TestBuildEntityKey(t *testing.T) {
@@ -29,30 +30,44 @@ func TestComputeLatency(t *testing.T) {
 func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	regexps, err := compileRequestContextRegexps(logger, &Config{
-		RequestContextExps: &map[string]string{
-			"attribute1": "Foo",
-			"attribute2": "Bar.+",
+		RequestContextExps: &[]*MatcherDto{
+			{
+				attrName: "attribute1",
+				regex:    "Foo",
+			},
+			{
+				attrName: "attribute2",
+				regex:    "Bar.+",
+			},
 		},
 	})
 	assert.Nil(t, err)
 	assert.NotNil(t, regexps)
 	assert.Equal(t, 2, len(*regexps))
 
-	regExp := (*regexps)["attribute1"]
+	regExp := (*regexps)[0].regex
 	assert.NotNil(t, regExp)
+	assert.Equal(t, "attribute1", (*regexps)[0].attrName)
 	assert.True(t, regExp.MatchString("Foo"))
 
-	regExp = (*regexps)["attribute2"]
+	regExp = (*regexps)[1].regex
 	assert.NotNil(t, regExp)
+	assert.Equal(t, "attribute2", (*regexps)[1].attrName)
 	assert.True(t, regExp.MatchString("Bart"))
 }
 
 func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	_, err := compileRequestContextRegexps(logger, &Config{
-		RequestContextExps: &map[string]string{
-			"attribute1": "+",
-			"attribute2": "Bar.+",
+		RequestContextExps: &[]*MatcherDto{
+			{
+				attrName: "attribute1",
+				regex:    "+",
+			},
+			{
+				attrName: "attribute2",
+				regex:    "Bar.+",
+			},
 		},
 	})
 	assert.NotNil(t, err)
@@ -63,8 +78,11 @@ func TestGetExpMatch(t *testing.T) {
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
-	value := getRequest(&map[string]*regexp.Regexp{
-		"http.url": compile,
+	value := getRequest(&[]*Matcher{
+		{
+			attrName: "http.url",
+			regex:    compile,
+		},
 	}, &testSpan)
 	assert.Equal(t, "/342994379019/NodeJSPerf-WithLayer", value)
 }
@@ -75,8 +93,11 @@ func TestGetExpNoMatch(t *testing.T) {
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")
-	value := getRequest(&map[string]*regexp.Regexp{
-		"http.url": compile,
+	value := getRequest(&[]*Matcher{
+		{
+			attrName: "http.url",
+			regex:    compile,
+		},
 	}, &testSpan)
 	assert.Equal(t, "BackgroundJob", value)
 }
