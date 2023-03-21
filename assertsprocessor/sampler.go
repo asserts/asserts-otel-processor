@@ -88,6 +88,8 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 
 			s.logger.Debug("Capturing error trace",
 				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
+				zap.String("service", traceStruct.requestKey.entityKey.AsString()),
+				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
 		} else if traceStruct.isSlow {
