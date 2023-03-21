@@ -22,8 +22,8 @@ var testConfig = Config{
 		"attribute": ".+",
 	},
 	RequestContextExps: &[]*MatcherDto{{
-		attrName: "attribute",
-		regex:    ".+",
+		AttrName: "attribute",
+		Regex:    ".+",
 	}},
 	CaptureAttributesInMetric:      []string{"attribute"},
 	DefaultLatencyThreshold:        0.5,

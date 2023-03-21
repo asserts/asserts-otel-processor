@@ -32,12 +32,12 @@ func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 	regexps, err := compileRequestContextRegexps(logger, &Config{
 		RequestContextExps: &[]*MatcherDto{
 			{
-				attrName: "attribute1",
-				regex:    "Foo",
+				AttrName: "attribute1",
+				Regex:    "Foo",
 			},
 			{
-				attrName: "attribute2",
-				regex:    "Bar.+",
+				AttrName: "attribute2",
+				Regex:    "Bar.+",
 			},
 		},
 	})
@@ -61,12 +61,12 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 	_, err := compileRequestContextRegexps(logger, &Config{
 		RequestContextExps: &[]*MatcherDto{
 			{
-				attrName: "attribute1",
-				regex:    "+",
+				AttrName: "attribute1",
+				Regex:    "+",
 			},
 			{
-				attrName: "attribute2",
-				regex:    "Bar.+",
+				AttrName: "attribute2",
+				Regex:    "Bar.+",
 			},
 		},
 	})

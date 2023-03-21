@@ -28,12 +28,12 @@ func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*[]*Match
 	var exps = make([]*Matcher, 0)
 	if config.RequestContextExps != nil {
 		for _, matcher := range *config.RequestContextExps {
-			compile, err := regexp.Compile(matcher.regex)
+			compile, err := regexp.Compile(matcher.Regex)
 			if err != nil {
 				return nil, err
 			}
 			exps = append(exps, &Matcher{
-				attrName: matcher.attrName,
+				attrName: matcher.AttrName,
 				regex:    compile,
 			})
 		}

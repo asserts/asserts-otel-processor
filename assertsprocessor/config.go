@@ -6,8 +6,8 @@ import (
 )
 
 type MatcherDto struct {
-	attrName string `mapstructure:"attr_name"`
-	regex    string `mapstructure:"regex"`
+	AttrName string `mapstructure:"attr_name"`
+	Regex    string `mapstructure:"regex"`
 }
 
 type Config struct {
@@ -36,7 +36,7 @@ func (config *Config) Validate() error {
 	}
 
 	for _, attrRegex := range *config.RequestContextExps {
-		_, err := regexp.Compile(attrRegex.regex)
+		_, err := regexp.Compile(attrRegex.Regex)
 		if err != nil {
 			return err
 		}
