@@ -28,6 +28,11 @@ func (tS *traceSampler) slowTraceCount() int {
 	return len(tS.slowQueue.priorityQueue)
 }
 
+type Matcher struct {
+	attrName string
+	regex    *regexp.Regexp
+}
+
 type sampler struct {
 	logger             *zap.Logger
 	config             *Config
@@ -36,7 +41,7 @@ type sampler struct {
 	traceFlushTicker   *clock.Ticker
 	nextConsumer       consumer.Traces
 	stop               chan bool
-	requestRegexps     *map[string]*regexp.Regexp
+	requestRegexps     *[]*Matcher
 }
 
 func (s *sampler) startProcessing() {
@@ -83,6 +88,8 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 
 			s.logger.Debug("Capturing error trace",
 				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
+				zap.String("service", traceStruct.requestKey.entityKey.AsString()),
+				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
 		} else if traceStruct.isSlow {

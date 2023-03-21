@@ -2,15 +2,16 @@ package assertsprocessor
 
 import (
 	"context"
+	"regexp"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 	"go.uber.org/zap"
-	"regexp"
-	"sync"
-	"testing"
-	"time"
 )
 
 var testConfig = Config{
@@ -20,9 +21,10 @@ var testConfig = Config{
 	AttributeExps: &map[string]string{
 		"attribute": ".+",
 	},
-	RequestContextExps: &map[string]string{
-		"attribute": ".+",
-	},
+	RequestContextExps: &[]*MatcherDto{{
+		AttrName: "attribute",
+		Regex:    ".+",
+	}},
 	CaptureAttributesInMetric:      []string{"attribute"},
 	DefaultLatencyThreshold:        0.5,
 	LimitPerService:                100,
@@ -61,7 +63,7 @@ func TestStart(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			requestRegexps:     &map[string]*regexp.Regexp{},
+			requestRegexps:     &[]*Matcher{},
 		},
 	}
 	assert.Nil(t, p.Start(ctx, nil))
@@ -135,7 +137,7 @@ func TestConsumeTraces(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			requestRegexps:     &map[string]*regexp.Regexp{},
+			requestRegexps:     &[]*Matcher{},
 		},
 	}
 

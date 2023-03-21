@@ -1,8 +1,9 @@
 package assertsprocessor
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidateNoError(t *testing.T) {
@@ -10,9 +11,10 @@ func TestValidateNoError(t *testing.T) {
 		AttributeExps: &map[string]string{
 			"attribute": ".+",
 		},
-		RequestContextExps: &map[string]string{
-			"attribute": ".+",
-		},
+		RequestContextExps: &[]*MatcherDto{{
+			AttrName: "attribute",
+			Regex:    ".+",
+		}},
 	}
 	err := dto.Validate()
 	assert.Nil(t, err)
@@ -23,9 +25,10 @@ func TestValidateAttributeExpError(t *testing.T) {
 		AttributeExps: &map[string]string{
 			"attribute": "+",
 		},
-		RequestContextExps: &map[string]string{
-			"attribute": ".+",
-		},
+		RequestContextExps: &[]*MatcherDto{{
+			AttrName: "attribute",
+			Regex:    ".+",
+		}},
 	}
 	err := dto.Validate()
 	assert.NotNil(t, err)
@@ -36,9 +39,10 @@ func TestValidateRequestExpError(t *testing.T) {
 		AttributeExps: &map[string]string{
 			"attribute": ".+",
 		},
-		RequestContextExps: &map[string]string{
-			"attribute": "+",
-		},
+		RequestContextExps: &[]*MatcherDto{{
+			AttrName: "attribute",
+			Regex:    "+",
+		}},
 	}
 	err := dto.Validate()
 	assert.NotNil(t, err)
@@ -49,9 +53,10 @@ func TestValidateLimits(t *testing.T) {
 		AttributeExps: &map[string]string{
 			"attribute": ".+",
 		},
-		RequestContextExps: &map[string]string{
-			"attribute": ".+",
-		},
+		RequestContextExps: &[]*MatcherDto{{
+			AttrName: "attribute",
+			Regex:    ".+",
+		}},
 		LimitPerService:           1,
 		LimitPerRequestPerService: 2,
 	}
