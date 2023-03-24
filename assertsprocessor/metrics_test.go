@@ -6,55 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
-	"regexp"
 	"testing"
 	"time"
 )
 
-func TestShouldCaptureMetrics(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	p := metricHelper{
-		logger: logger,
-		config: &Config{
-			AttributeExps: &map[string]string{
-				"rpc.system":  "aws-api",
-				"rpc.service": "(Sqs)|(DynamoDb)",
-			},
-		},
-		attributeValueRegExps: &map[string]*regexp.Regexp{},
-	}
-
-	err := p.compileSpanFilterRegexps()
-	if err != nil {
-		return
-	}
-
-	testSpan := ptrace.NewSpan()
-	testSpan.Attributes().PutStr("rpc.system", "aws-api")
-	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
-	assert.True(t, p.shouldCaptureMetrics(&testSpan))
-
-	testSpan.Attributes().PutStr("rpc.service", "Sqs")
-	assert.True(t, p.shouldCaptureMetrics(&testSpan))
-
-	testSpan.Attributes().PutStr("rpc.system", "kafka")
-	assert.False(t, p.shouldCaptureMetrics(&testSpan))
-
-	testSpan.Attributes().PutStr("rpc.system", "aws-api")
-	testSpan.Attributes().PutStr("rpc.service", "Ecs")
-	assert.False(t, p.shouldCaptureMetrics(&testSpan))
-}
-
 func TestBuildLabels(t *testing.T) {
-	systemPattern, _ := regexp.Compile("aws-api")
-	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]*regexp.Regexp{
-			"rpc.system":  systemPattern,
-			"rpc.service": servicePattern,
-		},
 		config: &Config{
 			Env:  "dev",
 			Site: "us-west-2",
@@ -85,15 +44,9 @@ func TestBuildLabels(t *testing.T) {
 }
 
 func TestCaptureMetrics(t *testing.T) {
-	systemPattern, _ := regexp.Compile("aws-api")
-	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]*regexp.Regexp{
-			"rpc.system":  systemPattern,
-			"rpc.service": servicePattern,
-		},
 		config: &Config{
 			Env:  "dev",
 			Site: "us-west-2",
@@ -129,15 +82,9 @@ func TestCaptureMetrics(t *testing.T) {
 }
 
 func TestStartExporter(t *testing.T) {
-	systemPattern, _ := regexp.Compile("aws-api")
-	servicePattern, _ := regexp.Compile("(Sqs)|(DynamoDb)")
 	logger, _ := zap.NewProduction()
 	p := metricHelper{
 		logger: logger,
-		attributeValueRegExps: &map[string]*regexp.Regexp{
-			"rpc.system":  systemPattern,
-			"rpc.service": servicePattern,
-		},
 		config: &Config{
 			Env:                    "dev",
 			Site:                   "us-west-2",

@@ -14,52 +14,17 @@ import (
 )
 
 type metricHelper struct {
-	logger                *zap.Logger
-	config                *Config
-	prometheusRegistry    *prometheus.Registry
-	latencyHistogram      *prometheus.HistogramVec
-	attributeValueRegExps *map[string]*regexp.Regexp
-}
-
-func (p *metricHelper) compileSpanFilterRegexps() error {
-	p.logger.Info("compiling regexps")
-	for attName, matchExpString := range *p.config.AttributeExps {
-		compile, err := regexp.Compile(matchExpString)
-		if err != nil {
-			return err
-		}
-		(*p.attributeValueRegExps)[attName] = compile
-	}
-	p.logger.Debug("compiled regexps successfully")
-	return nil
-}
-
-// Returns true if a span matches the span selection criteria
-func (p *metricHelper) shouldCaptureMetrics(span *ptrace.Span) bool {
-	if len(*p.attributeValueRegExps) > 0 {
-		spanAttributes := span.Attributes()
-		for attName, matchExp := range *p.attributeValueRegExps {
-			value, found := spanAttributes.Get(attName)
-			if !found {
-				return false
-			}
-			valueMatches := matchExp.String() == value.AsString() || matchExp.MatchString(value.AsString())
-			if !valueMatches {
-				return false
-			}
-		}
-		return true
-	} else {
-		return false
-	}
+	logger             *zap.Logger
+	config             *Config
+	prometheusRegistry *prometheus.Registry
+	latencyHistogram   *prometheus.HistogramVec
+	spanMatcher        *spanMatcher
 }
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span) {
-	if p.shouldCaptureMetrics(span) {
-		labels := p.buildLabels(namespace, service, span)
-		latencySeconds := computeLatency(span)
-		p.recordLatency(labels, latencySeconds)
-	}
+	labels := p.buildLabels(namespace, service, span)
+	latencySeconds := computeLatency(span)
+	p.recordLatency(labels, latencySeconds)
 }
 
 func (p *metricHelper) buildLabels(namespace string, service string, span *ptrace.Span) prometheus.Labels {

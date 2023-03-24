@@ -14,7 +14,6 @@ type Config struct {
 	AssertsServer                  *map[string]string `mapstructure:"asserts_server"`
 	Env                            string             `mapstructure:"asserts_env"`
 	Site                           string             `mapstructure:"asserts_site"`
-	AttributeExps                  *map[string]string `mapstructure:"span_attribute_match_regex"`
 	RequestContextExps             *[]*MatcherDto     `mapstructure:"request_context_regex"`
 	CaptureAttributesInMetric      []string           `mapstructure:"attributes_as_metric_labels"`
 	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
@@ -28,13 +27,6 @@ type Config struct {
 // Validate implements the component.ConfigValidator interface.
 // Checks for any invalid regexp
 func (config *Config) Validate() error {
-	for _, exp := range *config.AttributeExps {
-		_, err := regexp.Compile(exp)
-		if err != nil {
-			return err
-		}
-	}
-
 	for _, attrRegex := range *config.RequestContextExps {
 		_, err := regexp.Compile(attrRegex.Regex)
 		if err != nil {

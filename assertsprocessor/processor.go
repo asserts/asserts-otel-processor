@@ -27,9 +27,6 @@ func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 // Start implements the component.Component interface.
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
 	p.logger.Info("consumer.Start callback")
-	if err := p.metricBuilder.compileSpanFilterRegexps(); err != nil {
-		return err
-	}
 	p.sampler.startProcessing()
 	return nil
 }
@@ -54,6 +51,10 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourc
 	for _, aTrace := range *traces.traceById {
 		if aTrace.rootSpan != nil {
 			p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan)
+		}
+
+		for _, entrySpan := range aTrace.entrySpans {
+			p.metricBuilder.captureMetrics(traces.namespace, traces.service, entrySpan)
 		}
 
 		for _, exitSpan := range aTrace.exitSpans {

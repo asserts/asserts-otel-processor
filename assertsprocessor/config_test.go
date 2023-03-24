@@ -8,9 +8,6 @@ import (
 
 func TestValidateNoError(t *testing.T) {
 	dto := Config{
-		AttributeExps: &map[string]string{
-			"attribute": ".+",
-		},
 		RequestContextExps: &[]*MatcherDto{{
 			AttrName: "attribute",
 			Regex:    ".+",
@@ -20,25 +17,8 @@ func TestValidateNoError(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestValidateAttributeExpError(t *testing.T) {
-	dto := Config{
-		AttributeExps: &map[string]string{
-			"attribute": "+",
-		},
-		RequestContextExps: &[]*MatcherDto{{
-			AttrName: "attribute",
-			Regex:    ".+",
-		}},
-	}
-	err := dto.Validate()
-	assert.NotNil(t, err)
-}
-
 func TestValidateRequestExpError(t *testing.T) {
 	dto := Config{
-		AttributeExps: &map[string]string{
-			"attribute": ".+",
-		},
 		RequestContextExps: &[]*MatcherDto{{
 			AttrName: "attribute",
 			Regex:    "+",
@@ -50,9 +30,6 @@ func TestValidateRequestExpError(t *testing.T) {
 
 func TestValidateLimits(t *testing.T) {
 	dto := Config{
-		AttributeExps: &map[string]string{
-			"attribute": ".+",
-		},
 		RequestContextExps: &[]*MatcherDto{{
 			AttrName: "attribute",
 			Regex:    ".+",

@@ -2,7 +2,6 @@ package assertsprocessor
 
 import (
 	"context"
-	"regexp"
 	"sync"
 
 	"github.com/tilinna/clock"
@@ -28,11 +27,6 @@ func (tS *traceSampler) slowTraceCount() int {
 	return len(tS.slowQueue.priorityQueue)
 }
 
-type Matcher struct {
-	attrName string
-	regex    *regexp.Regexp
-}
-
 type sampler struct {
 	logger             *zap.Logger
 	config             *Config
@@ -41,7 +35,7 @@ type sampler struct {
 	traceFlushTicker   *clock.Ticker
 	nextConsumer       consumer.Traces
 	stop               chan bool
-	requestRegexps     *[]*Matcher
+	spanMatcher        *spanMatcher
 }
 
 func (s *sampler) startProcessing() {
@@ -120,7 +114,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 
 				// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
 				traceStruct.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute,
-					getRequest(s.requestRegexps, traceStruct.rootSpan))
+					s.spanMatcher.getRequest(traceStruct.rootSpan))
 				requestState.slowQueue.push(&item)
 			}
 		}
@@ -129,7 +123,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 
 func (s *sampler) updateTrace(namespace string, service string, trace *traceStruct) {
 	entityKey := buildEntityKey(s.config, namespace, service)
-	request := getRequest(s.requestRegexps, trace.rootSpan)
+	request := s.spanMatcher.getRequest(trace.rootSpan)
 	trace.isSlow = s.isSlow(namespace, service, trace.rootSpan, request)
 	if trace.isSlow {
 		trace.latencyThreshold = s.thresholdHelper.getThreshold(namespace, service, request)
