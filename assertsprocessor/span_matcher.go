@@ -16,7 +16,7 @@ type spanMatcher struct {
 }
 
 func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *Config) error {
-	logger.Info("compiling request context regexps")
+	logger.Info("Compiling request context regexps")
 	sm.spanAttrMatchers = make([]*spanAttrMatcher, 0)
 	if config.RequestContextExps != nil {
 		for _, matcher := range *config.RequestContextExps {
@@ -30,7 +30,7 @@ func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *
 			})
 		}
 	}
-	logger.Debug("compiled request context regexps successfully")
+	logger.Debug("Compiled request context regexps successfully")
 	return nil
 }
 
