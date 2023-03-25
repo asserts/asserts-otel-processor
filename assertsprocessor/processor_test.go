@@ -2,7 +2,6 @@ package assertsprocessor
 
 import (
 	"context"
-	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -18,9 +17,6 @@ var testConfig = Config{
 	Env:           "dev",
 	Site:          "us-west-2",
 	AssertsServer: &map[string]string{"endpoint": "http://localhost:8030"},
-	AttributeExps: &map[string]string{
-		"attribute": ".+",
-	},
 	RequestContextExps: &[]*MatcherDto{{
 		AttrName: "attribute",
 		Regex:    ".+",
@@ -51,9 +47,9 @@ func TestStart(t *testing.T) {
 		config:       &testConfig,
 		nextConsumer: dConsumer,
 		metricBuilder: &metricHelper{
-			logger:                testLogger,
-			config:                &testConfig,
-			attributeValueRegExps: &map[string]*regexp.Regexp{},
+			logger:      testLogger,
+			config:      &testConfig,
+			spanMatcher: &spanMatcher{},
 		},
 		sampler: &sampler{
 			logger:             testLogger,
@@ -63,7 +59,7 @@ func TestStart(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			requestRegexps:     &[]*Matcher{},
+			spanMatcher:        &spanMatcher{},
 		},
 	}
 	assert.Nil(t, p.Start(ctx, nil))
@@ -101,7 +97,7 @@ func TestStart(t *testing.T) {
 //			stop:                 make(chan bool),
 //			traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Minute),
 //			thresholdHelper:      &_th,
-//			requestRegexps:       &map[string]regexp.Regexp{},
+//			spanAttrMatchers:       &map[string]regexp.Regexp{},
 //		},
 //	}
 //}
@@ -120,15 +116,16 @@ func TestConsumeTraces(t *testing.T) {
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 	}
+	metricHelper := &metricHelper{
+		logger:      testLogger,
+		config:      &testConfig,
+		spanMatcher: &spanMatcher{},
+	}
 	p := assertsProcessorImpl{
-		logger:       testLogger,
-		config:       &testConfig,
-		nextConsumer: dConsumer,
-		metricBuilder: &metricHelper{
-			logger:                testLogger,
-			config:                &testConfig,
-			attributeValueRegExps: &map[string]*regexp.Regexp{},
-		},
+		logger:        testLogger,
+		config:        &testConfig,
+		nextConsumer:  dConsumer,
+		metricBuilder: metricHelper,
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,
@@ -137,7 +134,7 @@ func TestConsumeTraces(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			requestRegexps:     &[]*Matcher{},
+			spanMatcher:        &spanMatcher{},
 		},
 	}
 
@@ -161,6 +158,7 @@ func TestConsumeTraces(t *testing.T) {
 	nestedSpan.SetStartTimestamp(1e9)
 	nestedSpan.SetEndTimestamp(1e9 + 4e8)
 
+	metricHelper.buildHistogram()
 	err := p.ConsumeTraces(ctx, testTrace)
 	assert.Nil(t, err)
 }

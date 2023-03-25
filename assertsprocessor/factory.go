@@ -2,7 +2,6 @@ package assertsprocessor
 
 import (
 	"context"
-	"regexp"
 	"sync"
 	"time"
 
@@ -53,7 +52,8 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
-	regexps, err := compileRequestContextRegexps(logger, pConfig)
+	spanMatcher := &spanMatcher{}
+	err := spanMatcher.compileRequestContextRegexps(logger, pConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -68,9 +68,9 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	metricsHelper := metricHelper{
-		logger:                logger,
-		config:                pConfig,
-		attributeValueRegExps: &map[string]*regexp.Regexp{},
+		logger:      logger,
+		config:      pConfig,
+		spanMatcher: spanMatcher,
 	}
 	err = metricsHelper.buildHistogram()
 
@@ -85,7 +85,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		topTracesByService: &sync.Map{},
 		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Duration(pConfig.TraceFlushFrequencySeconds) * time.Second),
 		nextConsumer:       nextConsumer,
-		requestRegexps:     regexps,
+		spanMatcher:        spanMatcher,
 		stop:               make(chan bool),
 	}
 

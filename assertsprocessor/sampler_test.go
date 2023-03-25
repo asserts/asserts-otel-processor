@@ -69,7 +69,7 @@ func TestLatencyIsHighFalse(t *testing.T) {
 //		config:          &config,
 //		thresholdHelper: &th,
 //		topTracesByService:    &cache,
-//		requestRegexps: &map[string]regexp.Regexp{
+//		spanAttrMatchers: &map[string]regexp.Regexp{
 //			"http.url": *compile,
 //		},
 //		healthySamplingState: &sync.Map{},
@@ -122,19 +122,20 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	cache := sync.Map{}
 	compile, err := regexp.Compile("https?://.+?(/.+)")
 	assert.Nil(t, err)
-	var s = sampler{
+	s := sampler{
 		logger:             logger,
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		requestRegexps: &[]*Matcher{
-			{
-				attrName: "http.url",
-				regex:    compile,
+		spanMatcher: &spanMatcher{
+			spanAttrMatchers: []*spanAttrMatcher{
+				{
+					attrName: "http.url",
+					regex:    compile,
+				},
 			},
 		},
 	}
-
 	ctx := context.Background()
 	testTrace := ptrace.NewTraces()
 	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
@@ -200,10 +201,12 @@ func TestSampleNormalTrace(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		requestRegexps: &[]*Matcher{
-			{
-				attrName: "http.url",
-				regex:    compile,
+		spanMatcher: &spanMatcher{
+			spanAttrMatchers: []*spanAttrMatcher{
+				{
+					attrName: "http.url",
+					regex:    compile,
+				},
 			},
 		},
 	}
@@ -276,10 +279,12 @@ func TestFlushTraces(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		requestRegexps: &[]*Matcher{
-			{
-				attrName: "http.url",
-				regex:    compile,
+		spanMatcher: &spanMatcher{
+			spanAttrMatchers: []*spanAttrMatcher{
+				{
+					attrName: "http.url",
+					regex:    compile,
+				},
 			},
 		},
 		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Second),

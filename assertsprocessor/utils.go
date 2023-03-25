@@ -2,11 +2,8 @@ package assertsprocessor
 
 import (
 	"context"
-	"regexp"
-
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
-	"go.uber.org/zap"
 )
 
 func buildEntityKey(config *Config, namespace string, service string) EntityKeyDto {
@@ -21,38 +18,6 @@ func buildEntityKey(config *Config, namespace string, service string) EntityKeyD
 
 func computeLatency(span *ptrace.Span) float64 {
 	return float64(span.EndTimestamp()-span.StartTimestamp()) / 1e9
-}
-
-func compileRequestContextRegexps(logger *zap.Logger, config *Config) (*[]*Matcher, error) {
-	logger.Info("consumer.Start compiling request context regexps")
-	var exps = make([]*Matcher, 0)
-	if config.RequestContextExps != nil {
-		for _, matcher := range *config.RequestContextExps {
-			compile, err := regexp.Compile(matcher.Regex)
-			if err != nil {
-				return nil, err
-			}
-			exps = append(exps, &Matcher{
-				attrName: matcher.AttrName,
-				regex:    compile,
-			})
-		}
-	}
-	logger.Debug("consumer.Start compiled request context regexps successfully")
-	return &exps, nil
-}
-
-func getRequest(exps *[]*Matcher, span *ptrace.Span) string {
-	for _, matcher := range *exps {
-		value, found := span.Attributes().Get(matcher.attrName)
-		if found {
-			subMatch := matcher.regex.FindStringSubmatch(value.AsString())
-			if len(subMatch) >= 1 {
-				return subMatch[1]
-			}
-		}
-	}
-	return span.Name()
 }
 
 func spanHasError(span *ptrace.Span) bool {
@@ -73,12 +38,19 @@ type traceStruct struct {
 	latencyThreshold float64
 	rootSpan         *ptrace.Span
 	internalSpans    []*ptrace.Span
+	entrySpans       []*ptrace.Span
 	exitSpans        []*ptrace.Span
 }
 
 func (t *traceStruct) hasError() bool {
 	if spanHasError(t.rootSpan) {
 		return true
+	}
+
+	for _, span := range t.entrySpans {
+		if spanHasError(span) {
+			return true
+		}
 	}
 
 	for _, span := range t.exitSpans {
@@ -129,6 +101,8 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 				}
 				if isRootSpan(&span) {
 					t.rootSpan = &span
+				} else if isEntrySpan(&span) {
+					t.entrySpans = append(t.entrySpans, &span)
 				} else if isExitSpan(&span) {
 					t.exitSpans = append(t.exitSpans, &span)
 				} else {
@@ -158,12 +132,21 @@ func buildTrace(trace *traceStruct) *ptrace.Traces {
 		span.CopyTo(sp)
 	}
 
+	for _, span := range trace.entrySpans {
+		sp := ils.Spans().AppendEmpty()
+		span.CopyTo(sp)
+	}
+
 	for _, span := range trace.exitSpans {
 		sp := ils.Spans().AppendEmpty()
 		span.CopyTo(sp)
 	}
 
 	return &newTrace
+}
+
+func isEntrySpan(span *ptrace.Span) bool {
+	return span.Kind() == ptrace.SpanKindServer || span.Kind() == ptrace.SpanKindConsumer
 }
 
 func isExitSpan(span *ptrace.Span) bool {
