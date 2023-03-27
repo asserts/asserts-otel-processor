@@ -21,7 +21,7 @@ var config = Config{
 	Site:                      "us-west-2",
 	AssertsServer:             &map[string]string{"endpoint": "http://localhost:8030"},
 	DefaultLatencyThreshold:   0.5,
-	LimitPerService:           100,
+	LimitPerService:           2,
 	LimitPerRequestPerService: 5,
 }
 
@@ -60,63 +60,79 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	assert.False(t, s.isSlow("platform", "api-server", &testSpan, "/api"))
 }
 
-//func TestSampleTraceWithError(t *testing.T) {
-//	cache := sync.Map{}
-//	compile, err := regexp.Compile("https?://.+?(/.+)")
-//	assert.Nil(t, err)
-//	var s = sampler{
-//		logger:          logger,
-//		config:          &config,
-//		thresholdHelper: &th,
-//		topTracesByService:    &cache,
-//		spanAttrMatchers: &map[string]regexp.Regexp{
-//			"http.url": *compile,
-//		},
-//		healthySamplingState: &sync.Map{},
-//	}
-//
-//	ctx := context.Background()
-//	testTrace := ptrace.NewTraces()
-//	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
-//	attributes := resourceSpans.Resource().Attributes()
-//	attributes.PutStr(conventions.AttributeServiceName, "api-server")
-//	attributes.PutStr(conventions.AttributeServiceNamespace, "platform")
-//	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
-//
-//	rootSpan := scopeSpans.Spans().AppendEmpty()
-//	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-//	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
-//	rootSpan.SetStartTimestamp(1e9)
-//	rootSpan.SetEndTimestamp(1e9 + 7e8)
-//
-//	childSpan := scopeSpans.Spans().AppendEmpty()
-//	childSpan.SetParentSpanID(rootSpan.SpanID())
-//	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-//	childSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
-//	childSpan.Status()
-//	childSpan.SetStartTimestamp(1e9 + 1e8)
-//	childSpan.SetEndTimestamp(1e9 + 5e8)
-//
-//	s.sampleTraces(ctx, testTrace, "", &resourceTraces{
-//		namespace: "platform", service: "api-server",
-//		rootSpans:          []ptrace.Span{rootSpan},
-//		exitSpans:        []ptrace.Span{childSpan},
-//		resourceAttributes: &attributes,
-//	})
-//
-//	s.topTracesByService.Range(func(key any, value any) bool {
-//		stringKey := key.(string)
-//		traceQueue := *value.(*traceSampler)
-//		assert.Equal(t, "{, env=dev, namespace=platform, site=us-west-2}#Service#api-server#/api-server/v4/rules", stringKey)
-//		assert.Equal(t, 0, traceQueue.slowTraceCount())
-//		assert.Equal(t, 1, traceQueue.errorTraceCount())
-//		item := *traceQueue.errorQueue.priorityQueue[0]
-//		assert.Equal(t, testTrace, *item.traceStruct)
-//		assert.Equal(t, ctx, *item.ctx)
-//		assert.Equal(t, 0.7, item.latency)
-//		return true
-//	})
-//}
+func TestSampleTraceWithError(t *testing.T) {
+	cache := sync.Map{}
+	compile, err := regexp.Compile("https?://.+?(/.+)")
+	assert.Nil(t, err)
+	var s = sampler{
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
+		spanMatcher: &spanMatcher{
+			spanAttrMatchers: []*spanAttrMatcher{
+				{
+					attrName: "http.url",
+					regex:    compile,
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	testTrace := ptrace.NewTraces()
+	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
+	attributes := resourceSpans.Resource().Attributes()
+	attributes.PutStr(conventions.AttributeServiceName, "api-server")
+	attributes.PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
+
+	rootSpan := scopeSpans.Spans().AppendEmpty()
+	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	rootSpan.SetStartTimestamp(1e9)
+	rootSpan.SetEndTimestamp(1e9 + 7e8)
+
+	childSpan := scopeSpans.Spans().AppendEmpty()
+	childSpan.SetParentSpanID(rootSpan.SpanID())
+	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
+	childSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	childSpan.SetKind(ptrace.SpanKindClient)
+	childSpan.Status().SetCode(ptrace.StatusCodeError)
+	childSpan.SetStartTimestamp(1e9 + 1e8)
+	childSpan.SetEndTimestamp(1e9 + 5e8)
+
+	traceById := map[string]*traceStruct{}
+	traceById[rootSpan.TraceID().String()] = &traceStruct{
+		rootSpan:  &rootSpan,
+		exitSpans: []*ptrace.Span{&childSpan},
+	}
+
+	s.sampleTraces(ctx, &resourceTraces{
+		namespace: "platform", service: "api-server",
+		traceById: &traceById,
+	})
+
+	s.topTracesByService.Range(func(key any, value any) bool {
+		stringKey := key.(string)
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
+		assert.Equal(t, 1, serviceQueue.requestCount)
+		assert.NotNil(t, serviceQueue.getRequestState("/api-server/v4/rules"))
+		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
+		assert.Equal(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
+		item := *serviceQueue.getRequestState("/api-server/v4/rules").errorQueue.priorityQueue[0]
+		assert.NotNil(t, item.trace)
+		assert.Equal(t, &rootSpan, item.trace.rootSpan)
+		assert.Equal(t, 1, len((*item.trace).exitSpans))
+		assert.NotNil(t, &childSpan, item.trace.exitSpans[0])
+		assert.Equal(t, ctx, *item.ctx)
+		assert.Equal(t, 0.7, item.latency)
+		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
+		assert.True(t, found)
+		return true
+	})
+}
 
 func TestSampleTraceWithHighLatency(t *testing.T) {
 	cache := sync.Map{}
@@ -263,6 +279,86 @@ func TestSampleNormalTrace(t *testing.T) {
 		assert.True(t, found)
 		return true
 	})
+}
+
+func TestWithNoRootTrace(t *testing.T) {
+	var s = sampler{
+		topTracesByService: &sync.Map{},
+	}
+	ctx := context.Background()
+	traceById := map[string]*traceStruct{}
+	traceById["invalid"] = &traceStruct{}
+
+	s.sampleTraces(ctx, &resourceTraces{
+		namespace: "platform", service: "api-server",
+		traceById: &traceById,
+	})
+
+	s.topTracesByService.Range(func(key any, value any) bool {
+		assert.Fail(t, "topTracesByService map should be empty")
+		return true
+	})
+}
+
+func TestTraceCardinalityLimit(t *testing.T) {
+	cache := sync.Map{}
+	compile, err := regexp.Compile("https?://.+?(/.+)")
+	assert.Nil(t, err)
+	var s = sampler{
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
+		spanMatcher: &spanMatcher{
+			spanAttrMatchers: []*spanAttrMatcher{
+				{
+					attrName: "http.url",
+					regex:    compile,
+				},
+			},
+		},
+	}
+
+	ctx := context.Background()
+	testTrace := ptrace.NewTraces()
+	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
+	attributes := resourceSpans.Resource().Attributes()
+	attributes.PutStr(conventions.AttributeServiceName, "api-server")
+	attributes.PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
+
+	rootSpan := scopeSpans.Spans().AppendEmpty()
+	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.SetStartTimestamp(1e9)
+	rootSpan.SetEndTimestamp(1e9 + 7e8)
+
+	traceById := map[string]*traceStruct{}
+	traceById[rootSpan.TraceID().String()] = &traceStruct{
+		rootSpan: &rootSpan,
+	}
+
+	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v1/rules")
+	s.sampleTraces(ctx, &resourceTraces{
+		namespace: "platform", service: "api-server",
+		traceById: &traceById,
+	})
+	value, _ := s.topTracesByService.Load("{env=dev, namespace=platform, site=us-west-2}#Service#api-server")
+	serviceQueue := value.(*serviceQueues)
+	assert.Equal(t, 1, serviceQueue.requestCount)
+
+	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v2/rules")
+	s.sampleTraces(ctx, &resourceTraces{
+		namespace: "platform", service: "api-server",
+		traceById: &traceById,
+	})
+	assert.Equal(t, 2, serviceQueue.requestCount)
+
+	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v3/rules")
+	s.sampleTraces(ctx, &resourceTraces{
+		namespace: "platform", service: "api-server",
+		traceById: &traceById,
+	})
+	assert.Equal(t, 2, serviceQueue.requestCount)
 }
 
 func TestFlushTraces(t *testing.T) {

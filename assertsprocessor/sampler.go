@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/jellydator/ttlcache/v3"
 	"sync"
 
 	"github.com/tilinna/clock"
@@ -57,13 +58,14 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 		entityKeyString := traceStruct.requestKey.entityKey.AsString()
 
 		// Get the traceStruct queue for the entity and request
-		perService, _ := s.topTracesByService.LoadOrStore(entityKeyString, NewServiceQueues(s.config))
+		perService, _ := s.topTracesByService.LoadOrStore(entityKeyString, newServiceQueues(s.config))
 		request := traceStruct.requestKey.request
 		requestState := perService.(*serviceQueues).getRequestState(request)
 		if requestState == nil {
 			s.logger.Warn("Too many requests in Entity. Dropping",
 				zap.String("Entity", entityKeyString),
 				zap.String("Request", request))
+			return
 		}
 
 		item := Item{
@@ -82,7 +84,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 
 			s.logger.Debug("Capturing error trace",
 				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
-				zap.String("service", traceStruct.requestKey.entityKey.AsString()),
+				zap.String("service", entityKeyString),
 				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
@@ -91,33 +93,59 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 
 			s.logger.Debug("Capturing slow trace",
 				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
-				zap.String("service", traceStruct.requestKey.entityKey.AsString()),
+				zap.String("service", entityKeyString),
 				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latencyThreshold", traceStruct.latencyThreshold),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.slowQueue.push(&item)
 		} else {
-			// Capture healthy samples based on configured sampling rate
-			entry, _ := s.topTracesByService.LoadOrStore(entityKeyString, NewServiceQueues(s.config))
-			perService := entry.(*serviceQueues)
-			requestState := perService.getRequestState(request)
-			samplingState, _ := perService.periodicSamplingStates.LoadOrStore(request, &periodicSamplingState{
+			s.captureNormalSample(&item)
+		}
+	}
+}
+
+func (s *sampler) captureNormalSample(item *Item) {
+	// Capture healthy samples based on configured sampling rate
+	entityKeyString := item.trace.requestKey.entityKey.AsString()
+	request := item.trace.requestKey.request
+	entry, _ := s.topTracesByService.LoadOrStore(entityKeyString, newServiceQueues(s.config))
+	perService := entry.(*serviceQueues)
+	requestState := perService.getRequestState(request)
+	samplingStates := perService.periodicSamplingStates
+	samplingStateKV := samplingStates.Get(request)
+
+	if samplingStates.Len() < s.config.LimitPerService || samplingStateKV != nil {
+		var samplingState *periodicSamplingState = nil
+		if samplingStateKV == nil {
+			samplingState = &periodicSamplingState{
 				lastSampleTime: 0,
 				rwMutex:        &sync.RWMutex{},
-			})
-			if requestState != nil && samplingState.(*periodicSamplingState).sample(s.config.NormalSamplingFrequencyMinutes) {
-				s.logger.Debug("Capturing normal trace",
-					zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
-					zap.String("entity", entityKeyString),
-					zap.String("request", request),
-					zap.Float64("latency", traceStruct.latency))
-
-				// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
-				traceStruct.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute,
-					s.spanMatcher.getRequest(traceStruct.rootSpan))
-				requestState.slowQueue.push(&item)
 			}
+			samplingStates.Set(request, samplingState, ttlcache.DefaultTTL)
+			s.logger.Debug("Adding request context to cache",
+				zap.String("service", entityKeyString),
+				zap.String("request context", request),
+			)
+		} else {
+			samplingState = samplingStateKV.Value()
 		}
+		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
+			s.logger.Debug("Capturing normal trace",
+				zap.String("traceId", item.trace.rootSpan.TraceID().String()),
+				zap.String("entity", entityKeyString),
+				zap.String("request", request),
+				zap.Float64("latency", item.trace.latency))
+
+			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
+			item.trace.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute,
+				s.spanMatcher.getRequest(item.trace.rootSpan))
+			requestState.slowQueue.push(item)
+		}
+	} else {
+		s.logger.Warn("Too many request contexts. Normal traces won't be captured for",
+			zap.String("service", entityKeyString),
+			zap.String("request context", request),
+		)
 	}
 }
 

@@ -8,7 +8,7 @@ import (
 
 func TestNewServiceQueues(t *testing.T) {
 	var testConfig = &Config{}
-	var sq = NewServiceQueues(testConfig)
+	var sq = newServiceQueues(testConfig)
 
 	assert.NotNil(t, sq.requestStates)
 	assert.NotNil(t, sq.rwMutex)
@@ -21,7 +21,7 @@ func TestNewServiceQueues_Limit_Zero(t *testing.T) {
 		LimitPerService:           0,
 		LimitPerRequestPerService: 5,
 	}
-	var sq = NewServiceQueues(testConfig)
+	var sq = newServiceQueues(testConfig)
 
 	assert.Nil(t, sq.getRequestState("/request1"))
 	assert.Equal(t, 0, sq.requestCount)
@@ -32,7 +32,7 @@ func TestNewServiceQueues_Limit_One(t *testing.T) {
 		LimitPerService:           1,
 		LimitPerRequestPerService: 5,
 	}
-	var sq = NewServiceQueues(testConfig)
+	var sq = newServiceQueues(testConfig)
 
 	assert.Equal(t, 0, sq.requestCount)
 	queue := sq.getRequestState("/request1")
@@ -59,7 +59,7 @@ func TestNewServiceQueues_Limit_Two(t *testing.T) {
 		LimitPerService:           2,
 		LimitPerRequestPerService: 5,
 	}
-	var sq = NewServiceQueues(testConfig)
+	var sq = newServiceQueues(testConfig)
 
 	assert.Equal(t, 0, sq.requestCount)
 	queue := sq.getRequestState("/request1")
