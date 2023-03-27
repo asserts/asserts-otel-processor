@@ -33,7 +33,7 @@ type metricHelper struct {
 }
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span) {
-	serviceKey := service + "#" + namespace
+	serviceKey := namespace + "#" + service
 	requestContext := p.spanMatcher.getRequest(span)
 
 	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {

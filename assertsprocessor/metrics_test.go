@@ -99,7 +99,7 @@ func TestCaptureMetrics(t *testing.T) {
 	assert.NotNil(t, metric)
 }
 
-func TestRequestContextCardinalityExplosion(t *testing.T) {
+func TestMetricCardinalityLimit(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
 	matcher := spanMatcher{
@@ -129,7 +129,7 @@ func TestRequestContextCardinalityExplosion(t *testing.T) {
 
 	p.captureMetrics("robot-shop", "cart", &testSpan)
 	assert.Equal(t, 1, p.requestContextsByService.Size())
-	cache, _ := p.requestContextsByService.Load("cart#robot-shop")
+	cache, _ := p.requestContextsByService.Load("robot-shop#cart")
 	assert.Equal(t, 1, cache.Len())
 
 	testSpan.Attributes().PutStr("http.url", "http://cart:8080/cart/anonymous-2")
