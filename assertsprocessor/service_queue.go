@@ -1,24 +1,29 @@
 package assertsprocessor
 
 import (
+	"github.com/jellydator/ttlcache/v3"
 	"math"
 	"sync"
+	"time"
 )
 
 type serviceQueues struct {
 	config                 *Config
 	requestStates          *sync.Map
-	periodicSamplingStates *sync.Map
+	periodicSamplingStates *ttlcache.Cache[string, *periodicSamplingState]
 	requestCount           int
 	rwMutex                *sync.RWMutex
 }
 
-func NewServiceQueues(config *Config) *serviceQueues {
+func newServiceQueues(config *Config) *serviceQueues {
 	return &serviceQueues{
-		config:                 config,
-		requestStates:          &sync.Map{},
-		periodicSamplingStates: &sync.Map{},
-		rwMutex:                &sync.RWMutex{},
+		config:        config,
+		requestStates: &sync.Map{},
+		periodicSamplingStates: ttlcache.New[string, *periodicSamplingState](
+			ttlcache.WithTTL[string, *periodicSamplingState](time.Minute*time.Duration(config.RequestContextCacheTTL)),
+			ttlcache.WithCapacity[string, *periodicSamplingState](uint64(config.LimitPerService)),
+		),
+		rwMutex: &sync.RWMutex{},
 	}
 }
 
