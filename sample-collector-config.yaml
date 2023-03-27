@@ -21,9 +21,6 @@ processors:
       endpoint: https://chief.app.dev.asserts.ai/api-server
     asserts_env: dev
     asserts_site: dev
-    span_attribute_match_regex:
-      "rpc.system": "aws-api"
-      "rpc.service": "(Sqs)|(DynamoDb)"
     request_context_regex:
       - attr_name: "http.route"
         regex: "(.+)"
