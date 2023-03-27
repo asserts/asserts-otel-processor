@@ -19,6 +19,7 @@ type Config struct {
 	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
 	LimitPerService                int                `mapstructure:"trace_rate_limit_per_service"`
 	LimitPerRequestPerService      int                `mapstructure:"trace_rate_limit_per_service_per_request"`
+	RequestContextCacheTTL         int                `mapstructure:"request_context_cache_ttl_minutes"`
 	NormalSamplingFrequencyMinutes int                `mapstructure:"normal_trace_sampling_rate_minutes"`
 	PrometheusExporterPort         uint64             `mapstructure:"prometheus_exporter_port"`
 	TraceFlushFrequencySeconds     int                `mapstructure:"trace_flush_frequency_seconds"`

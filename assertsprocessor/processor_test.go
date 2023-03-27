@@ -2,6 +2,8 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/jellydator/ttlcache/v3"
+	"github.com/puzpuzpuz/xsync/v2"
 	"sync"
 	"testing"
 	"time"
@@ -117,9 +119,10 @@ func TestConsumeTraces(t *testing.T) {
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 	}
 	metricHelper := &metricHelper{
-		logger:      testLogger,
-		config:      &testConfig,
-		spanMatcher: &spanMatcher{},
+		logger:                   testLogger,
+		config:                   &testConfig,
+		spanMatcher:              &spanMatcher{},
+		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
 	}
 	p := assertsProcessorImpl{
 		logger:        testLogger,
