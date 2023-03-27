@@ -2,6 +2,8 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/jellydator/ttlcache/v3"
+	"github.com/puzpuzpuz/xsync/v2"
 	"sync"
 	"time"
 
@@ -68,9 +70,10 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	metricsHelper := metricHelper{
-		logger:      logger,
-		config:      pConfig,
-		spanMatcher: spanMatcher,
+		logger:                   logger,
+		config:                   pConfig,
+		spanMatcher:              spanMatcher,
+		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
 	}
 	err = metricsHelper.buildHistogram()
 

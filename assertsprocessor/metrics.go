@@ -1,9 +1,11 @@
 package assertsprocessor
 
 import (
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/puzpuzpuz/xsync/v2"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 	"net/http"
@@ -13,26 +15,64 @@ import (
 	"time"
 )
 
+const (
+	envLabel            = "asserts_env"
+	siteLabel           = "asserts_site"
+	namespaceLabel      = "namespace"
+	serviceLabel        = "service"
+	requestContextLabel = "asserts_request_context"
+)
+
 type metricHelper struct {
-	logger             *zap.Logger
-	config             *Config
-	prometheusRegistry *prometheus.Registry
-	latencyHistogram   *prometheus.HistogramVec
-	spanMatcher        *spanMatcher
+	logger                   *zap.Logger
+	config                   *Config
+	prometheusRegistry       *prometheus.Registry
+	latencyHistogram         *prometheus.HistogramVec
+	spanMatcher              *spanMatcher
+	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]]
 }
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span) {
-	labels := p.buildLabels(namespace, service, span)
-	latencySeconds := computeLatency(span)
-	p.recordLatency(labels, latencySeconds)
+	serviceKey := service + "#" + namespace
+	requestContext := p.spanMatcher.getRequest(span)
+
+	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {
+		cache := ttlcache.New[string, string](
+			ttlcache.WithTTL[string, string](time.Minute*time.Duration(p.config.RequestContextCacheTTL)),
+			ttlcache.WithCapacity[string, string](uint64(p.config.LimitPerService)),
+		)
+		p.logger.Debug("Created a cache of known request contexts for service - " + serviceKey)
+
+		go cache.Start() // starts automatic expired item deletion
+		return cache
+	})
+
+	if val := cache.Get(requestContext); cache.Len() < p.config.LimitPerService || val != nil {
+		if val == nil {
+			cache.Set(requestContext, requestContext, ttlcache.DefaultTTL)
+			p.logger.Debug("Adding request context to cache",
+				zap.String("service", serviceKey),
+				zap.String("request context", requestContext),
+			)
+		}
+		labels := p.buildLabels(namespace, service, requestContext, span)
+		latencySeconds := computeLatency(span)
+		p.recordLatency(labels, latencySeconds)
+	} else {
+		p.logger.Warn("Too many request contexts. Metrics won't be captured for",
+			zap.String("service", serviceKey),
+			zap.String("request context", requestContext),
+		)
+	}
 }
 
-func (p *metricHelper) buildLabels(namespace string, service string, span *ptrace.Span) prometheus.Labels {
+func (p *metricHelper) buildLabels(namespace string, service string, requestContext string, span *ptrace.Span) prometheus.Labels {
 	labels := prometheus.Labels{
-		"asserts_env":  p.config.Env,
-		"asserts_site": p.config.Site,
-		"namespace":    namespace,
-		"service":      service,
+		envLabel:            p.config.Env,
+		siteLabel:           p.config.Site,
+		namespaceLabel:      namespace,
+		serviceLabel:        service,
+		requestContextLabel: requestContext,
 	}
 
 	for _, labelName := range p.config.CaptureAttributesInMetric {
@@ -51,7 +91,7 @@ func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds fl
 }
 
 func (p *metricHelper) buildHistogram() error {
-	var allowedLabels = []string{"asserts_env", "asserts_site", "namespace", "service"}
+	var allowedLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestContextLabel}
 	if p.config.CaptureAttributesInMetric != nil {
 		for _, label := range p.config.CaptureAttributesInMetric {
 			allowedLabels = append(allowedLabels, p.applyPromConventions(label))
