@@ -42,8 +42,21 @@ type traceStruct struct {
 	exitSpans        []*ptrace.Span
 }
 
+func (t *traceStruct) getMainSpan() *ptrace.Span {
+	// A distributed trace will have only one root span. Trace fragments that come from a downstream service
+	// will not have a root span. In such a scenario, use the first entry or exit span as the main span
+	if t.rootSpan != nil {
+		return t.rootSpan
+	} else if len(t.entrySpans) > 0 {
+		return t.entrySpans[0]
+	} else if len(t.exitSpans) > 0 {
+		return t.exitSpans[0]
+	}
+	return nil
+}
+
 func (t *traceStruct) hasError() bool {
-	if spanHasError(t.rootSpan) {
+	if t.rootSpan != nil && spanHasError(t.rootSpan) {
 		return true
 	}
 
@@ -124,8 +137,10 @@ func buildTrace(trace *traceStruct) *ptrace.Traces {
 	trace.resourceSpan.Resource().CopyTo(rs.Resource())
 	ils := rs.ScopeSpans().AppendEmpty()
 
-	rootSpan := ils.Spans().AppendEmpty()
-	trace.rootSpan.CopyTo(rootSpan)
+	if trace.rootSpan != nil {
+		rootSpan := ils.Spans().AppendEmpty()
+		trace.rootSpan.CopyTo(rootSpan)
+	}
 
 	for _, span := range trace.internalSpans {
 		sp := ils.Spans().AppendEmpty()

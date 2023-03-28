@@ -51,7 +51,7 @@ func (s *sampler) stopProcessing() {
 
 func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 	for _, traceStruct := range *traces.traceById {
-		if traceStruct.rootSpan == nil {
+		if traceStruct.getMainSpan() == nil {
 			continue
 		}
 		s.updateTrace(traces.namespace, traces.service, traceStruct)
@@ -75,7 +75,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 		}
 		if traceStruct.hasError() {
 			// For all the spans which have error, add the request context
-			traceStruct.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, request)
+			traceStruct.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)
 			for _, span := range traceStruct.exitSpans {
 				if spanHasError(span) {
 					span.Attributes().PutStr(AssertsRequestContextAttribute, request)
@@ -83,16 +83,16 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 			}
 
 			s.logger.Debug("Capturing error trace",
-				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
+				zap.String("traceId", traceStruct.getMainSpan().TraceID().String()),
 				zap.String("service", entityKeyString),
 				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
 		} else if traceStruct.isSlow {
-			traceStruct.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, request)
+			traceStruct.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)
 
 			s.logger.Debug("Capturing slow trace",
-				zap.String("traceId", traceStruct.rootSpan.TraceID().String()),
+				zap.String("traceId", traceStruct.getMainSpan().TraceID().String()),
 				zap.String("service", entityKeyString),
 				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latencyThreshold", traceStruct.latencyThreshold),
@@ -131,14 +131,13 @@ func (s *sampler) captureNormalSample(item *Item) {
 		}
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
 			s.logger.Debug("Capturing normal trace",
-				zap.String("traceId", item.trace.rootSpan.TraceID().String()),
+				zap.String("traceId", item.trace.getMainSpan().TraceID().String()),
 				zap.String("entity", entityKeyString),
 				zap.String("request", request),
 				zap.Float64("latency", item.trace.latency))
 
 			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
-			item.trace.rootSpan.Attributes().PutStr(AssertsRequestContextAttribute,
-				s.spanMatcher.getRequest(item.trace.rootSpan))
+			item.trace.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)
 			requestState.slowQueue.push(item)
 		}
 	} else {
@@ -151,20 +150,20 @@ func (s *sampler) captureNormalSample(item *Item) {
 
 func (s *sampler) updateTrace(namespace string, service string, trace *traceStruct) {
 	entityKey := buildEntityKey(s.config, namespace, service)
-	request := s.spanMatcher.getRequest(trace.rootSpan)
-	trace.isSlow = s.isSlow(namespace, service, trace.rootSpan, request)
+	request := s.spanMatcher.getRequest(trace.getMainSpan())
+	trace.isSlow = s.isSlow(namespace, service, trace.getMainSpan(), request)
 	if trace.isSlow {
 		trace.latencyThreshold = s.thresholdHelper.getThreshold(namespace, service, request)
 	}
-	trace.latency = computeLatency(trace.rootSpan)
+	trace.latency = computeLatency(trace.getMainSpan())
 	trace.requestKey = &RequestKey{
 		entityKey: entityKey,
 		request:   request,
 	}
 }
 
-func (s *sampler) isSlow(namespace string, serviceName string, rootSpan *ptrace.Span, request string) bool {
-	return computeLatency(rootSpan) > s.thresholdHelper.getThreshold(namespace, serviceName, request)
+func (s *sampler) isSlow(namespace string, serviceName string, mainSpan *ptrace.Span, request string) bool {
+	return computeLatency(mainSpan) > s.thresholdHelper.getThreshold(namespace, serviceName, request)
 }
 
 func (s *sampler) stopTraceFlusher() {
