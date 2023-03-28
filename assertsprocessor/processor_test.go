@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/puzpuzpuz/xsync/v2"
+	"go.opentelemetry.io/collector/consumer"
 	"sync"
 	"testing"
 	"time"
@@ -31,7 +32,15 @@ var testConfig = Config{
 	NormalSamplingFrequencyMinutes: 5,
 }
 
-func TestStart(t *testing.T) {
+func TestCapabilities(t *testing.T) {
+	testLogger, _ := zap.NewProduction()
+	p := assertsProcessorImpl{
+		logger: testLogger,
+	}
+	assert.Equal(t, consumer.Capabilities{MutatesData: true}, p.Capabilities())
+}
+
+func TestStartAndShutdown(t *testing.T) {
 	ctx := context.Background()
 	dConsumer := dummyConsumer{
 		items: make([]*Item, 0),
@@ -66,44 +75,8 @@ func TestStart(t *testing.T) {
 		},
 	}
 	assert.Nil(t, p.Start(ctx, nil))
+	assert.Nil(t, p.Shutdown(ctx))
 }
-
-//func TestShutdown(t *testing.T) {
-//	ctx := context.Background()
-//	dConsumer := dummyConsumer{
-//		items: make([]*Item, 0),
-//	}
-//	testLogger, _ := zap.NewProduction()
-//	_th := thresholdHelper{
-//		logger:              testLogger,
-//		config:              &testConfig,
-//		stop:                make(chan bool),
-//		entityKeys:          &sync.Map{},
-//		thresholds:          &sync.Map{},
-//		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-//	}
-//	p := assertsProcessorImpl{
-//		logger:       testLogger,
-//		config:       &testConfig,
-//		nextConsumer: dConsumer,
-//		metricBuilder: &metricHelper{
-//			logger:                testLogger,
-//			config:                &testConfig,
-//			attributeValueRegExps: &map[string]regexp.Regexp{},
-//		},
-//		thresholdsHelper: &_th,
-//		sampler: &sampler{
-//			logger:               testLogger,
-//			config:               &testConfig,
-//			nextConsumer:         dConsumer,
-//			topTracesByService:         &sync.Map{},
-//			stop:                 make(chan bool),
-//			traceFlushTicker:     clock.FromContext(ctx).NewTicker(time.Minute),
-//			thresholdHelper:      &_th,
-//			spanAttrMatchers:       &map[string]regexp.Regexp{},
-//		},
-//	}
-//}
 
 func TestConsumeTraces(t *testing.T) {
 	ctx := context.Background()
@@ -157,6 +130,7 @@ func TestConsumeTraces(t *testing.T) {
 	nestedSpan := scopeSpans.Spans().AppendEmpty()
 	nestedSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
 	nestedSpan.SetParentSpanID(rootSpan.SpanID())
+	nestedSpan.SetKind(ptrace.SpanKindClient)
 	nestedSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
 	nestedSpan.Attributes().PutBool("error", true)
 	nestedSpan.SetStartTimestamp(1e9)
