@@ -48,17 +48,19 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourceTraces) error {
 	p.sampler.sampleTraces(ctx, traces)
 
-	for _, aTrace := range *traces.traceById {
-		if aTrace.rootSpan != nil {
-			p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan)
-		}
+	if p.config.CaptureMetrics {
+		for _, aTrace := range *traces.traceById {
+			if aTrace.rootSpan != nil {
+				p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan)
+			}
 
-		for _, entrySpan := range aTrace.entrySpans {
-			p.metricBuilder.captureMetrics(traces.namespace, traces.service, entrySpan)
-		}
+			for _, entrySpan := range aTrace.entrySpans {
+				p.metricBuilder.captureMetrics(traces.namespace, traces.service, entrySpan)
+			}
 
-		for _, exitSpan := range aTrace.exitSpans {
-			p.metricBuilder.captureMetrics(traces.namespace, traces.service, exitSpan)
+			for _, exitSpan := range aTrace.exitSpans {
+				p.metricBuilder.captureMetrics(traces.namespace, traces.service, exitSpan)
+			}
 		}
 	}
 

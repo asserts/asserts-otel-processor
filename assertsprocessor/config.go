@@ -14,6 +14,7 @@ type Config struct {
 	AssertsServer                  *map[string]string `mapstructure:"asserts_server"`
 	Env                            string             `mapstructure:"asserts_env"`
 	Site                           string             `mapstructure:"asserts_site"`
+	CaptureMetrics                 bool               `mapstructure:"capture_metrics"`
 	RequestContextExps             *[]*MatcherDto     `mapstructure:"request_context_regex"`
 	CaptureAttributesInMetric      []string           `mapstructure:"attributes_as_metric_labels"`
 	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`

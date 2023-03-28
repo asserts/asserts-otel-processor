@@ -16,9 +16,10 @@ import (
 )
 
 var testConfig = Config{
-	Env:           "dev",
-	Site:          "us-west-2",
-	AssertsServer: &map[string]string{"endpoint": "http://localhost:8030"},
+	Env:            "dev",
+	Site:           "us-west-2",
+	AssertsServer:  &map[string]string{"endpoint": "http://localhost:8030"},
+	CaptureMetrics: true,
 	RequestContextExps: &[]*MatcherDto{{
 		AttrName: "attribute",
 		Regex:    ".+",

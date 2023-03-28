@@ -21,20 +21,21 @@ processors:
       endpoint: https://chief.app.dev.asserts.ai/api-server
     asserts_env: dev
     asserts_site: dev
+    capture_metrics: true
     request_context_regex:
       - attr_name: "http.route"
         regex: "(.+)"
       - attr_name: "http.url"
         regex: "https?://.+?(/.+)"
     attributes_as_metric_labels:
-     - "rpc.system"
-     - "rpc.service"
-     - "rpc.method"
-     - "aws.table.name"
-     - "aws.queue.url"
-service: 
+      - "rpc.system"
+      - "rpc.service"
+      - "rpc.method"
+      - "aws.table.name"
+      - "aws.queue.url"
+service:
   telemetry:
-    logs: 
+    logs:
       level: "debug"
   pipelines:
     traces:
