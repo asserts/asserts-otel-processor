@@ -26,7 +26,7 @@ processors:
       - attr_name: "http.route"
         regex: "(.+)"
       - attr_name: "http.url"
-        regex: "https?://.+?(/.+)"
+        regex: "https?://.+?((/[^/?]+){1,2}).*"
     attributes_as_metric_labels:
       - "rpc.system"
       - "rpc.service"

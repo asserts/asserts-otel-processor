@@ -58,9 +58,8 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 
 func TestGetExpMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
-	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
+	compile, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
 	matcher := spanMatcher{
 		spanAttrMatchers: []*spanAttrMatcher{
 			{
@@ -70,8 +69,23 @@ func TestGetExpMatch(t *testing.T) {
 		},
 	}
 
-	value := matcher.getRequest(&testSpan)
-	assert.Equal(t, "/342994379019/NodeJSPerf-WithLayer", value)
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo")
+	assert.Equal(t, "/foo", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo?a=b")
+	assert.Equal(t, "/foo", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar")
+	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar?a=b")
+	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar/baz")
+	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar/baz?a=b")
+	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan))
 }
 
 func TestGetExpNoMatch(t *testing.T) {

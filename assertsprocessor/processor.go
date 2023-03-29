@@ -51,15 +51,15 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourc
 	if p.config.CaptureMetrics {
 		for _, aTrace := range *traces.traceById {
 			if aTrace.rootSpan != nil {
-				p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan)
+				p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan, aTrace.resourceSpan)
 			}
 
 			for _, entrySpan := range aTrace.entrySpans {
-				p.metricBuilder.captureMetrics(traces.namespace, traces.service, entrySpan)
+				p.metricBuilder.captureMetrics(traces.namespace, traces.service, entrySpan, aTrace.resourceSpan)
 			}
 
 			for _, exitSpan := range aTrace.exitSpans {
-				p.metricBuilder.captureMetrics(traces.namespace, traces.service, exitSpan)
+				p.metricBuilder.captureMetrics(traces.namespace, traces.service, exitSpan, aTrace.resourceSpan)
 			}
 		}
 	}
