@@ -32,7 +32,9 @@ type metricHelper struct {
 	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]]
 }
 
-func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span) {
+func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span,
+	resourceSpan *ptrace.ResourceSpans) {
+
 	serviceKey := namespace + "#" + service
 	requestContext := p.spanMatcher.getRequest(span)
 
@@ -55,7 +57,7 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 				zap.String("request context", requestContext),
 			)
 		}
-		labels := p.buildLabels(namespace, service, requestContext, span)
+		labels := p.buildLabels(namespace, service, requestContext, span, resourceSpan)
 		latencySeconds := computeLatency(span)
 		p.recordLatency(labels, latencySeconds)
 	} else {
@@ -66,7 +68,9 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	}
 }
 
-func (p *metricHelper) buildLabels(namespace string, service string, requestContext string, span *ptrace.Span) prometheus.Labels {
+func (p *metricHelper) buildLabels(namespace string, service string, requestContext string, span *ptrace.Span,
+	resourceSpan *ptrace.ResourceSpans) prometheus.Labels {
+
 	labels := prometheus.Labels{
 		envLabel:            p.config.Env,
 		siteLabel:           p.config.Site,
@@ -77,6 +81,9 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 
 	for _, labelName := range p.config.CaptureAttributesInMetric {
 		value, present := span.Attributes().Get(labelName)
+		if !present {
+			value, present = resourceSpan.Resource().Attributes().Get(labelName)
+		}
 		if present {
 			labels[p.applyPromConventions(labelName)] = value.AsString()
 		} else {
