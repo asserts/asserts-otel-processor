@@ -2,8 +2,6 @@ package assertsprocessor
 
 import (
 	"context"
-	"github.com/jellydator/ttlcache/v3"
-	"github.com/puzpuzpuz/xsync/v2"
 	"go.opentelemetry.io/collector/consumer"
 	"sync"
 	"testing"
@@ -55,14 +53,10 @@ func TestStartAndShutdown(t *testing.T) {
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 	}
 	p := assertsProcessorImpl{
-		logger:       testLogger,
-		config:       &testConfig,
-		nextConsumer: dConsumer,
-		metricBuilder: &metricHelper{
-			logger:      testLogger,
-			config:      &testConfig,
-			spanMatcher: &spanMatcher{},
-		},
+		logger:        testLogger,
+		config:        &testConfig,
+		nextConsumer:  dConsumer,
+		metricBuilder: newMetricHelper(testLogger, &testConfig, &spanMatcher{}),
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,
@@ -92,17 +86,11 @@ func TestConsumeTraces(t *testing.T) {
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 	}
-	metricHelper := &metricHelper{
-		logger:                   testLogger,
-		config:                   &testConfig,
-		spanMatcher:              &spanMatcher{},
-		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
-	}
 	p := assertsProcessorImpl{
 		logger:        testLogger,
 		config:        &testConfig,
 		nextConsumer:  dConsumer,
-		metricBuilder: metricHelper,
+		metricBuilder: newMetricHelper(testLogger, &testConfig, &spanMatcher{}),
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,
@@ -136,7 +124,6 @@ func TestConsumeTraces(t *testing.T) {
 	nestedSpan.SetStartTimestamp(1e9)
 	nestedSpan.SetEndTimestamp(1e9 + 4e8)
 
-	metricHelper.buildHistogram()
 	err := p.ConsumeTraces(ctx, testTrace)
 	assert.Nil(t, err)
 }

@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -27,9 +28,20 @@ type metricHelper struct {
 	logger                   *zap.Logger
 	config                   *Config
 	prometheusRegistry       *prometheus.Registry
-	latencyHistogram         *prometheus.HistogramVec
 	spanMatcher              *spanMatcher
+	histograms               *xsync.MapOf[string, *prometheus.HistogramVec]
 	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]]
+}
+
+func newMetricHelper(logger *zap.Logger, config *Config, spanMatcher *spanMatcher) *metricHelper {
+	return &metricHelper{
+		logger:                   logger,
+		config:                   config,
+		prometheusRegistry:       prometheus.NewRegistry(),
+		spanMatcher:              spanMatcher,
+		histograms:               xsync.NewMapOf[*prometheus.HistogramVec](),
+		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
+	}
 }
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span,
@@ -59,7 +71,8 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 		}
 		labels := p.buildLabels(namespace, service, requestContext, span, resourceSpan)
 		latencySeconds := computeLatency(span)
-		p.recordLatency(labels, latencySeconds)
+		histogram := p.getOrCreateHistogram(labels)
+		histogram.With(labels).Observe(latencySeconds)
 	} else {
 		p.logger.Warn("Too many request contexts. Metrics won't be captured for",
 			zap.String("service", serviceKey),
@@ -86,38 +99,28 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 		}
 		if present {
 			labels[p.applyPromConventions(labelName)] = value.AsString()
-		} else {
-			labels[p.applyPromConventions(labelName)] = ""
 		}
 	}
 	return labels
 }
 
-func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds float64) {
-	p.latencyHistogram.With(labels).Observe(latencySeconds)
-}
-
-func (p *metricHelper) buildHistogram() error {
-	var allowedLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestContextLabel}
-	if p.config.CaptureAttributesInMetric != nil {
-		for _, label := range p.config.CaptureAttributesInMetric {
-			allowedLabels = append(allowedLabels, p.applyPromConventions(label))
-		}
+func (p *metricHelper) getOrCreateHistogram(labels prometheus.Labels) *prometheus.HistogramVec {
+	labelNames := make([]string, 0, len(labels))
+	for k := range labels {
+		labelNames = append(labelNames, k)
 	}
-
-	// Start the prometheus server on port 9465
-	p.prometheusRegistry = prometheus.NewRegistry()
-	p.latencyHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "otel",
-		Subsystem: "span",
-		Name:      "latency_seconds",
-	}, allowedLabels)
-	err := p.prometheusRegistry.Register(p.latencyHistogram)
-	if err != nil {
-		p.logger.Fatal("Error starting Prometheus Server", zap.Error(err))
-		return err
-	}
-	return nil
+	sort.Strings(labelNames)
+	histogramKey := strings.Join(labelNames, ",")
+	histogram, _ := p.histograms.LoadOrCompute(histogramKey, func() *prometheus.HistogramVec {
+		histogram := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: "otel",
+			Subsystem: "span",
+			Name:      "latency_seconds",
+		}, labelNames)
+		p.prometheusRegistry.Register(histogram)
+		return histogram
+	})
+	return histogram
 }
 
 func (p *metricHelper) startExporter() {

@@ -2,28 +2,26 @@ package assertsprocessor
 
 import (
 	"github.com/google/go-cmp/cmp"
-	"github.com/jellydator/ttlcache/v3"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/puzpuzpuz/xsync/v2"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 	"regexp"
 	"testing"
-	"time"
 )
 
 func TestBuildLabels(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	p := metricHelper{
-		logger: logger,
-		config: &Config{
+	p := newMetricHelper(
+		logger,
+		&Config{
 			Env:  "dev",
 			Site: "us-west-2",
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
 				"aws.table.name", "aws.queue.url", "host.name"},
 		},
-	}
+		&spanMatcher{},
+	)
 
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 	resourceSpans.Resource().Attributes().PutStr("host.name", "192.168.1.19")
@@ -43,7 +41,6 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels["rpc_service"] = "DynamoDb"
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
-	expectedLabels["aws_queue_url"] = ""
 	expectedLabels["rpc_system"] = "aws-api"
 	expectedLabels["host_name"] = "192.168.1.19"
 
@@ -62,19 +59,17 @@ func TestCaptureMetrics(t *testing.T) {
 			},
 		},
 	}
-	p := metricHelper{
-		logger: logger,
-		config: &Config{
+	p := newMetricHelper(
+		logger,
+		&Config{
 			Env:  "dev",
 			Site: "us-west-2",
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
 				"aws.table.name", "aws.queue.url", "host.name"},
 			LimitPerService: 100,
 		},
-		spanMatcher:              &matcher,
-		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
-	}
-	_ = p.buildHistogram()
+		&matcher,
+	)
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()
@@ -96,14 +91,27 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels["rpc_service"] = "DynamoDb"
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
-	expectedLabels["aws_queue_url"] = ""
 	expectedLabels["rpc_system"] = "aws-api"
-	expectedLabels["host_name"] = "192.168.1.19"
 
+	assert.Equal(t, 0, p.histograms.Size())
 	p.captureMetrics("ride-services", "payment", &testSpan, &resourceSpans)
-	metric, err := p.latencyHistogram.GetMetricWith(expectedLabels)
+	assert.Equal(t, 1, p.histograms.Size())
+
+	metricKey := "asserts_env,asserts_request_context,asserts_site,aws_table_name,namespace,rpc_method,rpc_service,rpc_system,service"
+	p.histograms.Range(func(key string, value *prometheus.HistogramVec) bool {
+		assert.Equal(t, metricKey, key)
+		assert.NotNil(t, value)
+		return true
+	})
+
+	histogram, loaded := p.histograms.Load(metricKey)
+	assert.True(t, loaded)
+	observer, err := histogram.GetMetricWith(expectedLabels)
 	assert.Nil(t, err)
-	assert.NotNil(t, metric)
+	assert.NotNil(t, observer)
+
+	p.histograms.Delete(metricKey)
+	assert.Equal(t, 0, p.histograms.Size())
 }
 
 func TestMetricCardinalityLimit(t *testing.T) {
@@ -117,17 +125,15 @@ func TestMetricCardinalityLimit(t *testing.T) {
 			},
 		},
 	}
-	p := metricHelper{
-		logger: logger,
-		config: &Config{
+	p := newMetricHelper(
+		logger,
+		&Config{
 			Env:             "dev",
 			Site:            "us-west-2",
 			LimitPerService: 2,
 		},
-		spanMatcher:              &matcher,
-		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
-	}
-	_ = p.buildHistogram()
+		&matcher,
+	)
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()
@@ -151,21 +157,4 @@ func TestMetricCardinalityLimit(t *testing.T) {
 	assert.NotNil(t, cache.Get("/cart/anonymous-1"))
 	assert.NotNil(t, cache.Get("/cart/anonymous-2"))
 	assert.Nil(t, cache.Get("/cart/anonymous-3"))
-}
-
-func TestStartExporter(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	p := metricHelper{
-		logger: logger,
-		config: &Config{
-			Env:                    "dev",
-			Site:                   "us-west-2",
-			PrometheusExporterPort: 19465,
-			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
-				"aws.table.name", "aws.queue.url"},
-		},
-	}
-	_ = p.buildHistogram()
-	go p.startExporter()
-	time.Sleep(2 * time.Second)
 }
