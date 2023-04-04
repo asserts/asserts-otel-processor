@@ -54,8 +54,9 @@ func TestCaptureMetrics(t *testing.T) {
 	matcher := spanMatcher{
 		spanAttrMatchers: []*spanAttrMatcher{
 			{
-				attrName: "rpc.method",
-				regex:    compile,
+				attrName:    "rpc.method",
+				regex:       compile,
+				replacement: "$1",
 			},
 		},
 	}
@@ -120,8 +121,9 @@ func TestMetricCardinalityLimit(t *testing.T) {
 	matcher := spanMatcher{
 		spanAttrMatchers: []*spanAttrMatcher{
 			{
-				attrName: "http.url",
-				regex:    compile,
+				attrName:    "http.url",
+				regex:       compile,
+				replacement: "$1",
 			},
 		},
 	}

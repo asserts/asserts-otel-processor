@@ -7,8 +7,9 @@ import (
 )
 
 type spanAttrMatcher struct {
-	attrName string
-	regex    *regexp.Regexp
+	attrName    string
+	regex       *regexp.Regexp
+	replacement string
 }
 
 type spanMatcher struct {
@@ -25,8 +26,9 @@ func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *
 				return err
 			}
 			sm.spanAttrMatchers = append(sm.spanAttrMatchers, &spanAttrMatcher{
-				attrName: matcher.AttrName,
-				regex:    compile,
+				attrName:    matcher.AttrName,
+				regex:       compile,
+				replacement: matcher.Replacement,
 			})
 		}
 	}
@@ -40,7 +42,7 @@ func (sm *spanMatcher) getRequest(span *ptrace.Span) string {
 		if found {
 			subMatch := matcher.regex.FindStringSubmatch(value.AsString())
 			if len(subMatch) >= 1 {
-				return subMatch[1]
+				return matcher.regex.ReplaceAllString(value.AsString(), matcher.replacement)
 			}
 		}
 	}

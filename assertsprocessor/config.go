@@ -6,8 +6,9 @@ import (
 )
 
 type MatcherDto struct {
-	AttrName string `mapstructure:"attr_name"`
-	Regex    string `mapstructure:"regex"`
+	AttrName    string `mapstructure:"attr_name"`
+	Regex       string `mapstructure:"regex"`
+	Replacement string `mapstructure:"replacement"`
 }
 
 type Config struct {
