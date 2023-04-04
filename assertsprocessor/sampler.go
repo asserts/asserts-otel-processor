@@ -122,7 +122,7 @@ func (s *sampler) captureNormalSample(item *Item) {
 				rwMutex:        &sync.RWMutex{},
 			}
 			samplingStates.Set(request, samplingState, ttlcache.DefaultTTL)
-			s.logger.Debug("Adding request context to cache",
+			s.logger.Debug("Adding request context to sampling states cache",
 				zap.String("service", entityKeyString),
 				zap.String("request context", request),
 			)

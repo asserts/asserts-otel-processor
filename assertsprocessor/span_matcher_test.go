@@ -14,8 +14,9 @@ func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 	err := matcher.compileRequestContextRegexps(logger, &Config{
 		RequestContextExps: &[]*MatcherDto{
 			{
-				AttrName: "attribute1",
-				Regex:    "Foo",
+				AttrName:    "attribute1",
+				Regex:       "Foo",
+				Replacement: "$1",
 			},
 			{
 				AttrName: "attribute2",
@@ -44,8 +45,9 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 	err := matcher.compileRequestContextRegexps(logger, &Config{
 		RequestContextExps: &[]*MatcherDto{
 			{
-				AttrName: "attribute1",
-				Regex:    "+",
+				AttrName:    "attribute1",
+				Regex:       "+",
+				Replacement: "$1",
 			},
 			{
 				AttrName: "attribute2",
@@ -56,15 +58,16 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestGetExpMatch(t *testing.T) {
+func TestGetRequestMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 
 	compile, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
 	matcher := spanMatcher{
 		spanAttrMatchers: []*spanAttrMatcher{
 			{
-				attrName: "http.url",
-				regex:    compile,
+				attrName:    "http.url",
+				regex:       compile,
+				replacement: "$1",
 			},
 		},
 	}
@@ -88,7 +91,37 @@ func TestGetExpMatch(t *testing.T) {
 	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan))
 }
 
-func TestGetExpNoMatch(t *testing.T) {
+func TestGetRequestMatchMultipleGroups(t *testing.T) {
+	testSpan := ptrace.NewSpan()
+
+	compile1, _ := regexp.Compile("http://user:8080(/check)/anonymous-.*")
+	compile2, _ := regexp.Compile("http://user:8080(/add)/[0-9]+/([A-Z]+)/[0-9]+")
+	matcher := spanMatcher{
+		spanAttrMatchers: []*spanAttrMatcher{
+			{
+				attrName:    "http.url",
+				regex:       compile1,
+				replacement: "$1/#val",
+			},
+			{
+				attrName:    "http.url",
+				regex:       compile2,
+				replacement: "$1/$2",
+			},
+		},
+	}
+
+	testSpan.Attributes().PutStr("http.url", "http://user:8080/check/anonymous-1")
+	assert.Equal(t, "/check/#val", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "http://user:8080/add/123/TOY/2")
+	assert.Equal(t, "/add/TOY", matcher.getRequest(&testSpan))
+
+	testSpan.Attributes().PutStr("http.url", "http://cart:8080/check/anonymous-1")
+	assert.Equal(t, "", matcher.getRequest(&testSpan))
+}
+
+func TestGetRequestNoMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 	testSpan.SetName("BackgroundJob")
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
@@ -97,8 +130,9 @@ func TestGetExpNoMatch(t *testing.T) {
 	matcher := spanMatcher{
 		spanAttrMatchers: []*spanAttrMatcher{
 			{
-				attrName: "http.url",
-				regex:    compile,
+				attrName:    "http.url",
+				regex:       compile,
+				replacement: "$1",
 			},
 		},
 	}

@@ -10,7 +10,7 @@ import (
 type serviceQueues struct {
 	config                 *Config
 	requestStates          *sync.Map
-	periodicSamplingStates *ttlcache.Cache[string, *periodicSamplingState]
+	periodicSamplingStates *ttlcache.Cache[string, *periodicSamplingState] // limit cardinality of request contexts for which traces are captured
 	requestCount           int
 	rwMutex                *sync.RWMutex
 }

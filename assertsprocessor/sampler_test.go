@@ -73,8 +73,9 @@ func TestSampleTraceWithError(t *testing.T) {
 		spanMatcher: &spanMatcher{
 			spanAttrMatchers: []*spanAttrMatcher{
 				{
-					attrName: "http.url",
-					regex:    compile,
+					attrName:    "http.url",
+					regex:       compile,
+					replacement: "$1",
 				},
 			},
 		},
@@ -147,8 +148,9 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		spanMatcher: &spanMatcher{
 			spanAttrMatchers: []*spanAttrMatcher{
 				{
-					attrName: "http.url",
-					regex:    compile,
+					attrName:    "http.url",
+					regex:       compile,
+					replacement: "$1",
 				},
 			},
 		},
@@ -221,8 +223,9 @@ func TestSampleNormalTrace(t *testing.T) {
 		spanMatcher: &spanMatcher{
 			spanAttrMatchers: []*spanAttrMatcher{
 				{
-					attrName: "http.url",
-					regex:    compile,
+					attrName:    "http.url",
+					regex:       compile,
+					replacement: "$1",
 				},
 			},
 		},
@@ -313,8 +316,9 @@ func TestTraceCardinalityLimit(t *testing.T) {
 		spanMatcher: &spanMatcher{
 			spanAttrMatchers: []*spanAttrMatcher{
 				{
-					attrName: "http.url",
-					regex:    compile,
+					attrName:    "http.url",
+					regex:       compile,
+					replacement: "$1",
 				},
 			},
 		},
@@ -379,8 +383,9 @@ func TestFlushTraces(t *testing.T) {
 		spanMatcher: &spanMatcher{
 			spanAttrMatchers: []*spanAttrMatcher{
 				{
-					attrName: "http.url",
-					regex:    compile,
+					attrName:    "http.url",
+					regex:       compile,
+					replacement: "$1",
 				},
 			},
 		},
