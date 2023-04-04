@@ -30,7 +30,7 @@ type metricHelper struct {
 	prometheusRegistry       *prometheus.Registry
 	spanMatcher              *spanMatcher
 	histograms               *xsync.MapOf[string, *prometheus.HistogramVec]
-	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]]
+	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]] // limit cardinality of request contexts for which metrics are captured
 }
 
 func newMetricHelper(logger *zap.Logger, config *Config, spanMatcher *spanMatcher) *metricHelper {
