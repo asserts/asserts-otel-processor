@@ -22,6 +22,11 @@ func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *
 	if config.RequestContextExps != nil {
 		for _, matcher := range *config.RequestContextExps {
 			compile, err := regexp.Compile(matcher.Regex)
+			logger.Debug("Compiled request context regex",
+				zap.String("AttrName", matcher.AttrName),
+				zap.String("Regex", matcher.Regex),
+				zap.String("Replacement", matcher.Replacement),
+			)
 			if err != nil {
 				return err
 			}

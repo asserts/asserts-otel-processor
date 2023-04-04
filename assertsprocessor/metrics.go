@@ -49,6 +49,14 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 
 	serviceKey := namespace + "#" + service
 	requestContext := p.spanMatcher.getRequest(span)
+	url, _ := span.Attributes().Get("http.url")
+	route, _ := span.Attributes().Get("http.route")
+	p.logger.Debug("Span Matcher getRequest",
+		zap.String("http.url", url.AsString()),
+		zap.String("http.route", route.AsString()),
+		zap.String("span.Name()", span.Name()),
+		zap.String("requestContext", requestContext),
+	)
 
 	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {
 		cache := ttlcache.New[string, string](
