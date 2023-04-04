@@ -20,9 +20,8 @@ var testConfig = Config{
 	AssertsServer:  &map[string]string{"endpoint": "http://localhost:8030"},
 	CaptureMetrics: true,
 	RequestContextExps: &[]*MatcherDto{{
-		AttrName:    "attribute",
-		Regex:       ".+",
-		Replacement: "$1",
+		AttrName: "attribute",
+		Regex:    ".+",
 	}},
 	CaptureAttributesInMetric:      []string{"attribute"},
 	DefaultLatencyThreshold:        0.5,

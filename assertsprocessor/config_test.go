@@ -9,9 +9,8 @@ import (
 func TestValidateNoError(t *testing.T) {
 	dto := Config{
 		RequestContextExps: &[]*MatcherDto{{
-			AttrName:    "attribute",
-			Regex:       ".+",
-			Replacement: "$1",
+			AttrName: "attribute",
+			Regex:    ".+",
 		}},
 	}
 	err := dto.Validate()
@@ -21,9 +20,8 @@ func TestValidateNoError(t *testing.T) {
 func TestValidateRequestExpError(t *testing.T) {
 	dto := Config{
 		RequestContextExps: &[]*MatcherDto{{
-			AttrName:    "attribute",
-			Regex:       "+",
-			Replacement: "$1",
+			AttrName: "attribute",
+			Regex:    "+",
 		}},
 	}
 	err := dto.Validate()
@@ -33,9 +31,8 @@ func TestValidateRequestExpError(t *testing.T) {
 func TestValidateLimits(t *testing.T) {
 	dto := Config{
 		RequestContextExps: &[]*MatcherDto{{
-			AttrName:    "attribute",
-			Regex:       ".+",
-			Replacement: "$1",
+			AttrName: "attribute",
+			Regex:    ".+",
 		}},
 		LimitPerService:           1,
 		LimitPerRequestPerService: 2,

@@ -19,9 +19,8 @@ func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 				Replacement: "$1",
 			},
 			{
-				AttrName:    "attribute2",
-				Regex:       "Bar.+",
-				Replacement: "$1",
+				AttrName: "attribute2",
+				Regex:    "Bar.+",
 			},
 		},
 	})
@@ -51,9 +50,8 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 				Replacement: "$1",
 			},
 			{
-				AttrName:    "attribute2",
-				Regex:       "Bar.+",
-				Replacement: "$1",
+				AttrName: "attribute2",
+				Regex:    "Bar.+",
 			},
 		},
 	})

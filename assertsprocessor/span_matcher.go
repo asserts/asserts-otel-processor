@@ -30,10 +30,14 @@ func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *
 			if err != nil {
 				return err
 			}
+			replacement := matcher.Replacement
+			if replacement == "" {
+				replacement = "$1"
+			}
 			sm.spanAttrMatchers = append(sm.spanAttrMatchers, &spanAttrMatcher{
 				attrName:    matcher.AttrName,
 				regex:       compile,
-				replacement: matcher.Replacement,
+				replacement: replacement,
 			})
 		}
 	}
