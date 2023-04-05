@@ -92,15 +92,28 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 		requestContextLabel: requestContext,
 	}
 
+	capturedResourceAttributes := make([]string, 0)
+	capturedSpanAttributes := make([]string, 0)
 	for _, labelName := range p.config.CaptureAttributesInMetric {
 		value, present := span.Attributes().Get(labelName)
 		if !present {
 			value, present = resourceSpan.Resource().Attributes().Get(labelName)
+			if present {
+				capturedResourceAttributes = append(capturedResourceAttributes, labelName)
+			}
+		} else {
+			capturedSpanAttributes = append(capturedSpanAttributes, labelName)
 		}
 		if present {
 			labels[p.applyPromConventions(labelName)] = value.AsString()
 		}
 	}
+	p.logger.Debug("Captured Metric labels",
+		zap.String("traceId", span.TraceID().String()),
+		zap.String("spanId", span.SpanID().String()),
+		zap.String("capturedSpanAttributes", strings.Join(capturedSpanAttributes, ", ")),
+		zap.String("capturedResourceAttributes", strings.Join(capturedResourceAttributes, ", ")),
+	)
 	return labels
 }
 
@@ -117,7 +130,10 @@ func (p *metricHelper) getOrCreateHistogram(labels prometheus.Labels) *prometheu
 			Subsystem: "span",
 			Name:      "latency_seconds",
 		}, labelNames)
-		p.prometheusRegistry.Register(histogram)
+		err := p.prometheusRegistry.Register(histogram)
+		if err != nil {
+			p.logger.Error("Failed to register histogram", zap.Error(err))
+		}
 		return histogram
 	})
 	return histogram
