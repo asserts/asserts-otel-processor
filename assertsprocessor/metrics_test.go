@@ -1,7 +1,6 @@
 package assertsprocessor
 
 import (
-	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
@@ -27,6 +26,7 @@ func TestBuildLabels(t *testing.T) {
 	resourceSpans.Resource().Attributes().PutStr("host.name", "192.168.1.19")
 
 	testSpan := ptrace.NewSpan()
+	testSpan.SetKind(ptrace.SpanKindClient)
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
 	testSpan.Attributes().PutStr("rpc.method", "GetItem")
@@ -43,9 +43,10 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels["aws_table_name"] = "ride-bookings"
 	expectedLabels["rpc_system"] = "aws-api"
 	expectedLabels["host_name"] = "192.168.1.19"
+	expectedLabels["span_kind"] = "Client"
 
 	actualLabels := p.buildLabels("ride-services", "payment", "GetItem", &testSpan, &resourceSpans)
-	assert.True(t, cmp.Equal(&expectedLabels, &actualLabels))
+	assert.Equal(t, expectedLabels, actualLabels)
 }
 
 func TestCaptureMetrics(t *testing.T) {
@@ -79,6 +80,7 @@ func TestCaptureMetrics(t *testing.T) {
 	testSpan.Attributes().PutStr("rpc.method", "GetItem")
 	testSpan.Attributes().PutStr("aws.table.name", "ride-bookings")
 	testSpan.Attributes().PutStr("aws.table.nameee", "ride-bookings")
+	testSpan.SetKind(ptrace.SpanKindClient)
 
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
@@ -93,12 +95,13 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
 	expectedLabels["rpc_system"] = "aws-api"
+	expectedLabels["span_kind"] = "Client"
 
 	assert.Equal(t, 0, p.histograms.Size())
 	p.captureMetrics("ride-services", "payment", &testSpan, &resourceSpans)
 	assert.Equal(t, 1, p.histograms.Size())
 
-	metricKey := "asserts_env,asserts_request_context,asserts_site,aws_table_name,namespace,rpc_method,rpc_service,rpc_system,service"
+	metricKey := "asserts_env,asserts_request_context,asserts_site,aws_table_name,namespace,rpc_method,rpc_service,rpc_system,service,span_kind"
 	p.histograms.Range(func(key string, value *prometheus.HistogramVec) bool {
 		assert.Equal(t, metricKey, key)
 		assert.NotNil(t, value)

@@ -108,6 +108,7 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 			labels[p.applyPromConventions(labelName)] = value.AsString()
 		}
 	}
+	labels["span_kind"] = span.Kind().String()
 	p.logger.Debug("Captured Metric labels",
 		zap.String("traceId", span.TraceID().String()),
 		zap.String("spanId", span.SpanID().String()),
