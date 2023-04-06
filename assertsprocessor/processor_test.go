@@ -86,13 +86,11 @@ func TestConsumeTraces(t *testing.T) {
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 	}
-	helper := newMetricHelper(testLogger, &testConfig, &spanMatcher{})
-	_ = helper.init()
 	p := assertsProcessorImpl{
 		logger:        testLogger,
 		config:        &testConfig,
 		nextConsumer:  dConsumer,
-		metricBuilder: helper,
+		metricBuilder: newMetricHelper(testLogger, &testConfig, &spanMatcher{}),
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,

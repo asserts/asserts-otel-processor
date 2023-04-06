@@ -44,7 +44,6 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels["rpc_system"] = "aws-api"
 	expectedLabels["host_name"] = "192.168.1.19"
 	expectedLabels["span_kind"] = "Client"
-	expectedLabels["aws_queue_url"] = ""
 
 	actualLabels := p.buildLabels("ride-services", "payment", "GetItem", &testSpan, &resourceSpans)
 	assert.Equal(t, expectedLabels, actualLabels)
@@ -73,8 +72,6 @@ func TestCaptureMetrics(t *testing.T) {
 		},
 		&matcher,
 	)
-	err := p.init()
-	assert.Nil(t, err)
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()
@@ -100,7 +97,25 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels["rpc_system"] = "aws-api"
 	expectedLabels["span_kind"] = "Client"
 
+	assert.Equal(t, 0, p.histograms.Size())
 	p.captureMetrics("ride-services", "payment", &testSpan, &resourceSpans)
+	assert.Equal(t, 1, p.histograms.Size())
+
+	metricKey := "asserts_env,asserts_request_context,asserts_site,aws_table_name,namespace,rpc_method,rpc_service,rpc_system,service,span_kind"
+	p.histograms.Range(func(key string, value *prometheus.HistogramVec) bool {
+		assert.Equal(t, metricKey, key)
+		assert.NotNil(t, value)
+		return true
+	})
+
+	histogram, loaded := p.histograms.Load(metricKey)
+	assert.True(t, loaded)
+	observer, err := histogram.GetMetricWith(expectedLabels)
+	assert.Nil(t, err)
+	assert.NotNil(t, observer)
+
+	p.histograms.Delete(metricKey)
+	assert.Equal(t, 0, p.histograms.Size())
 }
 
 func TestMetricCardinalityLimit(t *testing.T) {
@@ -124,7 +139,6 @@ func TestMetricCardinalityLimit(t *testing.T) {
 		},
 		&matcher,
 	)
-	_ = p.init()
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()

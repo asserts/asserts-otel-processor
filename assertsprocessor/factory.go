@@ -69,10 +69,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	metricsHelper := newMetricHelper(logger, pConfig, spanMatcher)
-	err = metricsHelper.init()
-	if err != nil {
-		return nil, err
-	}
+
 	traceSampler := sampler{
 		logger:             logger,
 		config:             pConfig,
