@@ -22,6 +22,7 @@ const (
 	namespaceLabel      = "namespace"
 	serviceLabel        = "service"
 	requestContextLabel = "asserts_request_context"
+	spanKind            = "span_kind"
 )
 
 type metricHelper struct {
@@ -29,7 +30,7 @@ type metricHelper struct {
 	config                   *Config
 	prometheusRegistry       *prometheus.Registry
 	spanMatcher              *spanMatcher
-	histograms               *xsync.MapOf[string, *prometheus.HistogramVec]
+	latencyHistogram         *prometheus.HistogramVec
 	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]] // limit cardinality of request contexts for which metrics are captured
 }
 
@@ -39,9 +40,37 @@ func newMetricHelper(logger *zap.Logger, config *Config, spanMatcher *spanMatche
 		config:                   config,
 		prometheusRegistry:       prometheus.NewRegistry(),
 		spanMatcher:              spanMatcher,
-		histograms:               xsync.NewMapOf[*prometheus.HistogramVec](),
 		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
 	}
+}
+
+func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds float64) {
+	p.latencyHistogram.With(labels).Observe(latencySeconds)
+}
+
+func (p *metricHelper) init() error {
+	var allowedLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestContextLabel, spanKind}
+	if p.config.CaptureAttributesInMetric != nil {
+		for _, label := range p.config.CaptureAttributesInMetric {
+			allowedLabels = append(allowedLabels, p.applyPromConventions(label))
+		}
+	}
+	sort.Strings(allowedLabels)
+	p.logger.Info("Histogram with ", zap.String("labels", strings.Join(allowedLabels, ", ")))
+
+	// Start the prometheus server on port 9465
+	p.prometheusRegistry = prometheus.NewRegistry()
+	p.latencyHistogram = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: "otel",
+		Subsystem: "span",
+		Name:      "latency_seconds",
+	}, allowedLabels)
+	err := p.prometheusRegistry.Register(p.latencyHistogram)
+	if err != nil {
+		p.logger.Fatal("Error starting Prometheus Server", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span,
@@ -71,8 +100,7 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 		}
 		labels := p.buildLabels(namespace, service, requestContext, span, resourceSpan)
 		latencySeconds := computeLatency(span)
-		histogram := p.getOrCreateHistogram(labels)
-		histogram.With(labels).Observe(latencySeconds)
+		p.recordLatency(labels, latencySeconds)
 	} else {
 		p.logger.Warn("Too many request contexts. Metrics won't be captured for",
 			zap.String("service", serviceKey),
@@ -106,9 +134,11 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 		}
 		if present {
 			labels[p.applyPromConventions(labelName)] = value.AsString()
+		} else {
+			labels[p.applyPromConventions(labelName)] = ""
 		}
 	}
-	labels["span_kind"] = span.Kind().String()
+	labels[spanKind] = span.Kind().String()
 	p.logger.Debug("Captured Metric labels",
 		zap.String("traceId", span.TraceID().String()),
 		zap.String("spanId", span.SpanID().String()),
@@ -116,28 +146,6 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 		zap.String("capturedResourceAttributes", strings.Join(capturedResourceAttributes, ", ")),
 	)
 	return labels
-}
-
-func (p *metricHelper) getOrCreateHistogram(labels prometheus.Labels) *prometheus.HistogramVec {
-	labelNames := make([]string, 0, len(labels))
-	for k := range labels {
-		labelNames = append(labelNames, k)
-	}
-	sort.Strings(labelNames)
-	histogramKey := strings.Join(labelNames, ",")
-	histogram, _ := p.histograms.LoadOrCompute(histogramKey, func() *prometheus.HistogramVec {
-		histogram := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: "otel",
-			Subsystem: "span",
-			Name:      "latency_seconds",
-		}, labelNames)
-		err := p.prometheusRegistry.Register(histogram)
-		if err != nil {
-			p.logger.Error("Failed to register histogram", zap.Error(err))
-		}
-		return histogram
-	})
-	return histogram
 }
 
 func (p *metricHelper) startExporter() {

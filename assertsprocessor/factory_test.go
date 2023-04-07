@@ -63,7 +63,7 @@ func TestCreateProcessor(t *testing.T) {
 	assert.Equal(t, logger, _assertsProcessor.metricBuilder.logger)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.prometheusRegistry)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.spanMatcher)
-	assert.NotNil(t, _assertsProcessor.metricBuilder.histograms)
+	assert.NotNil(t, _assertsProcessor.metricBuilder.latencyHistogram)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.requestContextsByService)
 
 	// Sampler
