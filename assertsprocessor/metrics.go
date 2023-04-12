@@ -77,7 +77,7 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	resourceSpan *ptrace.ResourceSpans) {
 
 	serviceKey := namespace + "#" + service
-	requestContext := p.spanMatcher.getRequest(span)
+	requestContext := p.spanMatcher.getRequest(span, serviceKey)
 
 	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {
 		cache := ttlcache.New[string, string](

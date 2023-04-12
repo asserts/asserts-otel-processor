@@ -150,7 +150,8 @@ func (s *sampler) captureNormalSample(item *Item) {
 
 func (s *sampler) updateTrace(namespace string, service string, trace *traceStruct) {
 	entityKey := buildEntityKey(s.config, namespace, service)
-	request := s.spanMatcher.getRequest(trace.getMainSpan())
+	serviceKey := namespace + "#" + service
+	request := s.spanMatcher.getRequest(trace.getMainSpan(), serviceKey)
 	trace.isSlow = s.isSlow(namespace, service, trace.getMainSpan(), request)
 	if trace.isSlow {
 		trace.latencyThreshold = s.thresholdHelper.getThreshold(namespace, service, request)

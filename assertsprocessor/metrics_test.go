@@ -53,12 +53,15 @@ func TestBuildLabels(t *testing.T) {
 func TestCaptureMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	compile, _ := regexp.Compile("(.+)")
+
 	matcher := spanMatcher{
-		spanAttrMatchers: []*spanAttrMatcher{
-			{
-				attrName:    "rpc.method",
-				regex:       compile,
-				replacement: "$1",
+		spanAttrMatchers: map[string][]*spanAttrMatcher{
+			"default": {
+				{
+					attrName:    "rpc.method",
+					regex:       compile,
+					replacement: "$1",
+				},
 			},
 		},
 	}
@@ -107,11 +110,13 @@ func TestMetricCardinalityLimit(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
 	matcher := spanMatcher{
-		spanAttrMatchers: []*spanAttrMatcher{
-			{
-				attrName:    "http.url",
-				regex:       compile,
-				replacement: "$1",
+		spanAttrMatchers: map[string][]*spanAttrMatcher{
+			"default": {
+				{
+					attrName:    "http.url",
+					regex:       compile,
+					replacement: "$1",
+				},
 			},
 		},
 	}
