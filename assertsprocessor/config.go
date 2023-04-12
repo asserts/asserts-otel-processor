@@ -12,28 +12,30 @@ type MatcherDto struct {
 }
 
 type Config struct {
-	AssertsServer                  *map[string]string `mapstructure:"asserts_server"`
-	Env                            string             `mapstructure:"asserts_env"`
-	Site                           string             `mapstructure:"asserts_site"`
-	CaptureMetrics                 bool               `mapstructure:"capture_metrics"`
-	RequestContextExps             *[]*MatcherDto     `mapstructure:"request_context_regex"`
-	CaptureAttributesInMetric      []string           `mapstructure:"attributes_as_metric_labels"`
-	DefaultLatencyThreshold        float64            `mapstructure:"sampling_latency_threshold_seconds"`
-	LimitPerService                int                `mapstructure:"trace_rate_limit_per_service"`
-	LimitPerRequestPerService      int                `mapstructure:"trace_rate_limit_per_service_per_request"`
-	RequestContextCacheTTL         int                `mapstructure:"request_context_cache_ttl_minutes"`
-	NormalSamplingFrequencyMinutes int                `mapstructure:"normal_trace_sampling_rate_minutes"`
-	PrometheusExporterPort         uint64             `mapstructure:"prometheus_exporter_port"`
-	TraceFlushFrequencySeconds     int                `mapstructure:"trace_flush_frequency_seconds"`
+	AssertsServer                  *map[string]string       `mapstructure:"asserts_server"`
+	Env                            string                   `mapstructure:"asserts_env"`
+	Site                           string                   `mapstructure:"asserts_site"`
+	CaptureMetrics                 bool                     `mapstructure:"capture_metrics"`
+	RequestContextExps             map[string][]*MatcherDto `mapstructure:"request_context_regex"`
+	CaptureAttributesInMetric      []string                 `mapstructure:"attributes_as_metric_labels"`
+	DefaultLatencyThreshold        float64                  `mapstructure:"sampling_latency_threshold_seconds"`
+	LimitPerService                int                      `mapstructure:"trace_rate_limit_per_service"`
+	LimitPerRequestPerService      int                      `mapstructure:"trace_rate_limit_per_service_per_request"`
+	RequestContextCacheTTL         int                      `mapstructure:"request_context_cache_ttl_minutes"`
+	NormalSamplingFrequencyMinutes int                      `mapstructure:"normal_trace_sampling_rate_minutes"`
+	PrometheusExporterPort         uint64                   `mapstructure:"prometheus_exporter_port"`
+	TraceFlushFrequencySeconds     int                      `mapstructure:"trace_flush_frequency_seconds"`
 }
 
 // Validate implements the component.ConfigValidator interface.
 // Checks for any invalid regexp
 func (config *Config) Validate() error {
-	for _, attrRegex := range *config.RequestContextExps {
-		_, err := regexp.Compile(attrRegex.Regex)
-		if err != nil {
-			return err
+	for _, serviceRequestContextExps := range config.RequestContextExps {
+		for _, attrRegex := range serviceRequestContextExps {
+			_, err := regexp.Compile(attrRegex.Regex)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

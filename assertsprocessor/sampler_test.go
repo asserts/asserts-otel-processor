@@ -71,11 +71,13 @@ func TestSampleTraceWithError(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		spanMatcher: &spanMatcher{
-			spanAttrMatchers: []*spanAttrMatcher{
-				{
-					attrName:    "http.url",
-					regex:       compile,
-					replacement: "$1",
+			spanAttrMatchers: map[string][]*spanAttrMatcher{
+				"default": {
+					{
+						attrName:    "http.url",
+						regex:       compile,
+						replacement: "$1",
+					},
 				},
 			},
 		},
@@ -146,11 +148,13 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		spanMatcher: &spanMatcher{
-			spanAttrMatchers: []*spanAttrMatcher{
-				{
-					attrName:    "http.url",
-					regex:       compile,
-					replacement: "$1",
+			spanAttrMatchers: map[string][]*spanAttrMatcher{
+				"default": {
+					{
+						attrName:    "http.url",
+						regex:       compile,
+						replacement: "$1",
+					},
 				},
 			},
 		},
@@ -221,11 +225,13 @@ func TestSampleNormalTrace(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		spanMatcher: &spanMatcher{
-			spanAttrMatchers: []*spanAttrMatcher{
-				{
-					attrName:    "http.url",
-					regex:       compile,
-					replacement: "$1",
+			spanAttrMatchers: map[string][]*spanAttrMatcher{
+				"default": {
+					{
+						attrName:    "http.url",
+						regex:       compile,
+						replacement: "$1",
+					},
 				},
 			},
 		},
@@ -314,11 +320,13 @@ func TestTraceCardinalityLimit(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		spanMatcher: &spanMatcher{
-			spanAttrMatchers: []*spanAttrMatcher{
-				{
-					attrName:    "http.url",
-					regex:       compile,
-					replacement: "$1",
+			spanAttrMatchers: map[string][]*spanAttrMatcher{
+				"default": {
+					{
+						attrName:    "http.url",
+						regex:       compile,
+						replacement: "$1",
+					},
 				},
 			},
 		},
@@ -381,11 +389,13 @@ func TestFlushTraces(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		spanMatcher: &spanMatcher{
-			spanAttrMatchers: []*spanAttrMatcher{
-				{
-					attrName:    "http.url",
-					regex:       compile,
-					replacement: "$1",
+			spanAttrMatchers: map[string][]*spanAttrMatcher{
+				"default": {
+					{
+						attrName:    "http.url",
+						regex:       compile,
+						replacement: "$1",
+					},
 				},
 			},
 		},
