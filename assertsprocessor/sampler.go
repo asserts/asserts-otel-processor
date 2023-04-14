@@ -113,7 +113,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 				zap.Float64("latencyThreshold", traceStruct.latencyThreshold),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.slowQueue.push(&item)
-			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeError
+			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeSlow
 		} else {
 			if s.captureNormalSample(&item) {
 				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeNormal

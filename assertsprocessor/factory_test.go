@@ -65,6 +65,7 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.metricBuilder.spanMatcher)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.latencyHistogram)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.sampledTraceCount)
+	assert.NotNil(t, _assertsProcessor.metricBuilder.totalTraceCount)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.requestContextsByService)
 
 	// Sampler

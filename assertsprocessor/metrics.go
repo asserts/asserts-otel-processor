@@ -69,8 +69,11 @@ func (p *metricHelper) init() error {
 	sort.Strings(spanMetricLabels)
 	p.logger.Info("Latency Histogram with ", zap.String("labels", strings.Join(spanMetricLabels, ", ")))
 
+	sort.Strings(serviceKeyLabels)
+	p.logger.Info("Total Trace Counter with ", zap.String("labels", strings.Join(serviceKeyLabels, ", ")))
+
 	sort.Strings(sampledTraceCountLabels)
-	p.logger.Info("Sampled Trace Count Counter with ", zap.String("labels", strings.Join(sampledTraceCountLabels, ", ")))
+	p.logger.Info("Sampled Trace Counter with ", zap.String("labels", strings.Join(sampledTraceCountLabels, ", ")))
 
 	// Start the prometheus server on port 9465
 	p.prometheusRegistry = prometheus.NewRegistry()
