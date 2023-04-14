@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	envLabel            = "asserts_env"
-	siteLabel           = "asserts_site"
-	namespaceLabel      = "namespace"
-	serviceLabel        = "service"
-	requestContextLabel = "asserts_request_context"
-	spanKind            = "span_kind"
+	envLabel             = "asserts_env"
+	siteLabel            = "asserts_site"
+	namespaceLabel       = "namespace"
+	serviceLabel         = "service"
+	requestContextLabel  = "asserts_request_context"
+	spanKind             = "span_kind"
+	traceSampleTypeLabel = "sample_type"
 )
 
 type metricHelper struct {
@@ -31,6 +32,8 @@ type metricHelper struct {
 	prometheusRegistry       *prometheus.Registry
 	spanMatcher              *spanMatcher
 	latencyHistogram         *prometheus.HistogramVec
+	totalTraceCount          *prometheus.CounterVec
+	sampledTraceCount        *prometheus.CounterVec
 	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]] // limit cardinality of request contexts for which metrics are captured
 }
 
@@ -49,14 +52,28 @@ func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds fl
 }
 
 func (p *metricHelper) init() error {
-	var allowedLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestContextLabel, spanKind}
+	var serviceKeyLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel}
+	var spanMetricLabels = []string{requestContextLabel, spanKind}
+	var sampledTraceCountLabels = []string{traceSampleTypeLabel}
+
+	for _, label := range serviceKeyLabels {
+		spanMetricLabels = append(spanMetricLabels, label)
+		sampledTraceCountLabels = append(sampledTraceCountLabels, label)
+	}
+
 	if p.config.CaptureAttributesInMetric != nil {
 		for _, label := range p.config.CaptureAttributesInMetric {
-			allowedLabels = append(allowedLabels, p.applyPromConventions(label))
+			spanMetricLabels = append(spanMetricLabels, p.applyPromConventions(label))
 		}
 	}
-	sort.Strings(allowedLabels)
-	p.logger.Info("Histogram with ", zap.String("labels", strings.Join(allowedLabels, ", ")))
+	sort.Strings(spanMetricLabels)
+	p.logger.Info("Latency Histogram with ", zap.String("labels", strings.Join(spanMetricLabels, ", ")))
+
+	sort.Strings(serviceKeyLabels)
+	p.logger.Info("Total Trace Counter with ", zap.String("labels", strings.Join(serviceKeyLabels, ", ")))
+
+	sort.Strings(sampledTraceCountLabels)
+	p.logger.Info("Sampled Trace Counter with ", zap.String("labels", strings.Join(sampledTraceCountLabels, ", ")))
 
 	// Start the prometheus server on port 9465
 	p.prometheusRegistry = prometheus.NewRegistry()
@@ -64,12 +81,36 @@ func (p *metricHelper) init() error {
 		Namespace: "otel",
 		Subsystem: "span",
 		Name:      "latency_seconds",
-	}, allowedLabels)
+	}, spanMetricLabels)
 	err := p.prometheusRegistry.Register(p.latencyHistogram)
 	if err != nil {
-		p.logger.Fatal("Error starting Prometheus Server", zap.Error(err))
+		p.logger.Fatal("Error registering Latency Histogram Metric Vector", zap.Error(err))
 		return err
 	}
+
+	// Create Counter for total and sampled trace count
+	p.totalTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "trace",
+		Name:      "count_total",
+	}, serviceKeyLabels)
+	err = p.prometheusRegistry.Register(p.totalTraceCount)
+	if err != nil {
+		p.logger.Fatal("Error registering Total Trace Counter Vector", zap.Error(err))
+		return err
+	}
+
+	p.sampledTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "trace",
+		Name:      "sampled_count_total",
+	}, sampledTraceCountLabels)
+	err = p.prometheusRegistry.Register(p.sampledTraceCount)
+	if err != nil {
+		p.logger.Fatal("Error registering Sampled Trace Counter Vector", zap.Error(err))
+		return err
+	}
+
 	return nil
 }
 

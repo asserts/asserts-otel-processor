@@ -12,7 +12,11 @@ import (
 )
 
 const (
-	AssertsRequestContextAttribute = "asserts.request.context"
+	AssertsRequestContextAttribute  = "asserts.request.context"
+	AssertsTraceSampleTypeAttribute = "asserts.sample.type"
+	AssertsTraceSampleTypeNormal    = "normal"
+	AssertsTraceSampleTypeSlow      = "slow"
+	AssertsTraceSampleTypeError     = "error"
 )
 
 type traceSampler struct {
@@ -37,6 +41,7 @@ type sampler struct {
 	nextConsumer       consumer.Traces
 	stop               chan bool
 	spanMatcher        *spanMatcher
+	metricHelper       *metricHelper
 }
 
 func (s *sampler) startProcessing() {
@@ -73,9 +78,17 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 			ctx:     &ctx,
 			latency: traceStruct.latency,
 		}
+		sampledTraceCountLabels := map[string]string{
+			envLabel:       s.config.Env,
+			siteLabel:      s.config.Site,
+			namespaceLabel: traces.namespace,
+			serviceLabel:   traces.service,
+		}
+		s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
 		if traceStruct.hasError() {
 			// For all the spans which have error, add the request context
 			traceStruct.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)
+			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
 			for _, span := range traceStruct.exitSpans {
 				if spanHasError(span) {
 					span.Attributes().PutStr(AssertsRequestContextAttribute, request)
@@ -88,8 +101,10 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 				zap.String("request", traceStruct.requestKey.request),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
+			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeError
 		} else if traceStruct.isSlow {
 			traceStruct.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)
+			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
 
 			s.logger.Debug("Capturing slow trace",
 				zap.String("traceId", traceStruct.getMainSpan().TraceID().String()),
@@ -98,13 +113,21 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 				zap.Float64("latencyThreshold", traceStruct.latencyThreshold),
 				zap.Float64("latency", traceStruct.latency))
 			requestState.slowQueue.push(&item)
+			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeSlow
 		} else {
-			s.captureNormalSample(&item)
+			if s.captureNormalSample(&item) {
+				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeNormal
+			}
+		}
+
+		if sampledTraceCountLabels[traceSampleTypeLabel] != "" {
+			s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
 		}
 	}
 }
 
-func (s *sampler) captureNormalSample(item *Item) {
+func (s *sampler) captureNormalSample(item *Item) bool {
+	sampled := false
 	// Capture healthy samples based on configured sampling rate
 	entityKeyString := item.trace.requestKey.entityKey.AsString()
 	request := item.trace.requestKey.request
@@ -130,6 +153,7 @@ func (s *sampler) captureNormalSample(item *Item) {
 			samplingState = samplingStateKV.Value()
 		}
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
+			sampled = true
 			s.logger.Debug("Capturing normal trace",
 				zap.String("traceId", item.trace.getMainSpan().TraceID().String()),
 				zap.String("entity", entityKeyString),
@@ -138,6 +162,8 @@ func (s *sampler) captureNormalSample(item *Item) {
 
 			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
 			item.trace.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)
+			item.trace.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeNormal)
+
 			requestState.slowQueue.push(item)
 		}
 	} else {
@@ -146,6 +172,7 @@ func (s *sampler) captureNormalSample(item *Item) {
 			zap.String("request context", request),
 		)
 	}
+	return sampled
 }
 
 func (s *sampler) updateTrace(namespace string, service string, trace *traceStruct) {

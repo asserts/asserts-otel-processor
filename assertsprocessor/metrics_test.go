@@ -9,6 +9,25 @@ import (
 	"testing"
 )
 
+func TestInit(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	p := newMetricHelper(
+		logger,
+		&Config{
+			Env:  "dev",
+			Site: "us-west-2",
+			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
+				"aws.table.name", "aws.queue.url", "host.name"},
+		},
+		&spanMatcher{},
+	)
+	assert.Nil(t, p.init())
+	assert.NotNil(t, p.prometheusRegistry)
+	assert.NotNil(t, p.latencyHistogram)
+	assert.NotNil(t, p.sampledTraceCount)
+	assert.NotNil(t, p.totalTraceCount)
+}
+
 func TestBuildLabels(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	p := newMetricHelper(

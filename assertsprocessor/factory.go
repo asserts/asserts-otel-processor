@@ -82,6 +82,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		nextConsumer:       nextConsumer,
 		spanMatcher:        spanMatcher,
 		stop:               make(chan bool),
+		metricHelper:       metricsHelper,
 	}
 
 	p := &assertsProcessorImpl{
