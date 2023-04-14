@@ -527,5 +527,11 @@ func buildMetricHelper() *metricHelper {
 		Subsystem: "trace",
 		Name:      "sampled_count_total",
 	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel, traceSampleTypeLabel})
+
+	m.totalTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "trace",
+		Name:      "count_total",
+	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
 	return m
 }

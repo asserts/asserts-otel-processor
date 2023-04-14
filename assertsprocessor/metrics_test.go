@@ -25,6 +25,7 @@ func TestInit(t *testing.T) {
 	assert.NotNil(t, p.prometheusRegistry)
 	assert.NotNil(t, p.latencyHistogram)
 	assert.NotNil(t, p.sampledTraceCount)
+	assert.NotNil(t, p.totalTraceCount)
 }
 
 func TestBuildLabels(t *testing.T) {

@@ -84,6 +84,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 			namespaceLabel: traces.namespace,
 			serviceLabel:   traces.service,
 		}
+		s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
 		if traceStruct.hasError() {
 			// For all the spans which have error, add the request context
 			traceStruct.getMainSpan().Attributes().PutStr(AssertsRequestContextAttribute, request)

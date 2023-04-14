@@ -32,6 +32,7 @@ type metricHelper struct {
 	prometheusRegistry       *prometheus.Registry
 	spanMatcher              *spanMatcher
 	latencyHistogram         *prometheus.HistogramVec
+	totalTraceCount          *prometheus.CounterVec
 	sampledTraceCount        *prometheus.CounterVec
 	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]] // limit cardinality of request contexts for which metrics are captured
 }
@@ -84,7 +85,18 @@ func (p *metricHelper) init() error {
 		return err
 	}
 
-	// Create Counter for sampled trace count
+	// Create Counter for total and sampled trace count
+	p.totalTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "trace",
+		Name:      "count_total",
+	}, serviceKeyLabels)
+	err = p.prometheusRegistry.Register(p.totalTraceCount)
+	if err != nil {
+		p.logger.Fatal("Error registering Total Trace Counter Vector", zap.Error(err))
+		return err
+	}
+
 	p.sampledTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "trace",
