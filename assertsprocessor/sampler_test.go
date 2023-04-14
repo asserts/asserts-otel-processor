@@ -3,6 +3,7 @@ package assertsprocessor
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"regexp"
 	"sync"
 	"testing"
@@ -38,6 +39,7 @@ func TestLatencyIsHighTrue(t *testing.T) {
 		logger:          logger,
 		config:          &config,
 		thresholdHelper: &th,
+		metricHelper:    buildMetricHelper(),
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -52,6 +54,7 @@ func TestLatencyIsHighFalse(t *testing.T) {
 		logger:          logger,
 		config:          &config,
 		thresholdHelper: &th,
+		metricHelper:    buildMetricHelper(),
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -81,6 +84,7 @@ func TestSampleTraceWithError(t *testing.T) {
 				},
 			},
 		},
+		metricHelper: buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -158,7 +162,9 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 				},
 			},
 		},
+		metricHelper: buildMetricHelper(),
 	}
+
 	ctx := context.Background()
 	testTrace := ptrace.NewTraces()
 	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
@@ -235,6 +241,7 @@ func TestSampleNormalTrace(t *testing.T) {
 				},
 			},
 		},
+		metricHelper: buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -294,6 +301,7 @@ func TestSampleNormalTrace(t *testing.T) {
 func TestWithNoRootTrace(t *testing.T) {
 	var s = sampler{
 		topTracesByService: &sync.Map{},
+		metricHelper:       buildMetricHelper(),
 	}
 	ctx := context.Background()
 	traceById := map[string]*traceStruct{}
@@ -330,6 +338,7 @@ func TestTraceCardinalityLimit(t *testing.T) {
 				},
 			},
 		},
+		metricHelper: buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -402,6 +411,7 @@ func TestFlushTraces(t *testing.T) {
 		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Second),
 		nextConsumer:     dConsumer,
 		stop:             make(chan bool, 5),
+		metricHelper:     buildMetricHelper(),
 	}
 
 	latencyTrace := ptrace.NewTraces()
@@ -502,4 +512,20 @@ func TestFlushTraces(t *testing.T) {
 	assert.Equal(t, []string{"/api-server/v4/rules"}, requests)
 	s.stopProcessing()
 	time.Sleep(1 * time.Second)
+}
+
+func buildMetricHelper() *metricHelper {
+	m := &metricHelper{
+		sampledTraceCount: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: "asserts",
+			Subsystem: "trace",
+			Name:      "sampled_count_total",
+		}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel, traceSampleTypeLabel}),
+	}
+	m.sampledTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "trace",
+		Name:      "sampled_count_total",
+	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel, traceSampleTypeLabel})
+	return m
 }

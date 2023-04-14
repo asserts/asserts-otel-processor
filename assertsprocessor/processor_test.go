@@ -106,6 +106,7 @@ func TestConsumeTraces(t *testing.T) {
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
 			spanMatcher:        &spanMatcher{},
+			metricHelper:       buildMetricHelper(),
 		},
 	}
 

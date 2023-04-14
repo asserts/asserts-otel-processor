@@ -64,6 +64,7 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.metricBuilder.prometheusRegistry)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.spanMatcher)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.latencyHistogram)
+	assert.NotNil(t, _assertsProcessor.metricBuilder.sampledTraceCount)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.requestContextsByService)
 
 	// Sampler
@@ -74,6 +75,8 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.sampler.topTracesByService)
 	assert.NotNil(t, _assertsProcessor.sampler.traceFlushTicker)
 	assert.NotNil(t, _assertsProcessor.sampler.spanMatcher)
+	assert.NotNil(t, _assertsProcessor.sampler.metricHelper)
+	assert.Equal(t, _assertsProcessor.metricBuilder, _assertsProcessor.sampler.metricHelper)
 
 	// Threshold Helper
 	assert.Equal(t, config, *_assertsProcessor.sampler.thresholdHelper.config)
