@@ -60,11 +60,20 @@ func (th *thresholdHelper) startUpdates() {
 					return
 				case <-th.thresholdSyncTicker.C:
 					th.logger.Debug("Fetching thresholds")
+					keys := make([]string, 0)
 					th.entityKeys.Range(func(key any, value any) bool {
 						entityKey := value.(EntityKeyDto)
+						keys = append(keys, entityKey.AsString())
 						th.updateThresholdsAsync(entityKey)
 						return true
 					})
+					if len(keys) > 0 {
+						th.logger.Debug("Fetching thresholds for",
+							zap.Strings("Services", keys),
+						)
+					} else {
+						th.logger.Debug("Skip fetching thresholds as no service has reported a Trace")
+					}
 				}
 			}
 		}()
