@@ -448,6 +448,7 @@ func TestFlushTraces(t *testing.T) {
 	errorSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
 	errorSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
 	errorSpan.Attributes().PutBool("error", true)
+	errorSpan.Status().SetCode(ptrace.StatusCodeError)
 	errorSpan.SetStartTimestamp(1e9)
 	errorSpan.SetEndTimestamp(1e9 + 3e8)
 

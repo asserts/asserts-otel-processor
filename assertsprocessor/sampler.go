@@ -230,7 +230,7 @@ func (s *sampler) startTraceFlusher() {
 
 						// Flush all the isSlow traces
 						if len(_sampler.slowQueue.priorityQueue) > 0 {
-							slowTraceCount += len(_sampler.errorQueue.priorityQueue)
+							slowTraceCount += len(_sampler.slowQueue.priorityQueue)
 							s.logger.Debug("Flushing Slow Traces for",
 								zap.String("Service", entityKey),
 								zap.String("Request", requestKey),
