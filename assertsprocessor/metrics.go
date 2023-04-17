@@ -134,7 +134,7 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	if val := cache.Get(requestContext); cache.Len() < p.config.LimitPerService || val != nil {
 		if val == nil {
 			cache.Set(requestContext, requestContext, ttlcache.DefaultTTL)
-			p.logger.Debug("Adding request context to cache",
+			p.logger.Info("Adding request context to cache",
 				zap.String("service", serviceKey),
 				zap.String("request context", requestContext),
 			)

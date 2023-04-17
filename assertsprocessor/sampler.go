@@ -145,7 +145,7 @@ func (s *sampler) captureNormalSample(item *Item) bool {
 				rwMutex:        &sync.RWMutex{},
 			}
 			samplingStates.Set(request, samplingState, ttlcache.DefaultTTL)
-			s.logger.Debug("Adding request context to sampling states cache",
+			s.logger.Info("Adding request context to sampling states cache",
 				zap.String("service", entityKeyString),
 				zap.String("request context", request),
 			)
@@ -209,6 +209,8 @@ func (s *sampler) startTraceFlusher() {
 				s.topTracesByService.Range(func(key any, value any) bool {
 					var entityKey = key.(string)
 					var sq = value.(*serviceQueues)
+					var errorTraceCount = 0
+					var slowTraceCount = 0
 
 					sq.clearRequestStates().Range(func(key1 any, value1 any) bool {
 						var requestKey = key1.(string)
@@ -216,6 +218,7 @@ func (s *sampler) startTraceFlusher() {
 
 						// Flush all the errors
 						if len(_sampler.errorQueue.priorityQueue) > 0 {
+							errorTraceCount += len(_sampler.errorQueue.priorityQueue)
 							s.logger.Debug("Flushing Error Traces for",
 								zap.String("Service", entityKey),
 								zap.String("Request", requestKey),
@@ -227,6 +230,7 @@ func (s *sampler) startTraceFlusher() {
 
 						// Flush all the isSlow traces
 						if len(_sampler.slowQueue.priorityQueue) > 0 {
+							slowTraceCount += len(_sampler.slowQueue.priorityQueue)
 							s.logger.Debug("Flushing Slow Traces for",
 								zap.String("Service", entityKey),
 								zap.String("Request", requestKey),
@@ -237,6 +241,17 @@ func (s *sampler) startTraceFlusher() {
 						}
 						return true
 					})
+					if errorTraceCount > 0 || slowTraceCount > 0 {
+						s.logger.Info("# of traces flushed for",
+							zap.String("Service", entityKey),
+							zap.Int("Error traces", errorTraceCount),
+							zap.Int("Slow traces", slowTraceCount),
+						)
+					} else {
+						s.logger.Info("No traces to flush for",
+							zap.String("Service", entityKey),
+						)
+					}
 					return true
 				})
 			}
