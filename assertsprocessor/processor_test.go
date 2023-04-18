@@ -55,6 +55,15 @@ func TestStartAndShutdown(t *testing.T) {
 		entityKeys:          &sync.Map{},
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		assertsClient:       &assertsClient{},
+	}
+	configRefresh := configRefresh{
+		config:           &testConfig,
+		logger:           logger,
+		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		stop:             make(chan bool),
+		assertsClient:    &assertsClient{},
+		spanMatcher:      &spanMatcher{},
 	}
 	p := assertsProcessorImpl{
 		logger:        testLogger,
@@ -71,6 +80,7 @@ func TestStartAndShutdown(t *testing.T) {
 			thresholdHelper:    &_th,
 			spanMatcher:        &spanMatcher{},
 		},
+		configRefresh: &configRefresh,
 	}
 	assert.Nil(t, p.Start(ctx, nil))
 	assert.Nil(t, p.Shutdown(ctx))

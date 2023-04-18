@@ -3,6 +3,7 @@ package assertsprocessor
 import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
+	"reflect"
 	"regexp"
 )
 
@@ -19,7 +20,7 @@ type spanMatcher struct {
 
 func (sm *spanMatcher) compileRequestContextRegexps(config *Config) error {
 	sm.logger.Info("Compiling request context regexps")
-	sm.spanAttrMatchers = make(map[string][]*spanAttrMatcher)
+	spanAttrMatchers := make(map[string][]*spanAttrMatcher)
 	if config.RequestContextExps != nil {
 		for serviceKey, serviceRequestContextExps := range config.RequestContextExps {
 			serviceSpanAttrMatchers := make([]*spanAttrMatcher, 0)
@@ -44,8 +45,9 @@ func (sm *spanMatcher) compileRequestContextRegexps(config *Config) error {
 					replacement: replacement,
 				})
 			}
-			sm.spanAttrMatchers[serviceKey] = serviceSpanAttrMatchers
+			spanAttrMatchers[serviceKey] = serviceSpanAttrMatchers
 		}
+		sm.spanAttrMatchers = spanAttrMatchers
 	}
 	sm.logger.Debug("Compiled request context regexps successfully")
 	return nil
@@ -67,6 +69,28 @@ func (sm *spanMatcher) getRequest(span *ptrace.Span, serviceKey string) string {
 	}
 
 	return span.Name()
+}
+
+// configListener interface implementation
+func (sm *spanMatcher) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+	updated := !reflect.DeepEqual(prevConfig.RequestContextExps, currentConfig.RequestContextExps)
+	if updated {
+		sm.logger.Info("Change detected in config RequestContextExps",
+			zap.Any("Previous", prevConfig.RequestContextExps),
+			zap.Any("Current", currentConfig.RequestContextExps),
+		)
+	} else {
+		sm.logger.Debug("No change detected in config RequestContextExps")
+	}
+	return updated
+}
+
+func (sm *spanMatcher) onUpdate(config *Config) error {
+	err := sm.compileRequestContextRegexps(config)
+	if err != nil {
+		sm.logger.Error("Ignoring RequestContextExps due to regex compilation error", zap.Error(err))
+	}
+	return err
 }
 
 func getRequest(span *ptrace.Span, serviceSpanAttrMatchers []*spanAttrMatcher) string {

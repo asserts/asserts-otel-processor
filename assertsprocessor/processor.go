@@ -16,6 +16,7 @@ type assertsProcessorImpl struct {
 	nextConsumer  consumer.Traces
 	metricBuilder *metricHelper
 	sampler       *sampler
+	configRefresh *configRefresh
 }
 
 // Capabilities implements the consumer.Traces interface.
@@ -28,6 +29,7 @@ func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
 	p.logger.Info("consumer.Start callback")
 	p.sampler.startProcessing()
+	p.configRefresh.startUpdates()
 	return nil
 }
 
@@ -35,6 +37,7 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 	p.logger.Info("consumer.Shutdown")
 	p.sampler.stopProcessing()
+	p.configRefresh.stopUpdates()
 	return nil
 }
 
@@ -64,5 +67,25 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourc
 		}
 	}
 
+	return nil
+}
+
+// configListener interface implementation
+func (p *assertsProcessorImpl) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+	updated := prevConfig.CaptureMetrics != currentConfig.CaptureMetrics
+	if updated {
+		p.logger.Info("Change detected in config CaptureMetrics",
+			zap.Any("Previous", prevConfig.CaptureMetrics),
+			zap.Any("Current", currentConfig.CaptureMetrics),
+		)
+	} else {
+		p.logger.Debug("No change detected in config CaptureMetrics")
+	}
+	return updated
+}
+
+func (p *assertsProcessorImpl) onUpdate(config *Config) error {
+	// TODO does this need to be guarded with a RWLock?
+	p.config.CaptureMetrics = config.CaptureMetrics
 	return nil
 }

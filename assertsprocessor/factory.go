@@ -101,6 +101,21 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		sampler:       &traceSampler,
 	}
 
+	listeners := make([]configListener, 0)
+	listeners = append(listeners, spanMatcher)
+	listeners = append(listeners, &thresholdsHelper)
+	listeners = append(listeners, p)
+	configRefresh := configRefresh{
+		config:           pConfig,
+		logger:           logger,
+		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		stop:             make(chan bool),
+		assertsClient:    &assertsClient,
+		spanMatcher:      spanMatcher,
+		configListeners:  listeners,
+	}
+	p.configRefresh = &configRefresh
+
 	go metricsHelper.startExporter()
 	return p, nil
 }

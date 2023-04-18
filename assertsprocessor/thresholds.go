@@ -111,3 +111,23 @@ func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []Th
 	}
 	th.logger.Debug("Got thresholds ", fields...)
 }
+
+// configListener interface implementation
+func (th *thresholdHelper) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+	updated := prevConfig.DefaultLatencyThreshold != currentConfig.DefaultLatencyThreshold
+	if updated {
+		th.logger.Info("Change detected in config DefaultLatencyThreshold",
+			zap.Any("Previous", prevConfig.DefaultLatencyThreshold),
+			zap.Any("Current", currentConfig.DefaultLatencyThreshold),
+		)
+	} else {
+		th.logger.Debug("No change detected in config DefaultLatencyThreshold")
+	}
+	return updated
+}
+
+func (th *thresholdHelper) onUpdate(config *Config) error {
+	// TODO does this need to be guarded with a RWLock?
+	th.config.DefaultLatencyThreshold = config.DefaultLatencyThreshold
+	return nil
+}
