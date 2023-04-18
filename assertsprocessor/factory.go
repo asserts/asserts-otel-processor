@@ -53,10 +53,17 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
-	spanMatcher := &spanMatcher{}
-	err := spanMatcher.compileRequestContextRegexps(logger, pConfig)
+	spanMatcher := &spanMatcher{
+		logger: logger,
+	}
+	err := spanMatcher.compileRequestContextRegexps(pConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	assertsClient := assertsClient{
+		config: pConfig,
+		logger: logger,
 	}
 
 	thresholdsHelper := thresholdHelper{
@@ -66,6 +73,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
+		assertsClient:       &assertsClient,
 	}
 
 	metricsHelper := newMetricHelper(logger, pConfig, spanMatcher)

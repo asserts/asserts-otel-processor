@@ -127,22 +127,27 @@ func TestStopUpdates(t *testing.T) {
 func TestUpdateThresholds(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	ctx := context.Background()
-	var m = thresholdHelper{
-		logger: logger,
-		config: &Config{
-			Env:  "dev",
-			Site: "us-west-2",
-			AssertsServer: &map[string]string{
-				"endpoint": "http://localhost:8030",
-				"user":     "user",
-				"password": "password",
-			},
-			DefaultLatencyThreshold: 0.5,
+	config := &Config{
+		Env:  "dev",
+		Site: "us-west-2",
+		AssertsServer: &map[string]string{
+			"endpoint": "http://localhost:8030",
+			"user":     "user",
+			"password": "password",
 		},
+		DefaultLatencyThreshold: 0.5,
+	}
+	var m = thresholdHelper{
+		logger:              logger,
+		config:              config,
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Second),
+		assertsClient: &assertsClient{
+			config: config,
+			logger: logger,
+		},
 	}
 	entityKey := EntityKeyDto{
 		Type: "Service", Name: "api-server", Scope: map[string]string{

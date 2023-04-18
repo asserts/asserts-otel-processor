@@ -10,8 +10,10 @@ import (
 
 func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{}
-	err := matcher.compileRequestContextRegexps(logger, &Config{
+	matcher := spanMatcher{
+		logger: logger,
+	}
+	err := matcher.compileRequestContextRegexps(&Config{
 		RequestContextExps: map[string][]*MatcherDto{
 			"namespace#service": {
 				{
@@ -56,8 +58,10 @@ func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 
 func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{}
-	err := matcher.compileRequestContextRegexps(logger, &Config{
+	matcher := spanMatcher{
+		logger: logger,
+	}
+	err := matcher.compileRequestContextRegexps(&Config{
 		RequestContextExps: map[string][]*MatcherDto{
 			"namespace#service": {
 				{

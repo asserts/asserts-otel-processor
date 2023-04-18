@@ -1,15 +1,11 @@
 package assertsprocessor
 
 import (
-	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"github.com/tilinna/clock"
 	"go.uber.org/zap"
-	"io"
 	"net/http"
 	"sync"
-	"time"
 )
 
 type ThresholdDto struct {
@@ -25,6 +21,7 @@ type thresholdHelper struct {
 	thresholdSyncTicker *clock.Ticker
 	entityKeys          *sync.Map
 	stop                chan bool
+	assertsClient       *assertsClient
 }
 
 func (th *thresholdHelper) getThreshold(ns string, service string, request string) float64 {
@@ -97,61 +94,9 @@ func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
 
 func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto, error) {
 	var thresholds []ThresholdDto
-	client := &http.Client{
-		Timeout: time.Second * 5,
-	}
-	// Add all metrics in request body
-	buf := &bytes.Buffer{}
-	err := json.NewEncoder(buf).Encode(entityKey)
-	if err != nil {
-		th.logger.Error("Request payload JSON encoding error", zap.Error(err))
-	}
-
-	// Build request
-	assertsServer := *th.config.AssertsServer
-	url := assertsServer["endpoint"] + "/v1/latency-thresholds"
-	req, err := http.NewRequest("POST", url, bytes.NewReader(buf.Bytes()))
-	if err != nil {
-		th.logger.Error("Got error", zap.Error(err))
-	}
-
-	th.logger.Debug("Fetching thresholds",
-		zap.String("URL", url),
-		zap.String("Entity Key", entityKey.AsString()),
-	)
-
-	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Accept", "application/json")
-	// Add authentication headers
-	if assertsServer["user"] != "" && assertsServer["password"] != "" {
-		req.Header.Add("Authorization", "Basic "+basicAuth(assertsServer["user"], assertsServer["password"]))
-	}
-
-	// Make the call
-	response, err := client.Do(req)
-
-	// Handle response
-	if err != nil {
-		th.logger.Error("Failed to fetch thresholds",
-			zap.String("Entity Key", entityKey.AsString()), zap.Error(err))
-	} else if response.StatusCode == 200 {
-		body, err := io.ReadAll(response.Body)
-		bodyString := string(body)
-		th.logger.Debug("Got Thresholds Response ", zap.String("Body", bodyString))
-		if err == nil {
-			err = json.Unmarshal(body, &thresholds)
-		}
-	} else {
-		if body, err := io.ReadAll(response.Body); err == nil {
-			th.logger.Error("Un-expected response",
-				zap.String("Entity Key", entityKey.AsString()),
-				zap.Int("status_code", response.StatusCode),
-				zap.String("Response", string(body)),
-				zap.Error(err))
-		}
-	}
-	if response != nil && response.Body != nil {
-		err = response.Body.Close()
+	body, err := th.assertsClient.invoke(http.MethodPost, latencyThresholdsApi, entityKey)
+	if err == nil {
+		err = json.Unmarshal(body, &thresholds)
 	}
 
 	th.logThresholds(entityKey, thresholds)
@@ -165,9 +110,4 @@ func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []Th
 		fields = append(fields, zap.Float64(thresholds[i].RequestContext, thresholds[i].LatencyUpperBound))
 	}
 	th.logger.Debug("Got thresholds ", fields...)
-}
-
-func basicAuth(username string, password string) string {
-	auth := username + ":" + password
-	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
