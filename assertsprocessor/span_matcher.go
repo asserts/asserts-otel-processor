@@ -13,18 +13,19 @@ type spanAttrMatcher struct {
 }
 
 type spanMatcher struct {
+	logger           *zap.Logger
 	spanAttrMatchers map[string][]*spanAttrMatcher
 }
 
-func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *Config) error {
-	logger.Info("Compiling request context regexps")
+func (sm *spanMatcher) compileRequestContextRegexps(config *Config) error {
+	sm.logger.Info("Compiling request context regexps")
 	sm.spanAttrMatchers = make(map[string][]*spanAttrMatcher)
 	if config.RequestContextExps != nil {
 		for serviceKey, serviceRequestContextExps := range config.RequestContextExps {
 			serviceSpanAttrMatchers := make([]*spanAttrMatcher, 0)
 			for _, matcher := range serviceRequestContextExps {
 				compile, err := regexp.Compile(matcher.Regex)
-				logger.Debug("Compiled request context regex",
+				sm.logger.Debug("Compiled request context regex",
 					zap.String("Service", serviceKey),
 					zap.String("AttrName", matcher.AttrName),
 					zap.String("Regex", matcher.Regex),
@@ -46,7 +47,7 @@ func (sm *spanMatcher) compileRequestContextRegexps(logger *zap.Logger, config *
 			sm.spanAttrMatchers[serviceKey] = serviceSpanAttrMatchers
 		}
 	}
-	logger.Debug("Compiled request context regexps successfully")
+	sm.logger.Debug("Compiled request context regexps successfully")
 	return nil
 }
 
