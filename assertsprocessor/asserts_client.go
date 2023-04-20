@@ -87,7 +87,7 @@ func (ac *assertsClient) readResponseBody(api string, statusCode int, body io.Re
 		} else {
 			bodyString := string(responseBody)
 			err = errors.New(bodyString)
-			ac.logger.Error("Un-expected response",
+			ac.logger.Info("Un-expected response",
 				zap.String("Api", api),
 				zap.Int("Status code", statusCode),
 				zap.String("Response", bodyString),

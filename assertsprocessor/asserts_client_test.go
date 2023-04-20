@@ -63,7 +63,9 @@ func TestInvoke(t *testing.T) {
 		},
 	}
 
-	ac.invoke(http.MethodPost, latencyThresholdsApi, "junit")
+	invoke, err := ac.invoke(http.MethodPost, latencyThresholdsApi, "junit")
+	assert.NotNil(t, err)
+	assert.Nil(t, invoke)
 }
 
 func TestReadResponseBodySuccess(t *testing.T) {
