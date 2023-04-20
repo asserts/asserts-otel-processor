@@ -114,7 +114,6 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		stop:             make(chan bool),
 		restClient:       &assertsClient,
-		spanMatcher:      spanMatcher,
 		configListeners:  listeners,
 	}
 	p.configRefresh = &configRefresh

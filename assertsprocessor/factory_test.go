@@ -98,7 +98,6 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.configRefresh.configSyncTicker)
 	assert.NotNil(t, _assertsProcessor.configRefresh.stop)
 	assert.NotNil(t, _assertsProcessor.configRefresh.restClient)
-	assert.NotNil(t, _assertsProcessor.configRefresh.spanMatcher)
 	assert.NotNil(t, _assertsProcessor.configRefresh.configListeners)
 	assert.Equal(t, 4, len(_assertsProcessor.configRefresh.configListeners))
 

@@ -63,7 +63,6 @@ func TestStartAndShutdown(t *testing.T) {
 		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		stop:             make(chan bool),
 		restClient:       &assertsClient{},
-		spanMatcher:      &spanMatcher{},
 	}
 	p := assertsProcessorImpl{
 		logger:        testLogger,

@@ -18,7 +18,6 @@ type configRefresh struct {
 	configSyncTicker *clock.Ticker
 	stop             chan bool
 	restClient       restClient
-	spanMatcher      *spanMatcher
 	configListeners  []configListener
 }
 
