@@ -15,6 +15,10 @@ const (
 	latencyThresholdsApi = "/v1/latency-thresholds"
 )
 
+type restClient interface {
+	invoke(method string, api string, payload any) ([]byte, error)
+}
+
 type assertsClient struct {
 	config *Config
 	logger *zap.Logger
@@ -64,27 +68,37 @@ func (ac *assertsClient) invoke(method string, api string, payload any) ([]byte,
 			zap.String("Api", api),
 			zap.Error(err),
 		)
-	} else if response.StatusCode == 200 {
-		responseBody, err = io.ReadAll(response.Body)
-		if err != nil {
+	} else {
+		responseBody, err = ac.readResponseBody(api, response.StatusCode, response.Body)
+	}
+
+	return responseBody, err
+}
+
+func (ac *assertsClient) readResponseBody(api string, statusCode int, body io.ReadCloser) ([]byte, error) {
+	responseBody, err := io.ReadAll(body)
+	if err == nil {
+		if statusCode == 200 {
 			ac.logger.Debug("Got Response",
 				zap.String("Api", api),
 				zap.String("Body", string(responseBody)),
 			)
-		}
-	} else {
-		if responseBody, err = io.ReadAll(response.Body); err == nil {
+		} else {
 			ac.logger.Error("Un-expected response",
 				zap.String("Api", api),
-				zap.Int("Status code", response.StatusCode),
+				zap.Int("Status code", statusCode),
 				zap.String("Response", string(responseBody)),
-				zap.Error(err))
+				zap.Error(err),
+			)
 		}
+	} else {
+		ac.logger.Error("Error reading response body",
+			zap.String("Api", api),
+			zap.Int("Status code", statusCode),
+			zap.Error(err),
+		)
 	}
-	if response != nil && response.Body != nil {
-		_ = response.Body.Close()
-	}
-
+	_ = body.Close()
 	return responseBody, err
 }
 

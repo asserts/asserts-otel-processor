@@ -32,6 +32,7 @@ var th = thresholdHelper{
 	config:     &config,
 	entityKeys: &sync.Map{},
 	thresholds: &sync.Map{},
+	rwMutex:    &sync.RWMutex{},
 }
 
 func TestLatencyIsHighTrue(t *testing.T) {

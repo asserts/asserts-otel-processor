@@ -6,6 +6,7 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
+	"sync"
 )
 
 // The methods from a Span that we care for to enable easy mocking
@@ -17,6 +18,7 @@ type assertsProcessorImpl struct {
 	metricBuilder *metricHelper
 	sampler       *sampler
 	configRefresh *configRefresh
+	rwMutex       *sync.RWMutex // guard access to config.CaptureMetrics
 }
 
 // Capabilities implements the consumer.Traces interface.
@@ -51,7 +53,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourceTraces) error {
 	p.sampler.sampleTraces(ctx, traces)
 
-	if p.config.CaptureMetrics {
+	if p.captureMetrics() {
 		for _, aTrace := range *traces.traceById {
 			if aTrace.rootSpan != nil {
 				p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan, aTrace.resourceSpan)
@@ -70,8 +72,18 @@ func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourc
 	return nil
 }
 
+func (p *assertsProcessorImpl) captureMetrics() bool {
+	p.rwMutex.RLock()
+	defer p.rwMutex.RUnlock()
+
+	return p.config.CaptureMetrics
+}
+
 // configListener interface implementation
 func (p *assertsProcessorImpl) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+	p.rwMutex.RLock()
+	defer p.rwMutex.RUnlock()
+
 	updated := prevConfig.CaptureMetrics != currentConfig.CaptureMetrics
 	if updated {
 		p.logger.Info("Change detected in config CaptureMetrics",
@@ -84,8 +96,13 @@ func (p *assertsProcessorImpl) isUpdated(prevConfig *Config, currentConfig *Conf
 	return updated
 }
 
-func (p *assertsProcessorImpl) onUpdate(config *Config) error {
-	// TODO does this need to be guarded with a RWLock?
-	p.config.CaptureMetrics = config.CaptureMetrics
+func (p *assertsProcessorImpl) onUpdate(currentConfig *Config) error {
+	p.rwMutex.Lock()
+	defer p.rwMutex.Unlock()
+
+	p.config.CaptureMetrics = currentConfig.CaptureMetrics
+	p.logger.Info("Updated config CaptureMetrics",
+		zap.Bool("Current", p.config.CaptureMetrics),
+	)
 	return nil
 }

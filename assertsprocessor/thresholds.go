@@ -21,7 +21,8 @@ type thresholdHelper struct {
 	thresholdSyncTicker *clock.Ticker
 	entityKeys          *sync.Map
 	stop                chan bool
-	assertsClient       *assertsClient
+	rc                  restClient
+	rwMutex             *sync.RWMutex // guard access to config.DefaultLatencyThreshold
 }
 
 func (th *thresholdHelper) getThreshold(ns string, service string, request string) float64 {
@@ -29,7 +30,7 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 	th.entityKeys.LoadOrStore(entityKey.AsString(), entityKey)
 	var thresholds, _ = th.thresholds.Load(entityKey.AsString())
 
-	thresholdFound := th.config.DefaultLatencyThreshold
+	thresholdFound := th.getDefaultThreshold()
 	if thresholds != nil {
 		thresholdMap := thresholds.(map[string]*ThresholdDto)
 
@@ -40,6 +41,13 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 		}
 	}
 	return thresholdFound
+}
+
+func (th *thresholdHelper) getDefaultThreshold() float64 {
+	th.rwMutex.RLock()
+	defer th.rwMutex.RUnlock()
+
+	return th.config.DefaultLatencyThreshold
 }
 
 func (th *thresholdHelper) stopUpdates() {
@@ -94,7 +102,7 @@ func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
 
 func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto, error) {
 	var thresholds []ThresholdDto
-	body, err := th.assertsClient.invoke(http.MethodPost, latencyThresholdsApi, entityKey)
+	body, err := th.rc.invoke(http.MethodPost, latencyThresholdsApi, entityKey)
 	if err == nil {
 		err = json.Unmarshal(body, &thresholds)
 	}
@@ -114,6 +122,9 @@ func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []Th
 
 // configListener interface implementation
 func (th *thresholdHelper) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+	th.rwMutex.RLock()
+	defer th.rwMutex.RUnlock()
+
 	updated := prevConfig.DefaultLatencyThreshold != currentConfig.DefaultLatencyThreshold
 	if updated {
 		th.logger.Info("Change detected in config DefaultLatencyThreshold",
@@ -126,8 +137,13 @@ func (th *thresholdHelper) isUpdated(prevConfig *Config, currentConfig *Config) 
 	return updated
 }
 
-func (th *thresholdHelper) onUpdate(config *Config) error {
-	// TODO does this need to be guarded with a RWLock?
-	th.config.DefaultLatencyThreshold = config.DefaultLatencyThreshold
+func (th *thresholdHelper) onUpdate(currentConfig *Config) error {
+	th.rwMutex.Lock()
+	defer th.rwMutex.Unlock()
+
+	th.config.DefaultLatencyThreshold = currentConfig.DefaultLatencyThreshold
+	th.logger.Info("Updated config DefaultLatencyThreshold",
+		zap.Float64("Current", th.config.DefaultLatencyThreshold),
+	)
 	return nil
 }

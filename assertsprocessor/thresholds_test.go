@@ -12,7 +12,7 @@ import (
 
 func TestGetThresholdDefaultThreshold(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	m := thresholdHelper{
+	th := thresholdHelper{
 		logger: logger,
 		config: &Config{
 			Env:                     "dev",
@@ -22,6 +22,7 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 		},
 		thresholds: &sync.Map{},
 		entityKeys: &sync.Map{},
+		rwMutex:    &sync.RWMutex{},
 	}
 
 	dto := EntityKeyDto{
@@ -29,8 +30,8 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 			"env": "dev", "site": "us-west-2", "namespace": "platform",
 		},
 	}
-	assert.Equal(t, 0.5, m.getThreshold("platform", "api-server", "123"))
-	m.entityKeys.Range(func(key any, value any) bool {
+	assert.Equal(t, 0.5, th.getThreshold("platform", "api-server", "123"))
+	th.entityKeys.Range(func(key any, value any) bool {
 		assert.Equal(t, dto.AsString(), key.(string))
 		assert.Equal(t, dto, value.(EntityKeyDto))
 		return true
@@ -39,7 +40,7 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 
 func TestGetRequestThresholdFound(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	var m = thresholdHelper{
+	var th = thresholdHelper{
 		logger: logger,
 		config: &Config{
 			Env:                     "dev",
@@ -49,6 +50,7 @@ func TestGetRequestThresholdFound(t *testing.T) {
 		},
 		thresholds: &sync.Map{},
 		entityKeys: &sync.Map{},
+		rwMutex:    &sync.RWMutex{},
 	}
 
 	dto := EntityKeyDto{
@@ -56,10 +58,10 @@ func TestGetRequestThresholdFound(t *testing.T) {
 			"env": "dev", "site": "us-west-2", "namespace": "platform",
 		},
 	}
-	m.entityKeys.Store(dto.AsString(), dto)
+	th.entityKeys.Store(dto.AsString(), dto)
 
 	byRequest := map[string]*ThresholdDto{}
-	m.thresholds.Store(dto.AsString(), byRequest)
+	th.thresholds.Store(dto.AsString(), byRequest)
 
 	byRequest["/v1/latency-thresholds"] = &ThresholdDto{
 		RequestContext:    "/v1/latency-thresholds",
@@ -71,12 +73,12 @@ func TestGetRequestThresholdFound(t *testing.T) {
 		LatencyUpperBound: 2,
 	}
 
-	assert.Equal(t, float64(1), m.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
+	assert.Equal(t, float64(1), th.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
 }
 
 func TestGetServiceDefaultThresholdFound(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	var m = thresholdHelper{
+	var th = thresholdHelper{
 		logger: logger,
 		config: &Config{
 			Env:                     "dev",
@@ -86,6 +88,7 @@ func TestGetServiceDefaultThresholdFound(t *testing.T) {
 		},
 		thresholds: &sync.Map{},
 		entityKeys: &sync.Map{},
+		rwMutex:    &sync.RWMutex{},
 	}
 
 	dto := EntityKeyDto{
@@ -93,22 +96,22 @@ func TestGetServiceDefaultThresholdFound(t *testing.T) {
 			"env": "dev", "site": "us-west-2", "namespace": "platform",
 		},
 	}
-	m.entityKeys.Store(dto.AsString(), dto)
+	th.entityKeys.Store(dto.AsString(), dto)
 
 	byRequest := map[string]*ThresholdDto{}
-	m.thresholds.Store(dto.AsString(), byRequest)
+	th.thresholds.Store(dto.AsString(), byRequest)
 
 	byRequest[""] = &ThresholdDto{
 		RequestContext:    "",
 		LatencyUpperBound: 1,
 	}
 
-	assert.Equal(t, float64(1), m.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
+	assert.Equal(t, float64(1), th.getThreshold("platform", "api-server", "/v1/latency-thresholds"))
 }
 
 func TestStopUpdates(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	var m = thresholdHelper{
+	var th = thresholdHelper{
 		logger: logger,
 		config: &Config{
 			Env:                     "dev",
@@ -120,8 +123,8 @@ func TestStopUpdates(t *testing.T) {
 		entityKeys: &sync.Map{},
 		stop:       make(chan bool),
 	}
-	m.stopUpdates()
-	assert.True(t, <-m.stop)
+	th.stopUpdates()
+	assert.True(t, <-th.stop)
 }
 
 func TestUpdateThresholds(t *testing.T) {
@@ -137,14 +140,14 @@ func TestUpdateThresholds(t *testing.T) {
 		},
 		DefaultLatencyThreshold: 0.5,
 	}
-	var m = thresholdHelper{
+	var th = thresholdHelper{
 		logger:              logger,
 		config:              config,
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Second),
-		assertsClient: &assertsClient{
+		rc: &assertsClient{
 			config: config,
 			logger: logger,
 		},
@@ -154,9 +157,48 @@ func TestUpdateThresholds(t *testing.T) {
 			"env": "dev", "site": "us-west-2",
 		},
 	}
-	m.entityKeys.Store(entityKey.AsString(), entityKey)
-	go func() { m.startUpdates() }()
+	th.entityKeys.Store(entityKey.AsString(), entityKey)
+	go func() { th.startUpdates() }()
 	time.Sleep(2 * time.Second)
-	m.stopUpdates()
+	th.stopUpdates()
 	time.Sleep(1 * time.Second)
+}
+
+func TestThresholdsIsUpdated(t *testing.T) {
+	prevConfig := &Config{
+		DefaultLatencyThreshold: 0.5,
+	}
+	currentConfig := &Config{
+		DefaultLatencyThreshold: 0.51,
+	}
+
+	logger, _ := zap.NewProduction()
+	var th = thresholdHelper{
+		logger:  logger,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.False(t, th.isUpdated(prevConfig, prevConfig))
+	assert.True(t, th.isUpdated(prevConfig, currentConfig))
+}
+
+func TestThresholdsOnUpdate(t *testing.T) {
+	prevConfig := &Config{
+		DefaultLatencyThreshold: 0.5,
+	}
+	currentConfig := &Config{
+		DefaultLatencyThreshold: 0.51,
+	}
+
+	logger, _ := zap.NewProduction()
+	var th = thresholdHelper{
+		logger:  logger,
+		config:  prevConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.Equal(t, .5, th.getDefaultThreshold())
+	err := th.onUpdate(currentConfig)
+	assert.Nil(t, err)
+	assert.Equal(t, .51, th.getDefaultThreshold())
 }

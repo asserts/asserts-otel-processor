@@ -57,6 +57,8 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, nextConsumer, _assertsProcessor.nextConsumer)
 	assert.NotNil(t, _assertsProcessor.metricBuilder)
 	assert.NotNil(t, _assertsProcessor.sampler)
+	assert.NotNil(t, _assertsProcessor.configRefresh)
+	assert.NotNil(t, _assertsProcessor.rwMutex)
 
 	// Metric Builder
 	assert.Equal(t, config, *_assertsProcessor.metricBuilder.config)
@@ -67,6 +69,7 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.metricBuilder.sampledTraceCount)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.totalTraceCount)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.requestContextsByService)
+	assert.NotNil(t, _assertsProcessor.metricBuilder.rwMutex)
 
 	// Sampler
 	assert.Equal(t, config, *_assertsProcessor.sampler.config)
@@ -86,4 +89,16 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.sampler.thresholdHelper.thresholds)
 	assert.NotNil(t, _assertsProcessor.sampler.thresholdHelper.stop)
 	assert.NotNil(t, _assertsProcessor.sampler.thresholdHelper.thresholdSyncTicker)
+	assert.NotNil(t, _assertsProcessor.sampler.thresholdHelper.rc)
+	assert.NotNil(t, _assertsProcessor.sampler.thresholdHelper.rwMutex)
+
+	// Config Refresh
+	assert.Equal(t, config, *_assertsProcessor.configRefresh.config)
+	assert.Equal(t, logger, _assertsProcessor.configRefresh.logger)
+	assert.NotNil(t, _assertsProcessor.configRefresh.configSyncTicker)
+	assert.NotNil(t, _assertsProcessor.configRefresh.stop)
+	assert.NotNil(t, _assertsProcessor.configRefresh.restClient)
+	assert.NotNil(t, _assertsProcessor.configRefresh.spanMatcher)
+	assert.NotNil(t, _assertsProcessor.configRefresh.configListeners)
+	assert.Equal(t, 3, len(_assertsProcessor.configRefresh.configListeners))
 }

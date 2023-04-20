@@ -73,11 +73,12 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
-		assertsClient:       &assertsClient,
+		rc:                  &assertsClient,
+		rwMutex:             &sync.RWMutex{},
 	}
 
 	metricsHelper := newMetricHelper(logger, pConfig, spanMatcher)
-	err = metricsHelper.init()
+	err = metricsHelper.registerMetrics()
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +100,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		nextConsumer:  nextConsumer,
 		metricBuilder: metricsHelper,
 		sampler:       &traceSampler,
+		rwMutex:       &sync.RWMutex{},
 	}
 
 	listeners := make([]configListener, 0)
@@ -110,12 +112,12 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		logger:           logger,
 		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		stop:             make(chan bool),
-		assertsClient:    &assertsClient,
+		restClient:       &assertsClient,
 		spanMatcher:      spanMatcher,
 		configListeners:  listeners,
 	}
 	p.configRefresh = &configRefresh
 
-	go metricsHelper.startExporter()
+	metricsHelper.startExporter()
 	return p, nil
 }

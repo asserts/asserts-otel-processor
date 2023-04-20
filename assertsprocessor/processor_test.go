@@ -55,14 +55,14 @@ func TestStartAndShutdown(t *testing.T) {
 		entityKeys:          &sync.Map{},
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		assertsClient:       &assertsClient{},
+		rc:                  &assertsClient{},
 	}
 	configRefresh := configRefresh{
 		config:           &testConfig,
 		logger:           logger,
 		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		stop:             make(chan bool),
-		assertsClient:    &assertsClient{},
+		restClient:       &assertsClient{},
 		spanMatcher:      &spanMatcher{},
 	}
 	p := assertsProcessorImpl{
@@ -99,9 +99,10 @@ func TestConsumeTraces(t *testing.T) {
 		entityKeys:          &sync.Map{},
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		rwMutex:             &sync.RWMutex{},
 	}
 	helper := newMetricHelper(testLogger, &testConfig, &spanMatcher{})
-	_ = helper.init()
+	_ = helper.registerMetrics()
 	p := assertsProcessorImpl{
 		logger:        testLogger,
 		config:        &testConfig,
@@ -118,6 +119,7 @@ func TestConsumeTraces(t *testing.T) {
 			spanMatcher:        &spanMatcher{},
 			metricHelper:       buildMetricHelper(),
 		},
+		rwMutex: &sync.RWMutex{},
 	}
 
 	testTrace := ptrace.NewTraces()
@@ -143,4 +145,44 @@ func TestConsumeTraces(t *testing.T) {
 
 	err := p.ConsumeTraces(ctx, testTrace)
 	assert.Nil(t, err)
+}
+
+func TestProcessorIsUpdated(t *testing.T) {
+	prevConfig := &Config{
+		CaptureMetrics: false,
+	}
+	currentConfig := &Config{
+		CaptureMetrics: true,
+	}
+
+	testLogger, _ := zap.NewProduction()
+	p := assertsProcessorImpl{
+		logger:  testLogger,
+		config:  prevConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.False(t, p.isUpdated(prevConfig, prevConfig))
+	assert.True(t, p.isUpdated(prevConfig, currentConfig))
+}
+
+func TestProcessorOnUpdate(t *testing.T) {
+	prevConfig := &Config{
+		CaptureMetrics: false,
+	}
+	currentConfig := &Config{
+		CaptureMetrics: true,
+	}
+
+	testLogger, _ := zap.NewProduction()
+	p := assertsProcessorImpl{
+		logger:  testLogger,
+		config:  prevConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.False(t, p.captureMetrics())
+	err := p.onUpdate(currentConfig)
+	assert.Nil(t, err)
+	assert.True(t, p.captureMetrics())
 }

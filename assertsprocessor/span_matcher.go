@@ -85,10 +85,14 @@ func (sm *spanMatcher) isUpdated(prevConfig *Config, currentConfig *Config) bool
 	return updated
 }
 
-func (sm *spanMatcher) onUpdate(config *Config) error {
-	err := sm.compileRequestContextRegexps(config)
-	if err != nil {
-		sm.logger.Error("Ignoring RequestContextExps due to regex compilation error", zap.Error(err))
+func (sm *spanMatcher) onUpdate(currentConfig *Config) error {
+	err := sm.compileRequestContextRegexps(currentConfig)
+	if err == nil {
+		sm.logger.Info("Updated config RequestContextExps",
+			zap.Any("Current", currentConfig.RequestContextExps),
+		)
+	} else {
+		sm.logger.Error("Ignoring config RequestContextExps due to regex compilation error", zap.Error(err))
 	}
 	return err
 }

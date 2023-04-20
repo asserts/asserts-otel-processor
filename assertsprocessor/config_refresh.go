@@ -8,8 +8,8 @@ import (
 )
 
 type configListener interface {
-	isUpdated(currConfig *Config, latestConfig *Config) bool
-	onUpdate(config *Config) error
+	isUpdated(prevConfig *Config, currentConfig *Config) bool
+	onUpdate(currentConfig *Config) error
 }
 
 type configRefresh struct {
@@ -17,7 +17,7 @@ type configRefresh struct {
 	logger           *zap.Logger
 	configSyncTicker *clock.Ticker
 	stop             chan bool
-	assertsClient    *assertsClient
+	restClient       restClient
 	spanMatcher      *spanMatcher
 	configListeners  []configListener
 }
@@ -37,23 +37,23 @@ func (cr *configRefresh) startUpdates() {
 					return
 				case <-cr.configSyncTicker.C:
 					cr.logger.Info("Fetching collector config")
-					cr.fetchAndUpdateConfig()
+					cr.fetchAndUpdateConfig(cr.restClient)
 				}
 			}
 		}()
 	}
 }
 
-func (cr *configRefresh) fetchAndUpdateConfig() {
-	latestConfig, err := cr.fetchConfig()
+func (cr *configRefresh) fetchAndUpdateConfig(rc restClient) {
+	latestConfig, err := cr.fetchConfig(rc)
 	if err == nil {
 		cr.updateConfig(latestConfig)
 	}
 }
 
-func (cr *configRefresh) fetchConfig() (*Config, error) {
-	var config *Config
-	body, err := cr.assertsClient.invoke(http.MethodGet, configApi, nil)
+func (cr *configRefresh) fetchConfig(rc restClient) (*Config, error) {
+	var config = &Config{}
+	body, err := rc.invoke(http.MethodGet, configApi, nil)
 	if err == nil {
 		err = json.Unmarshal(body, config)
 		if err == nil {
@@ -74,6 +74,8 @@ func (cr *configRefresh) updateConfig(latestConfig *Config) {
 		}
 	}
 	if err == nil {
+		// The config updates are accepted only when all the listeners consume the config updates without
+		// error. This could potentially leave different components with different versions of the config
 		cr.config = latestConfig
 	}
 }

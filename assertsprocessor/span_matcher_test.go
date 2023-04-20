@@ -171,3 +171,112 @@ func TestGetRequestNoMatch(t *testing.T) {
 	value := matcher.getRequest(&testSpan, "namespace#service")
 	assert.Equal(t, "BackgroundJob", value)
 }
+
+func TestSpanMatcherIsUpdated(t *testing.T) {
+	prevExps := map[string][]*MatcherDto{
+		"namespace#service": {
+			{
+				AttrName:    "attribute1",
+				Regex:       "(Foo)",
+				Replacement: "$1",
+			},
+			{
+				AttrName: "attribute2",
+				Regex:    "(Bar).+",
+			},
+		},
+		"default": {
+			{
+				AttrName: "attribute3",
+				Regex:    "(Baz).+",
+			},
+		},
+	}
+	prevConfig := &Config{
+		RequestContextExps: prevExps,
+	}
+	currentExps := map[string][]*MatcherDto{
+		"namespace#service": {
+			{
+				AttrName:    "attribute1",
+				Regex:       "(Foo)",
+				Replacement: "$1",
+			},
+			{
+				AttrName: "attribute2",
+				Regex:    "(Bar).+",
+			},
+		},
+		"default": {
+			{
+				AttrName: "attribute3",
+				Regex:    "(Baz).+",
+			},
+		},
+	}
+	currentConfig := &Config{
+		RequestContextExps: currentExps,
+	}
+
+	logger, _ := zap.NewProduction()
+	matcher := spanMatcher{
+		logger: logger,
+	}
+
+	assert.False(t, matcher.isUpdated(prevConfig, currentConfig))
+
+	currentExps["namespace#service"][1].Replacement = "$2"
+	assert.True(t, matcher.isUpdated(prevConfig, currentConfig))
+
+	delete(currentExps, "default")
+	assert.True(t, matcher.isUpdated(prevConfig, currentConfig))
+}
+
+func TestSpanMatcherOnUpdateSuccess(t *testing.T) {
+	config := &Config{
+		RequestContextExps: map[string][]*MatcherDto{
+			"default": {
+				{
+					AttrName:    "attribute1",
+					Regex:       "(Foo)",
+					Replacement: "$1",
+				},
+			},
+		},
+	}
+
+	logger, _ := zap.NewProduction()
+	matcher := spanMatcher{
+		logger: logger,
+	}
+
+	assert.Nil(t, matcher.spanAttrMatchers)
+	err := matcher.onUpdate(config)
+	assert.Nil(t, err)
+	assert.NotNil(t, matcher.spanAttrMatchers)
+	assert.Equal(t, 1, len(matcher.spanAttrMatchers))
+}
+
+func TestSpanMatcherOnUpdateError(t *testing.T) {
+	config := &Config{
+		RequestContextExps: map[string][]*MatcherDto{
+			"default": {
+				{
+					AttrName:    "attribute1",
+					Regex:       "+",
+					Replacement: "$1",
+				},
+			},
+		},
+	}
+
+	logger, _ := zap.NewProduction()
+	matcher := spanMatcher{
+		logger: logger,
+	}
+
+	assert.Nil(t, matcher.spanAttrMatchers)
+	err := matcher.onUpdate(config)
+	assert.NotNil(t, err)
+	assert.Nil(t, matcher.spanAttrMatchers)
+}
