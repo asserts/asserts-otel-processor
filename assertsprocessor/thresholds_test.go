@@ -146,7 +146,7 @@ func TestUpdateThresholds(t *testing.T) {
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
-		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Second),
+		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Millisecond),
 		rc: &assertsClient{
 			config: config,
 			logger: logger,
@@ -159,9 +159,9 @@ func TestUpdateThresholds(t *testing.T) {
 	}
 	th.entityKeys.Store(entityKey.AsString(), entityKey)
 	go func() { th.startUpdates() }()
-	time.Sleep(2 * time.Second)
+	time.Sleep(2 * time.Millisecond)
 	th.stopUpdates()
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Millisecond)
 }
 
 func TestThresholdsIsUpdated(t *testing.T) {

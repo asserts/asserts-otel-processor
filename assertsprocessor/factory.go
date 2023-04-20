@@ -106,6 +106,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	listeners := make([]configListener, 0)
 	listeners = append(listeners, spanMatcher)
 	listeners = append(listeners, &thresholdsHelper)
+	listeners = append(listeners, metricsHelper)
 	listeners = append(listeners, p)
 	configRefresh := configRefresh{
 		config:           pConfig,

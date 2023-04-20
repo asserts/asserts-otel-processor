@@ -100,5 +100,7 @@ func TestCreateProcessor(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.configRefresh.restClient)
 	assert.NotNil(t, _assertsProcessor.configRefresh.spanMatcher)
 	assert.NotNil(t, _assertsProcessor.configRefresh.configListeners)
-	assert.Equal(t, 3, len(_assertsProcessor.configRefresh.configListeners))
+	assert.Equal(t, 4, len(_assertsProcessor.configRefresh.configListeners))
+
+	_ = _assertsProcessor.metricBuilder.stopExporter()
 }

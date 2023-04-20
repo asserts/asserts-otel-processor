@@ -194,7 +194,7 @@ func TestMetricHelperIsUpdated(t *testing.T) {
 func TestMetricHelperOnUpdate(t *testing.T) {
 	prevConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
-		PrometheusExporterPort:    9465,
+		PrometheusExporterPort:    9466,
 	}
 	currentConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
