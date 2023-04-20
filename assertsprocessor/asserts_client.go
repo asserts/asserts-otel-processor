@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -84,11 +85,12 @@ func (ac *assertsClient) readResponseBody(api string, statusCode int, body io.Re
 				zap.String("Body", string(responseBody)),
 			)
 		} else {
+			bodyString := string(responseBody)
+			err = errors.New(bodyString)
 			ac.logger.Error("Un-expected response",
 				zap.String("Api", api),
 				zap.Int("Status code", statusCode),
-				zap.String("Response", string(responseBody)),
-				zap.Error(err),
+				zap.String("Response", bodyString),
 			)
 		}
 	} else {

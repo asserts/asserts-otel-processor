@@ -146,10 +146,14 @@ func TestUpdateThresholds(t *testing.T) {
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
-		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Millisecond),
-		rc: &assertsClient{
-			config: config,
-			logger: logger,
+		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(10 * time.Millisecond),
+		rc: &mockRestClient{
+			expectedData: []byte(`[{
+				"requestType": "inbound",
+				"requestContext": "/v4/rules",
+				"upperThreshold": 0.25
+			}]`),
+			expectedErr: nil,
 		},
 	}
 	entityKey := EntityKeyDto{
@@ -158,10 +162,67 @@ func TestUpdateThresholds(t *testing.T) {
 		},
 	}
 	th.entityKeys.Store(entityKey.AsString(), entityKey)
+
+	value, _ := th.thresholds.Load(entityKey.AsString())
+	assert.Nil(t, value)
+
+	go func() { th.startUpdates() }()
+	time.Sleep(20 * time.Millisecond)
+	th.stopUpdates()
+	time.Sleep(10 * time.Millisecond)
+
+	thresholds, _ := th.thresholds.Load(entityKey.AsString())
+	assert.NotNil(t, thresholds)
+
+	thresholdsMap := thresholds.(map[string]*ThresholdDto)
+	assert.Equal(t, 1, len(thresholdsMap))
+	assert.NotNil(t, thresholdsMap["/v4/rules"])
+	assert.Equal(t, "inbound", thresholdsMap["/v4/rules"].RequestType)
+	assert.Equal(t, "/v4/rules", thresholdsMap["/v4/rules"].RequestContext)
+	assert.Equal(t, 0.25, thresholdsMap["/v4/rules"].LatencyUpperBound)
+}
+
+func TestUpdateThresholdsUnmarshalError(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	ctx := context.Background()
+	config := &Config{
+		Env:  "dev",
+		Site: "us-west-2",
+		AssertsServer: &map[string]string{
+			"endpoint": "http://localhost:8030",
+			"user":     "user",
+			"password": "password",
+		},
+		DefaultLatencyThreshold: 0.5,
+	}
+	var th = thresholdHelper{
+		logger:              logger,
+		config:              config,
+		thresholds:          &sync.Map{},
+		entityKeys:          &sync.Map{},
+		stop:                make(chan bool),
+		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(1 * time.Millisecond),
+		rc: &mockRestClient{
+			expectedData: []byte(`invalid json`),
+			expectedErr:  nil,
+		},
+	}
+	entityKey := EntityKeyDto{
+		Type: "Service", Name: "api-server", Scope: map[string]string{
+			"env": "dev", "site": "us-west-2",
+		},
+	}
+	th.entityKeys.Store(entityKey.AsString(), entityKey)
+
+	value, _ := th.thresholds.Load(entityKey.AsString())
+	assert.Nil(t, value)
+
 	go func() { th.startUpdates() }()
 	time.Sleep(2 * time.Millisecond)
 	th.stopUpdates()
-	time.Sleep(1 * time.Millisecond)
+
+	thresholds, _ := th.thresholds.Load(entityKey.AsString())
+	assert.Nil(t, thresholds)
 }
 
 func TestThresholdsIsUpdated(t *testing.T) {

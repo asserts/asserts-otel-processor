@@ -105,9 +105,13 @@ func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto
 	body, err := th.rc.invoke(http.MethodPost, latencyThresholdsApi, entityKey)
 	if err == nil {
 		err = json.Unmarshal(body, &thresholds)
+		if err == nil {
+			th.logThresholds(entityKey, thresholds)
+		} else {
+			th.logger.Error("Error unmarshalling thresholds", zap.Error(err))
+		}
 	}
 
-	th.logThresholds(entityKey, thresholds)
 	return thresholds, err
 }
 

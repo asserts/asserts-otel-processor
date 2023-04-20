@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"io"
+	"net/http"
 	"testing"
 )
 
@@ -46,6 +47,25 @@ func (mrc *mockReadCloser) Read(p []byte) (n int, err error) {
 
 func (mrc *mockReadCloser) Close() error { return nil }
 
+func TestInvoke(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	ac := assertsClient{
+		logger: logger,
+		config: &Config{
+			Env:  "dev",
+			Site: "us-west-2",
+			AssertsServer: &map[string]string{
+				"endpoint": "http://localhost:8030",
+				"user":     "asserts",
+				"password": "asserts",
+			},
+			DefaultLatencyThreshold: 0.5,
+		},
+	}
+
+	ac.invoke(http.MethodPost, latencyThresholdsApi, "junit")
+}
+
 func TestReadResponseBodySuccess(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	ac := assertsClient{
@@ -76,7 +96,7 @@ func TestReadResponseBodyErrorStatusCode(t *testing.T) {
 
 	body, err := ac.readResponseBody(configApi, 401, mrc)
 
-	assert.Nil(t, err)
+	assert.NotNil(t, err)
 	assert.Equal(t, mrc.expectedData, body)
 }
 
