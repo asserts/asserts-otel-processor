@@ -226,10 +226,10 @@ func TestUpdateThresholdsUnmarshalError(t *testing.T) {
 }
 
 func TestThresholdsIsUpdated(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		DefaultLatencyThreshold: 0.5,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		DefaultLatencyThreshold: 0.51,
 	}
 
@@ -239,27 +239,27 @@ func TestThresholdsIsUpdated(t *testing.T) {
 		rwMutex: &sync.RWMutex{},
 	}
 
-	assert.False(t, th.isUpdated(prevConfig, prevConfig))
-	assert.True(t, th.isUpdated(prevConfig, currentConfig))
+	assert.False(t, th.isUpdated(currConfig, currConfig))
+	assert.True(t, th.isUpdated(currConfig, newConfig))
 }
 
 func TestThresholdsOnUpdate(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		DefaultLatencyThreshold: 0.5,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		DefaultLatencyThreshold: 0.51,
 	}
 
 	logger, _ := zap.NewProduction()
 	var th = thresholdHelper{
 		logger:  logger,
-		config:  prevConfig,
+		config:  currConfig,
 		rwMutex: &sync.RWMutex{},
 	}
 
 	assert.Equal(t, .5, th.getDefaultThreshold())
-	err := th.onUpdate(currentConfig)
+	err := th.onUpdate(newConfig)
 	assert.Nil(t, err)
 	assert.Equal(t, .51, th.getDefaultThreshold())
 }

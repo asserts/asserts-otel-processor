@@ -125,15 +125,15 @@ func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []Th
 }
 
 // configListener interface implementation
-func (th *thresholdHelper) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+func (th *thresholdHelper) isUpdated(currConfig *Config, newConfig *Config) bool {
 	th.rwMutex.RLock()
 	defer th.rwMutex.RUnlock()
 
-	updated := prevConfig.DefaultLatencyThreshold != currentConfig.DefaultLatencyThreshold
+	updated := currConfig.DefaultLatencyThreshold != newConfig.DefaultLatencyThreshold
 	if updated {
 		th.logger.Info("Change detected in config DefaultLatencyThreshold",
-			zap.Any("Previous", prevConfig.DefaultLatencyThreshold),
-			zap.Any("Current", currentConfig.DefaultLatencyThreshold),
+			zap.Any("Current", currConfig.DefaultLatencyThreshold),
+			zap.Any("New", newConfig.DefaultLatencyThreshold),
 		)
 	} else {
 		th.logger.Debug("No change detected in config DefaultLatencyThreshold")
@@ -141,13 +141,13 @@ func (th *thresholdHelper) isUpdated(prevConfig *Config, currentConfig *Config) 
 	return updated
 }
 
-func (th *thresholdHelper) onUpdate(currentConfig *Config) error {
+func (th *thresholdHelper) onUpdate(newConfig *Config) error {
 	th.rwMutex.Lock()
 	defer th.rwMutex.Unlock()
 
-	th.config.DefaultLatencyThreshold = currentConfig.DefaultLatencyThreshold
+	th.config.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
 	th.logger.Info("Updated config DefaultLatencyThreshold",
-		zap.Float64("Current", th.config.DefaultLatencyThreshold),
+		zap.Float64("New", th.config.DefaultLatencyThreshold),
 	)
 	return nil
 }

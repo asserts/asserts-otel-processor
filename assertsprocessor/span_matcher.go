@@ -72,12 +72,12 @@ func (sm *spanMatcher) getRequest(span *ptrace.Span, serviceKey string) string {
 }
 
 // configListener interface implementation
-func (sm *spanMatcher) isUpdated(prevConfig *Config, currentConfig *Config) bool {
-	updated := !reflect.DeepEqual(prevConfig.RequestContextExps, currentConfig.RequestContextExps)
+func (sm *spanMatcher) isUpdated(currConfig *Config, newConfig *Config) bool {
+	updated := !reflect.DeepEqual(currConfig.RequestContextExps, newConfig.RequestContextExps)
 	if updated {
 		sm.logger.Info("Change detected in config RequestContextExps",
-			zap.Any("Previous", prevConfig.RequestContextExps),
-			zap.Any("Current", currentConfig.RequestContextExps),
+			zap.Any("Current", currConfig.RequestContextExps),
+			zap.Any("New", newConfig.RequestContextExps),
 		)
 	} else {
 		sm.logger.Debug("No change detected in config RequestContextExps")
@@ -85,11 +85,11 @@ func (sm *spanMatcher) isUpdated(prevConfig *Config, currentConfig *Config) bool
 	return updated
 }
 
-func (sm *spanMatcher) onUpdate(currentConfig *Config) error {
-	err := sm.compileRequestContextRegexps(currentConfig)
+func (sm *spanMatcher) onUpdate(newConfig *Config) error {
+	err := sm.compileRequestContextRegexps(newConfig)
 	if err == nil {
 		sm.logger.Info("Updated config RequestContextExps",
-			zap.Any("Current", currentConfig.RequestContextExps),
+			zap.Any("New", newConfig.RequestContextExps),
 		)
 	} else {
 		sm.logger.Error("Ignoring config RequestContextExps due to regex compilation error", zap.Error(err))

@@ -265,15 +265,15 @@ func (p *metricHelper) applyPromConventions(text string) string {
 }
 
 // configListener interface implementation
-func (p *metricHelper) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+func (p *metricHelper) isUpdated(currConfig *Config, newConfig *Config) bool {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
-	updated := !reflect.DeepEqual(prevConfig.CaptureAttributesInMetric, currentConfig.CaptureAttributesInMetric)
+	updated := !reflect.DeepEqual(currConfig.CaptureAttributesInMetric, newConfig.CaptureAttributesInMetric)
 	if updated {
 		p.logger.Info("Change detected in config CaptureAttributesInMetric",
-			zap.Any("Previous", prevConfig.CaptureAttributesInMetric),
-			zap.Any("Current", currentConfig.CaptureAttributesInMetric),
+			zap.Any("Current", currConfig.CaptureAttributesInMetric),
+			zap.Any("New", newConfig.CaptureAttributesInMetric),
 		)
 	} else {
 		p.logger.Debug("No change detected in config CaptureAttributesInMetric")
@@ -281,7 +281,7 @@ func (p *metricHelper) isUpdated(prevConfig *Config, currentConfig *Config) bool
 	return updated
 }
 
-func (p *metricHelper) onUpdate(currentConfig *Config) error {
+func (p *metricHelper) onUpdate(newConfig *Config) error {
 	p.rwMutex.Lock()
 	defer p.rwMutex.Unlock()
 
@@ -290,15 +290,15 @@ func (p *metricHelper) onUpdate(currentConfig *Config) error {
 	// and redo all of that work again
 	err := p.stopExporter()
 	if err == nil {
-		prevConfigCaptureAttributesInMetric := p.config.CaptureAttributesInMetric
+		currConfigCaptureAttributesInMetric := p.config.CaptureAttributesInMetric
 		// use new config
-		p.config.CaptureAttributesInMetric = currentConfig.CaptureAttributesInMetric
+		p.config.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
 
 		// create new prometheus registry and register metrics
 		err = p.registerMetrics()
 		if err == nil {
 			p.logger.Info("Updated config CaptureAttributesInMetric",
-				zap.Any("Current", currentConfig.CaptureAttributesInMetric),
+				zap.Any("New", newConfig.CaptureAttributesInMetric),
 			)
 		} else {
 			p.logger.Error("Ignoring config CaptureAttributesInMetric due to error registering new latency histogram",
@@ -306,7 +306,7 @@ func (p *metricHelper) onUpdate(currentConfig *Config) error {
 			)
 			// latency histogram registration failed, reverting to old config
 			// create new prometheus registry and register metrics again
-			p.config.CaptureAttributesInMetric = prevConfigCaptureAttributesInMetric
+			p.config.CaptureAttributesInMetric = currConfigCaptureAttributesInMetric
 			_ = p.registerMetrics()
 		}
 

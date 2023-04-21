@@ -175,39 +175,39 @@ func TestMetricCardinalityLimit(t *testing.T) {
 }
 
 func TestMetricHelperIsUpdated(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
 	}
 	p := newMetricHelper(
 		logger,
-		prevConfig,
+		currConfig,
 		&spanMatcher{},
 	)
 
-	assert.False(t, p.isUpdated(prevConfig, prevConfig))
-	assert.True(t, p.isUpdated(prevConfig, currentConfig))
+	assert.False(t, p.isUpdated(currConfig, currConfig))
+	assert.True(t, p.isUpdated(currConfig, newConfig))
 }
 
 func TestMetricHelperOnUpdate(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
 		PrometheusExporterPort:    9466,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
 	}
 
 	logger, _ := zap.NewProduction()
 	p := newMetricHelper(
 		logger,
-		prevConfig,
+		currConfig,
 		&spanMatcher{},
 	)
 	_ = p.registerMetrics()
 	p.startExporter()
 
-	assert.Nil(t, p.onUpdate(currentConfig))
+	assert.Nil(t, p.onUpdate(newConfig))
 }

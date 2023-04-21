@@ -80,15 +80,15 @@ func (p *assertsProcessorImpl) captureMetrics() bool {
 }
 
 // configListener interface implementation
-func (p *assertsProcessorImpl) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+func (p *assertsProcessorImpl) isUpdated(currConfig *Config, newConfig *Config) bool {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
-	updated := prevConfig.CaptureMetrics != currentConfig.CaptureMetrics
+	updated := currConfig.CaptureMetrics != newConfig.CaptureMetrics
 	if updated {
 		p.logger.Info("Change detected in config CaptureMetrics",
-			zap.Any("Previous", prevConfig.CaptureMetrics),
-			zap.Any("Current", currentConfig.CaptureMetrics),
+			zap.Any("Current", currConfig.CaptureMetrics),
+			zap.Any("New", newConfig.CaptureMetrics),
 		)
 	} else {
 		p.logger.Debug("No change detected in config CaptureMetrics")
@@ -96,13 +96,13 @@ func (p *assertsProcessorImpl) isUpdated(prevConfig *Config, currentConfig *Conf
 	return updated
 }
 
-func (p *assertsProcessorImpl) onUpdate(currentConfig *Config) error {
+func (p *assertsProcessorImpl) onUpdate(newConfig *Config) error {
 	p.rwMutex.Lock()
 	defer p.rwMutex.Unlock()
 
-	p.config.CaptureMetrics = currentConfig.CaptureMetrics
+	p.config.CaptureMetrics = newConfig.CaptureMetrics
 	p.logger.Info("Updated config CaptureMetrics",
-		zap.Bool("Current", p.config.CaptureMetrics),
+		zap.Bool("New", p.config.CaptureMetrics),
 	)
 	return nil
 }

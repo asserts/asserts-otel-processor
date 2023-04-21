@@ -147,41 +147,41 @@ func TestConsumeTraces(t *testing.T) {
 }
 
 func TestProcessorIsUpdated(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureMetrics: false,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureMetrics: true,
 	}
 
 	testLogger, _ := zap.NewProduction()
 	p := assertsProcessorImpl{
 		logger:  testLogger,
-		config:  prevConfig,
+		config:  currConfig,
 		rwMutex: &sync.RWMutex{},
 	}
 
-	assert.False(t, p.isUpdated(prevConfig, prevConfig))
-	assert.True(t, p.isUpdated(prevConfig, currentConfig))
+	assert.False(t, p.isUpdated(currConfig, currConfig))
+	assert.True(t, p.isUpdated(currConfig, newConfig))
 }
 
 func TestProcessorOnUpdate(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureMetrics: false,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureMetrics: true,
 	}
 
 	testLogger, _ := zap.NewProduction()
 	p := assertsProcessorImpl{
 		logger:  testLogger,
-		config:  prevConfig,
+		config:  currConfig,
 		rwMutex: &sync.RWMutex{},
 	}
 
 	assert.False(t, p.captureMetrics())
-	err := p.onUpdate(currentConfig)
+	err := p.onUpdate(newConfig)
 	assert.Nil(t, err)
 	assert.True(t, p.captureMetrics())
 }

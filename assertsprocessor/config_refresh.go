@@ -8,8 +8,8 @@ import (
 )
 
 type configListener interface {
-	isUpdated(prevConfig *Config, currentConfig *Config) bool
-	onUpdate(currentConfig *Config) error
+	isUpdated(currConfig *Config, newConfig *Config) bool
+	onUpdate(newConfig *Config) error
 }
 
 type configRefresh struct {

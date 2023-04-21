@@ -15,11 +15,11 @@ type (
 	}
 )
 
-func (mcl *mockConfigListener) isUpdated(prevConfig *Config, currentConfig *Config) bool {
+func (mcl *mockConfigListener) isUpdated(currConfig *Config, newConfig *Config) bool {
 	return mcl.expectedIsUpdated
 }
 
-func (mcl *mockConfigListener) onUpdate(currentConfig *Config) error {
+func (mcl *mockConfigListener) onUpdate(newConfig *Config) error {
 	mcl.expectedOnUpdate = true
 	return mcl.expectedErr
 }
@@ -71,10 +71,10 @@ func TestFetchConfigUnmarshalError(t *testing.T) {
 }
 
 func TestUpdateConfig(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureMetrics: false,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureMetrics: true,
 	}
 	listener := &mockConfigListener{
@@ -84,21 +84,21 @@ func TestUpdateConfig(t *testing.T) {
 
 	cr := configRefresh{
 		logger:          logger,
-		config:          prevConfig,
+		config:          currConfig,
 		configListeners: []configListener{listener},
 	}
 
 	assert.False(t, cr.config.CaptureMetrics)
-	cr.updateConfig(currentConfig)
+	cr.updateConfig(newConfig)
 	assert.True(t, listener.expectedOnUpdate)
 	assert.True(t, cr.config.CaptureMetrics)
 }
 
 func TestUpdateConfigNoChange(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureMetrics: true,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureMetrics: true,
 	}
 	listener := &mockConfigListener{
@@ -108,21 +108,21 @@ func TestUpdateConfigNoChange(t *testing.T) {
 
 	cr := configRefresh{
 		logger:          logger,
-		config:          prevConfig,
+		config:          currConfig,
 		configListeners: []configListener{listener},
 	}
 
 	assert.True(t, cr.config.CaptureMetrics)
-	cr.updateConfig(currentConfig)
+	cr.updateConfig(newConfig)
 	assert.False(t, listener.expectedOnUpdate)
 	assert.True(t, cr.config.CaptureMetrics)
 }
 
 func TestUpdateConfigError(t *testing.T) {
-	prevConfig := &Config{
+	currConfig := &Config{
 		CaptureMetrics: false,
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		CaptureMetrics: false,
 	}
 	listener := &mockConfigListener{
@@ -132,12 +132,12 @@ func TestUpdateConfigError(t *testing.T) {
 
 	cr := configRefresh{
 		logger:          logger,
-		config:          prevConfig,
+		config:          currConfig,
 		configListeners: []configListener{listener},
 	}
 
 	assert.False(t, cr.config.CaptureMetrics)
-	cr.updateConfig(currentConfig)
+	cr.updateConfig(newConfig)
 	assert.True(t, listener.expectedOnUpdate)
 	assert.False(t, cr.config.CaptureMetrics)
 }
@@ -149,7 +149,7 @@ func TestFetchAndUpdateConfig(t *testing.T) {
 		}`),
 		expectedErr: nil,
 	}
-	prevConfig := &Config{
+	currConfig := &Config{
 		DefaultLatencyThreshold: 0.5,
 	}
 	listener := &mockConfigListener{
@@ -159,7 +159,7 @@ func TestFetchAndUpdateConfig(t *testing.T) {
 
 	cr := configRefresh{
 		logger:          logger,
-		config:          prevConfig,
+		config:          currConfig,
 		configListeners: []configListener{listener},
 	}
 

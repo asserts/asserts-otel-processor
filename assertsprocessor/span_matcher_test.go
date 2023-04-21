@@ -192,7 +192,7 @@ func TestSpanMatcherIsUpdated(t *testing.T) {
 			},
 		},
 	}
-	prevConfig := &Config{
+	currConfig := &Config{
 		RequestContextExps: prevExps,
 	}
 	currentExps := map[string][]*MatcherDto{
@@ -214,7 +214,7 @@ func TestSpanMatcherIsUpdated(t *testing.T) {
 			},
 		},
 	}
-	currentConfig := &Config{
+	newConfig := &Config{
 		RequestContextExps: currentExps,
 	}
 
@@ -223,13 +223,13 @@ func TestSpanMatcherIsUpdated(t *testing.T) {
 		logger: logger,
 	}
 
-	assert.False(t, matcher.isUpdated(prevConfig, currentConfig))
+	assert.False(t, matcher.isUpdated(currConfig, newConfig))
 
 	currentExps["namespace#service"][1].Replacement = "$2"
-	assert.True(t, matcher.isUpdated(prevConfig, currentConfig))
+	assert.True(t, matcher.isUpdated(currConfig, newConfig))
 
 	delete(currentExps, "default")
-	assert.True(t, matcher.isUpdated(prevConfig, currentConfig))
+	assert.True(t, matcher.isUpdated(currConfig, newConfig))
 }
 
 func TestSpanMatcherOnUpdateSuccess(t *testing.T) {
