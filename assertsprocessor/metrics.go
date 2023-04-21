@@ -240,6 +240,14 @@ func (p *metricHelper) startExporter() {
 }
 
 func (p *metricHelper) stopExporter() error {
+	p.latencyHistogram.Reset()
+	p.totalTraceCount.Reset()
+	p.sampledTraceCount.Reset()
+
+	p.prometheusRegistry.Unregister(p.latencyHistogram)
+	p.prometheusRegistry.Unregister(p.totalTraceCount)
+	p.prometheusRegistry.Unregister(p.sampledTraceCount)
+
 	shutdownCtx := context.Background()
 	return p.httpServer.Shutdown(shutdownCtx)
 }
