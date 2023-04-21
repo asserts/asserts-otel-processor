@@ -53,17 +53,32 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
+	restClient := restClientFactory(logger, pConfig)
+
+	configRefresh := configRefresh{
+		config:           pConfig,
+		logger:           logger,
+		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		stop:             make(chan bool),
+		restClient:       restClient,
+	}
+
+	// First up, fetch the latest collector config from asserts api server
+	if newConfig, fetchError := configRefresh.fetchConfig(restClient); fetchError == nil {
+		// If config is fetched successfully from api server then for the following
+		// attributes it takes precedence over the local collector config
+		pConfig.CaptureMetrics = newConfig.CaptureMetrics
+		pConfig.RequestContextExps = newConfig.RequestContextExps
+		pConfig.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
+		pConfig.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
+	}
+
 	spanMatcher := &spanMatcher{
 		logger: logger,
 	}
 	err := spanMatcher.compileRequestContextRegexps(pConfig)
 	if err != nil {
 		return nil, err
-	}
-
-	assertsClient := assertsClient{
-		config: pConfig,
-		logger: logger,
 	}
 
 	thresholdsHelper := thresholdHelper{
@@ -73,11 +88,12 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		thresholds:          &sync.Map{},
 		entityKeys:          &sync.Map{},
 		stop:                make(chan bool),
-		assertsClient:       &assertsClient,
+		rc:                  restClient,
+		rwMutex:             &sync.RWMutex{},
 	}
 
 	metricsHelper := newMetricHelper(logger, pConfig, spanMatcher)
-	err = metricsHelper.init()
+	err = metricsHelper.registerMetrics()
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +115,17 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		nextConsumer:  nextConsumer,
 		metricBuilder: metricsHelper,
 		sampler:       &traceSampler,
+		rwMutex:       &sync.RWMutex{},
 	}
 
-	go metricsHelper.startExporter()
+	listeners := make([]configListener, 0)
+	listeners = append(listeners, spanMatcher)
+	listeners = append(listeners, &thresholdsHelper)
+	listeners = append(listeners, metricsHelper)
+	listeners = append(listeners, p)
+	configRefresh.configListeners = listeners
+	p.configRefresh = &configRefresh
+
+	metricsHelper.startExporter()
 	return p, nil
 }

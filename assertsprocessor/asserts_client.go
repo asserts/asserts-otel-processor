@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -11,8 +12,13 @@ import (
 )
 
 const (
+	configApi            = "/v1/otel-collector-config"
 	latencyThresholdsApi = "/v1/latency-thresholds"
 )
+
+type restClient interface {
+	invoke(method string, api string, payload any) ([]byte, error)
+}
 
 type assertsClient struct {
 	config *Config
@@ -63,31 +69,53 @@ func (ac *assertsClient) invoke(method string, api string, payload any) ([]byte,
 			zap.String("Api", api),
 			zap.Error(err),
 		)
-	} else if response.StatusCode == 200 {
-		responseBody, err = io.ReadAll(response.Body)
-		if err != nil {
+	} else {
+		responseBody, err = ac.readResponseBody(api, response.StatusCode, response.Body)
+	}
+
+	return responseBody, err
+}
+
+func (ac *assertsClient) readResponseBody(api string, statusCode int, body io.ReadCloser) ([]byte, error) {
+	responseBody, err := io.ReadAll(body)
+	if err == nil {
+		if statusCode == 200 {
 			ac.logger.Debug("Got Response",
 				zap.String("Api", api),
 				zap.String("Body", string(responseBody)),
 			)
+		} else {
+			bodyString := string(responseBody)
+			err = errors.New(bodyString)
+			ac.logger.Info("Un-expected response",
+				zap.String("Api", api),
+				zap.Int("Status code", statusCode),
+				zap.String("Response", bodyString),
+			)
 		}
 	} else {
-		if responseBody, err = io.ReadAll(response.Body); err == nil {
-			ac.logger.Error("Un-expected response",
-				zap.String("Api", api),
-				zap.Int("Status code", response.StatusCode),
-				zap.String("Response", string(responseBody)),
-				zap.Error(err))
-		}
+		ac.logger.Error("Error reading response body",
+			zap.String("Api", api),
+			zap.Int("Status code", statusCode),
+			zap.Error(err),
+		)
 	}
-	if response != nil && response.Body != nil {
-		_ = response.Body.Close()
-	}
-
+	_ = body.Close()
 	return responseBody, err
 }
 
 func basicAuth(username string, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
+}
+
+var (
+	restClientFactory = createRestClient
+)
+
+func createRestClient(logger *zap.Logger, pConfig *Config) restClient {
+	return &assertsClient{
+		config: pConfig,
+		logger: logger,
+	}
 }
