@@ -4,6 +4,8 @@ import (
 	"context"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/processor"
+	"go.uber.org/zap"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +40,7 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, float64(3), pConfig.DefaultLatencyThreshold)
 }
 
-func TestCreateProcessor(t *testing.T) {
+func TestCreateProcessorDefaultConfig(t *testing.T) {
 	factory := NewFactory()
 	ctx := context.Background()
 	var createSettings = processor.CreateSettings{
@@ -54,7 +56,7 @@ func TestCreateProcessor(t *testing.T) {
 	var _assertsProcessor = _processorRef.(*assertsProcessorImpl)
 	assert.Equal(t, config, *_assertsProcessor.config)
 	assert.NotNil(t, logger, _assertsProcessor.logger)
-	assert.NotNil(t, nextConsumer, _assertsProcessor.nextConsumer)
+	assert.Equal(t, nextConsumer, _assertsProcessor.nextConsumer)
 	assert.NotNil(t, _assertsProcessor.metricBuilder)
 	assert.NotNil(t, _assertsProcessor.sampler)
 	assert.NotNil(t, _assertsProcessor.configRefresh)
@@ -102,4 +104,58 @@ func TestCreateProcessor(t *testing.T) {
 	assert.Equal(t, 4, len(_assertsProcessor.configRefresh.configListeners))
 
 	_ = _assertsProcessor.metricBuilder.stopExporter()
+}
+
+func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
+	factory := NewFactory()
+	ctx := context.Background()
+	var createSettings = processor.CreateSettings{
+		ID: component.NewIDWithName(component.DataTypeTraces, ""),
+	}
+	createSettings.Logger = logger
+	var nextConsumer consumer.Traces = dummyConsumer{}
+
+	mockClient := &mockRestClient{
+		expectedData: []byte(`{
+			"CaptureMetrics": true,
+			"RequestContextExps": {"default":[{"AttrName":"attribute1","Regex":"+","Replacement":"$1"}]},
+			"CaptureAttributesInMetric": ["rpc.system", "rpc.service"],
+			"DefaultLatencyThreshold": 0.51
+		}`),
+		expectedErr: nil,
+	}
+	restClientFactory = func(logger *zap.Logger, pConfig *Config) restClient {
+		return mockClient
+	}
+
+	assert.False(t, config.CaptureMetrics)
+	assert.Nil(t, config.RequestContextExps)
+	assert.Nil(t, config.CaptureAttributesInMetric)
+	assert.Equal(t, 0.5, config.DefaultLatencyThreshold)
+
+	var _processorRef, err = factory.CreateTracesProcessor(ctx, createSettings, &config, nextConsumer)
+
+	assert.NotNil(t, err)
+	assert.Nil(t, _processorRef)
+
+	var _assertsProcessor = _processorRef.(*assertsProcessorImpl)
+	// Compilation of a bad regex will cause processor creation to fail in this test
+	assert.Nil(t, _assertsProcessor)
+
+	assert.Equal(t, http.MethodGet, mockClient.expectedMethod)
+	assert.Equal(t, configApi, mockClient.expectedApi)
+	assert.Nil(t, mockClient.expectedPayload)
+
+	assert.True(t, config.CaptureMetrics)
+	assert.NotNil(t, config.RequestContextExps)
+	assert.Equal(t, 1, len(config.RequestContextExps))
+	assert.Equal(t, 1, len(config.RequestContextExps["default"]))
+	assert.Equal(t, "attribute1", config.RequestContextExps["default"][0].AttrName)
+	assert.Equal(t, "+", config.RequestContextExps["default"][0].Regex)
+	assert.Equal(t, "$1", config.RequestContextExps["default"][0].Replacement)
+	assert.NotNil(t, config.CaptureAttributesInMetric)
+	assert.Equal(t, 2, len(config.CaptureAttributesInMetric))
+	assert.Equal(t, "rpc.system", config.CaptureAttributesInMetric[0])
+	assert.Equal(t, "rpc.service", config.CaptureAttributesInMetric[1])
+	assert.Equal(t, 0.51, config.DefaultLatencyThreshold)
 }

@@ -108,3 +108,14 @@ func basicAuth(username string, password string) string {
 	auth := username + ":" + password
 	return base64.StdEncoding.EncodeToString([]byte(auth))
 }
+
+var (
+	restClientFactory = createRestClient
+)
+
+func createRestClient(logger *zap.Logger, pConfig *Config) restClient {
+	return &assertsClient{
+		config: pConfig,
+		logger: logger,
+	}
+}
