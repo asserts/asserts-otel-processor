@@ -116,4 +116,11 @@ func TestEnrichSpan(t *testing.T) {
 	contextAtt, _ := span.Attributes().Get(AssertsRequestContextAttribute)
 	assert.NotNil(t, contextAtt)
 	assert.Equal(t, "/mock-request-context", contextAtt.Str())
+
+	span.SetKind(ptrace.SpanKindInternal)
+	processor.enrichSpan("asserts", "api-server", &span)
+
+	typeAtt, _ = span.Attributes().Get(AssertsRequestTypeAttribute)
+	assert.NotNil(t, typeAtt)
+	assert.Equal(t, "internal", typeAtt.Str())
 }

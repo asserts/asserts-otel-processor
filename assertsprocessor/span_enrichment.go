@@ -11,6 +11,7 @@ const (
 	AssertsRequestContextAttribute = "asserts.request.context"
 	AssertsRequestTypeInbound      = "inbound"
 	AssertsRequestTypeOutbound     = "outbound"
+	AssertsRequestTypeInternal     = "internal"
 )
 
 type ErrorTypeConfig struct {
@@ -77,6 +78,8 @@ func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {
 		span.Attributes().PutStr(AssertsRequestTypeAttribute, AssertsRequestTypeOutbound)
 	} else if kind == ptrace.SpanKindServer || kind == ptrace.SpanKindConsumer {
 		span.Attributes().PutStr(AssertsRequestTypeAttribute, AssertsRequestTypeInbound)
+	} else if kind == ptrace.SpanKindInternal {
+		span.Attributes().PutStr(AssertsRequestTypeAttribute, AssertsRequestTypeInternal)
 	}
 }
 
