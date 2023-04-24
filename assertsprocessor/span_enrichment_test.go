@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+type spanTestRequestContextBuilder struct {
+}
+
+var requestContextValue = "/mock-request-context"
+
+func (rcb *spanTestRequestContextBuilder) getRequest(span *ptrace.Span, serviceKey string) string {
+	return requestContextValue
+}
+
 func TestCompileValidExpression(t *testing.T) {
 	errorTypeConfig := ErrorTypeConfig{
 		ErrorType: "client_errors",
@@ -62,7 +71,7 @@ func TestBuildErrorProcessor(t *testing.T) {
 func TestEnrichSpan(t *testing.T) {
 	clientMatcher, _ := regexp.Compile("4..")
 	serverMatcher, _ := regexp.Compile("5..")
-	processor := spanEnrichmentProcessor{
+	processor := spanEnrichmentProcessorImpl{
 		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{
 			"http.status_code": {
 				&errorTypeCompiledConfig{
@@ -73,6 +82,7 @@ func TestEnrichSpan(t *testing.T) {
 				},
 			},
 		},
+		requestBuilder: &spanTestRequestContextBuilder{},
 	}
 	normalTrace := ptrace.NewTraces()
 	resourceSpans := normalTrace.ResourceSpans().AppendEmpty()
@@ -81,7 +91,7 @@ func TestEnrichSpan(t *testing.T) {
 
 	span.Attributes().PutStr("http.status_code", "404")
 	span.SetKind(ptrace.SpanKindClient)
-	processor.enrichSpan(&span)
+	processor.enrichSpan("asserts", "api-server", &span)
 
 	att, _ := span.Attributes().Get(AssertsErrorTypeAttribute)
 	assert.NotNil(t, att)
@@ -93,7 +103,7 @@ func TestEnrichSpan(t *testing.T) {
 
 	span.Attributes().PutStr("http.status_code", "504")
 	span.SetKind(ptrace.SpanKindServer)
-	processor.enrichSpan(&span)
+	processor.enrichSpan("asserts", "api-server", &span)
 
 	att, _ = span.Attributes().Get(AssertsErrorTypeAttribute)
 	assert.NotNil(t, att)
@@ -102,4 +112,8 @@ func TestEnrichSpan(t *testing.T) {
 	typeAtt, _ = span.Attributes().Get(AssertsRequestTypeAttribute)
 	assert.NotNil(t, typeAtt)
 	assert.Equal(t, "inbound", typeAtt.Str())
+
+	contextAtt, _ := span.Attributes().Get(AssertsRequestContextAttribute)
+	assert.NotNil(t, contextAtt)
+	assert.Equal(t, "/mock-request-context", contextAtt.Str())
 }

@@ -12,6 +12,7 @@ func TestValidateNoError(t *testing.T) {
 			"default": {
 				{
 					AttrName: "attribute",
+					SpanKind: "Client",
 					Regex:    ".+",
 				},
 			},
@@ -29,12 +30,36 @@ func TestValidateNoError(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestValidateSpanKindMissing(t *testing.T) {
+	dto := Config{
+		RequestContextExps: map[string][]*MatcherDto{
+			"default": {
+				{
+					AttrName: "attribute",
+					Regex:    ".+",
+				},
+			},
+		},
+		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
+			"http.status_code": {
+				&ErrorTypeConfig{
+					ValueExpr: "4..",
+					ErrorType: "client_errors",
+				},
+			},
+		},
+	}
+	err := dto.Validate()
+	assert.NotNil(t, err)
+}
+
 func TestValidateRequestExpError(t *testing.T) {
 	dto := Config{
 		RequestContextExps: map[string][]*MatcherDto{
 			"default": {
 				{
 					AttrName: "attribute",
+					SpanKind: "Client",
 					Regex:    "+",
 				},
 			},
@@ -58,6 +83,7 @@ func TestValidateErrorTypeConfigError(t *testing.T) {
 			"default": {
 				{
 					AttrName: "attribute",
+					SpanKind: "Client",
 					Regex:    ".+",
 				},
 			},
@@ -81,6 +107,7 @@ func TestValidateLimits(t *testing.T) {
 			"default": {
 				{
 					AttrName: "attribute",
+					SpanKind: "Client",
 					Regex:    ".+",
 				},
 			},

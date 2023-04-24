@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	AssertsRequestContextAttribute  = "asserts.request.context"
 	AssertsTraceSampleTypeAttribute = "asserts.sample.type"
 	AssertsTraceSampleTypeNormal    = "normal"
 	AssertsTraceSampleTypeSlow      = "slow"
@@ -40,7 +39,6 @@ type sampler struct {
 	traceFlushTicker   *clock.Ticker
 	nextConsumer       consumer.Traces
 	stop               chan bool
-	spanMatcher        *spanMatcher
 	metricHelper       *metricHelper
 }
 
@@ -177,8 +175,8 @@ func (s *sampler) captureNormalSample(item *Item) bool {
 
 func (s *sampler) updateTrace(namespace string, service string, trace *traceStruct) {
 	entityKey := buildEntityKey(s.config, namespace, service)
-	serviceKey := namespace + "#" + service
-	request := s.spanMatcher.getRequest(trace.getMainSpan(), serviceKey)
+	attrValue, _ := trace.getMainSpan().Attributes().Get(AssertsRequestContextAttribute)
+	request := attrValue.Str()
 	trace.isSlow = s.isSlow(namespace, service, trace.getMainSpan(), request)
 	if trace.isSlow {
 		trace.latencyThreshold = s.thresholdHelper.getThreshold(namespace, service, request)

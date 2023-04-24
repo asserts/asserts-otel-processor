@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
-	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -68,25 +67,12 @@ func TestLatencyIsHighFalse(t *testing.T) {
 
 func TestSampleTraceWithError(t *testing.T) {
 	cache := sync.Map{}
-	compile, err := regexp.Compile("https?://.+?(/.+)")
-	assert.Nil(t, err)
 	var s = sampler{
 		logger:             logger,
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		spanMatcher: &spanMatcher{
-			spanAttrMatchers: map[string][]*spanAttrMatcher{
-				"default": {
-					{
-						attrName:    "http.url",
-						regex:       compile,
-						replacement: "$1",
-					},
-				},
-			},
-		},
-		metricHelper: buildMetricHelper(),
+		metricHelper:       buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -99,14 +85,14 @@ func TestSampleTraceWithError(t *testing.T) {
 
 	rootSpan := scopeSpans.Spans().AppendEmpty()
 	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	rootSpan.SetStartTimestamp(1e9)
 	rootSpan.SetEndTimestamp(1e9 + 7e8)
 
 	childSpan := scopeSpans.Spans().AppendEmpty()
 	childSpan.SetParentSpanID(rootSpan.SpanID())
 	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	childSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	childSpan.SetKind(ptrace.SpanKindClient)
 	childSpan.Status().SetCode(ptrace.StatusCodeError)
 	childSpan.SetStartTimestamp(1e9 + 1e8)
@@ -146,25 +132,12 @@ func TestSampleTraceWithError(t *testing.T) {
 
 func TestSampleTraceWithHighLatency(t *testing.T) {
 	cache := sync.Map{}
-	compile, err := regexp.Compile("https?://.+?(/.+)")
-	assert.Nil(t, err)
 	s := sampler{
 		logger:             logger,
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		spanMatcher: &spanMatcher{
-			spanAttrMatchers: map[string][]*spanAttrMatcher{
-				"default": {
-					{
-						attrName:    "http.url",
-						regex:       compile,
-						replacement: "$1",
-					},
-				},
-			},
-		},
-		metricHelper: buildMetricHelper(),
+		metricHelper:       buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -178,7 +151,7 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	rootSpan := scopeSpans.Spans().AppendEmpty()
 	rootSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
 	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	rootSpan.SetStartTimestamp(1e9)
 	rootSpan.SetEndTimestamp(1e9 + 7e8)
 
@@ -187,7 +160,7 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	childSpan.SetParentSpanID(rootSpan.SpanID())
 	childSpan.SetKind(ptrace.SpanKindClient)
 	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	childSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
@@ -225,25 +198,12 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 
 func TestSampleNormalTrace(t *testing.T) {
 	cache := sync.Map{}
-	compile, err := regexp.Compile("https?://.+?(/.+)")
-	assert.Nil(t, err)
 	var s = sampler{
 		logger:             logger,
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		spanMatcher: &spanMatcher{
-			spanAttrMatchers: map[string][]*spanAttrMatcher{
-				"default": {
-					{
-						attrName:    "http.url",
-						regex:       compile,
-						replacement: "$1",
-					},
-				},
-			},
-		},
-		metricHelper: buildMetricHelper(),
+		metricHelper:       buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -256,7 +216,7 @@ func TestSampleNormalTrace(t *testing.T) {
 
 	rootSpan := scopeSpans.Spans().AppendEmpty()
 	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	rootSpan.SetStartTimestamp(1e9)
 	rootSpan.SetEndTimestamp(1e9 + 4e8)
 
@@ -264,7 +224,7 @@ func TestSampleNormalTrace(t *testing.T) {
 	childSpan.SetParentSpanID(rootSpan.SpanID())
 	childSpan.SetKind(ptrace.SpanKindInternal)
 	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	childSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	childSpan.SetStartTimestamp(1e9 + 2e8)
 	childSpan.SetEndTimestamp(1e9 + 3e8)
 
@@ -322,25 +282,12 @@ func TestWithNoRootTrace(t *testing.T) {
 
 func TestTraceCardinalityLimit(t *testing.T) {
 	cache := sync.Map{}
-	compile, err := regexp.Compile("https?://.+?(/.+)")
-	assert.Nil(t, err)
 	var s = sampler{
 		logger:             logger,
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		spanMatcher: &spanMatcher{
-			spanAttrMatchers: map[string][]*spanAttrMatcher{
-				"default": {
-					{
-						attrName:    "http.url",
-						regex:       compile,
-						replacement: "$1",
-					},
-				},
-			},
-		},
-		metricHelper: buildMetricHelper(),
+		metricHelper:       buildMetricHelper(),
 	}
 
 	ctx := context.Background()
@@ -361,7 +308,7 @@ func TestTraceCardinalityLimit(t *testing.T) {
 		rootSpan: &rootSpan,
 	}
 
-	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v1/rules")
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v1/rules")
 	s.sampleTraces(ctx, &resourceTraces{
 		namespace: "platform", service: "api-server",
 		traceById: &traceById,
@@ -370,14 +317,14 @@ func TestTraceCardinalityLimit(t *testing.T) {
 	serviceQueue := value.(*serviceQueues)
 	assert.Equal(t, 1, serviceQueue.requestCount)
 
-	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v2/rules")
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v2/rules")
 	s.sampleTraces(ctx, &resourceTraces{
 		namespace: "platform", service: "api-server",
 		traceById: &traceById,
 	})
 	assert.Equal(t, 2, serviceQueue.requestCount)
 
-	rootSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v3/rules")
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v3/rules")
 	s.sampleTraces(ctx, &resourceTraces{
 		namespace: "platform", service: "api-server",
 		traceById: &traceById,
@@ -387,9 +334,6 @@ func TestTraceCardinalityLimit(t *testing.T) {
 
 func TestFlushTraces(t *testing.T) {
 	cache := sync.Map{}
-	compile, err := regexp.Compile("https?://.+?(/.+)")
-	assert.Nil(t, err)
-
 	ctx := context.Background()
 	dConsumer := dummyConsumer{
 		items: make([]*Item, 0),
@@ -399,21 +343,10 @@ func TestFlushTraces(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		spanMatcher: &spanMatcher{
-			spanAttrMatchers: map[string][]*spanAttrMatcher{
-				"default": {
-					{
-						attrName:    "http.url",
-						regex:       compile,
-						replacement: "$1",
-					},
-				},
-			},
-		},
-		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Millisecond),
-		nextConsumer:     dConsumer,
-		stop:             make(chan bool, 5),
-		metricHelper:     buildMetricHelper(),
+		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Millisecond),
+		nextConsumer:       dConsumer,
+		stop:               make(chan bool, 5),
+		metricHelper:       buildMetricHelper(),
 	}
 
 	latencyTrace := ptrace.NewTraces()
@@ -427,7 +360,7 @@ func TestFlushTraces(t *testing.T) {
 	latencySpan.SetName("LatencySpan")
 	latencySpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
 	latencySpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-	latencySpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	latencySpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	latencySpan.SetStartTimestamp(1e9)
 	latencySpan.SetEndTimestamp(1e9 + 6e8)
 
@@ -448,7 +381,7 @@ func TestFlushTraces(t *testing.T) {
 	errorSpan.SetName("ErrorSpan")
 	errorSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 7})
 	errorSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	errorSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	errorSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	errorSpan.Attributes().PutBool("error", true)
 	errorSpan.Status().SetCode(ptrace.StatusCodeError)
 	errorSpan.SetStartTimestamp(1e9)
@@ -470,7 +403,7 @@ func TestFlushTraces(t *testing.T) {
 	normalSpan.SetName("NormalSpan")
 	normalSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 6})
 	normalSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 10})
-	normalSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	normalSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	normalSpan.SetStartTimestamp(1e9)
 	normalSpan.SetEndTimestamp(1e9 + 3e8)
 

@@ -6,6 +6,7 @@ import (
 )
 
 type MatcherDto struct {
+	SpanKind    string `mapstructure:"span_kind"`
 	AttrName    string `mapstructure:"attr_name"`
 	Regex       string `mapstructure:"regex"`
 	Replacement string `mapstructure:"replacement"`
@@ -31,11 +32,19 @@ type Config struct {
 // Validate implements the component.ConfigValidator interface.
 // Checks for any invalid regexp
 func (config *Config) Validate() error {
-	for _, serviceRequestContextExps := range config.RequestContextExps {
+	for serviceKey, serviceRequestContextExps := range config.RequestContextExps {
 		for _, attrRegex := range serviceRequestContextExps {
 			_, err := regexp.Compile(attrRegex.Regex)
 			if err != nil {
-				return err
+				return ValidationError{
+					message: fmt.Sprintf("Invalid regexp %s: for service: %s, span_kind: %s and attribute: %s",
+						attrRegex.Regex, serviceKey, attrRegex.SpanKind, attrRegex.AttrName),
+				}
+			} else if attrRegex.SpanKind == "" {
+				return ValidationError{
+					message: fmt.Sprintf("Span kind not specified for regexp %s: for service: %s, attribute: %s",
+						attrRegex.Regex, serviceKey, attrRegex.AttrName),
+				}
 			}
 		}
 	}

@@ -6,10 +6,11 @@ import (
 )
 
 const (
-	AssertsErrorTypeAttribute   = "asserts.error.type"
-	AssertsRequestTypeAttribute = "asserts.request.type"
-	AssertsRequestTypeInbound   = "inbound"
-	AssertsRequestTypeOutbound  = "outbound"
+	AssertsErrorTypeAttribute      = "asserts.error.type"
+	AssertsRequestTypeAttribute    = "asserts.request.type"
+	AssertsRequestContextAttribute = "asserts.request.context"
+	AssertsRequestTypeInbound      = "inbound"
+	AssertsRequestTypeOutbound     = "outbound"
 )
 
 type ErrorTypeConfig struct {
@@ -35,12 +36,17 @@ type errorTypeCompiledConfig struct {
 	errorType    string
 }
 
-type spanEnrichmentProcessor struct {
-	errorTypeConfigs map[string][]*errorTypeCompiledConfig
+type spanEnrichmentProcessor interface {
+	enrichSpan(namespace string, service string, span *ptrace.Span)
 }
 
-func buildEnrichmentProcessor(config *Config) *spanEnrichmentProcessor {
-	processor := spanEnrichmentProcessor{
+type spanEnrichmentProcessorImpl struct {
+	errorTypeConfigs map[string][]*errorTypeCompiledConfig
+	requestBuilder   requestContextBuilder
+}
+
+func buildEnrichmentProcessor(config *Config) *spanEnrichmentProcessorImpl {
+	processor := spanEnrichmentProcessorImpl{
 		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{},
 	}
 	for attrName, errorConfigs := range config.ErrorTypeConfigs {
@@ -57,9 +63,14 @@ func buildEnrichmentProcessor(config *Config) *spanEnrichmentProcessor {
 	return &processor
 }
 
-func (ep *spanEnrichmentProcessor) enrichSpan(span *ptrace.Span) {
+func (ep *spanEnrichmentProcessorImpl) enrichSpan(namespace string, service string, span *ptrace.Span) {
 	ep.addErrorType(span)
+	ep.addRequestType(span)
+	request := ep.requestBuilder.getRequest(span, namespace+"#"+service)
+	span.Attributes().PutStr(AssertsRequestContextAttribute, request)
+}
 
+func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {
 	// Add request type
 	kind := span.Kind()
 	if kind == ptrace.SpanKindClient || kind == ptrace.SpanKindProducer {
@@ -69,7 +80,7 @@ func (ep *spanEnrichmentProcessor) enrichSpan(span *ptrace.Span) {
 	}
 }
 
-func (ep *spanEnrichmentProcessor) addErrorType(span *ptrace.Span) {
+func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
 	for attrName, errorConfigs := range ep.errorTypeConfigs {
 		value, present := span.Attributes().Get(attrName)
 		if present {

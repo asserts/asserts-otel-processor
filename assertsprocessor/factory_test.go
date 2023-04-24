@@ -57,6 +57,7 @@ func TestCreateProcessorDefaultConfig(t *testing.T) {
 	assert.Equal(t, config, *_assertsProcessor.config)
 	assert.NotNil(t, logger, _assertsProcessor.logger)
 	assert.Equal(t, nextConsumer, _assertsProcessor.nextConsumer)
+	assert.NotNil(t, _assertsProcessor.spanEnricher)
 	assert.NotNil(t, _assertsProcessor.metricBuilder)
 	assert.NotNil(t, _assertsProcessor.sampler)
 	assert.NotNil(t, _assertsProcessor.configRefresh)
@@ -66,7 +67,6 @@ func TestCreateProcessorDefaultConfig(t *testing.T) {
 	assert.Equal(t, config, *_assertsProcessor.metricBuilder.config)
 	assert.Equal(t, logger, _assertsProcessor.metricBuilder.logger)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.prometheusRegistry)
-	assert.NotNil(t, _assertsProcessor.metricBuilder.spanMatcher)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.latencyHistogram)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.sampledTraceCount)
 	assert.NotNil(t, _assertsProcessor.metricBuilder.totalTraceCount)
@@ -80,7 +80,6 @@ func TestCreateProcessorDefaultConfig(t *testing.T) {
 	assert.Equal(t, nextConsumer, _assertsProcessor.sampler.nextConsumer)
 	assert.NotNil(t, _assertsProcessor.sampler.topTracesByService)
 	assert.NotNil(t, _assertsProcessor.sampler.traceFlushTicker)
-	assert.NotNil(t, _assertsProcessor.sampler.spanMatcher)
 	assert.NotNil(t, _assertsProcessor.sampler.metricHelper)
 	assert.Equal(t, _assertsProcessor.metricBuilder, _assertsProcessor.sampler.metricHelper)
 

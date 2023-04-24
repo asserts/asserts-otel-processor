@@ -27,6 +27,7 @@ var testConfig = Config{
 			},
 		},
 	},
+	ErrorTypeConfigs:               map[string][]*ErrorTypeConfig{},
 	CaptureAttributesInMetric:      []string{"attribute"},
 	DefaultLatencyThreshold:        0.5,
 	LimitPerService:                100,
@@ -68,7 +69,7 @@ func TestStartAndShutdown(t *testing.T) {
 		logger:        testLogger,
 		config:        &testConfig,
 		nextConsumer:  dConsumer,
-		metricBuilder: newMetricHelper(testLogger, &testConfig, &spanMatcher{}),
+		metricBuilder: newMetricHelper(testLogger, &testConfig),
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,
@@ -77,12 +78,18 @@ func TestStartAndShutdown(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			spanMatcher:        &spanMatcher{},
 		},
 		configRefresh: &configRefresh,
 	}
 	assert.Nil(t, p.Start(ctx, nil))
 	assert.Nil(t, p.Shutdown(ctx))
+}
+
+type mockEnrichmentProcessor struct {
+}
+
+func (mEP *mockEnrichmentProcessor) enrichSpan(namespace string, service string, span *ptrace.Span) {
+	span.Attributes().PutStr(AssertsRequestContextAttribute, "/mock-request-context")
 }
 
 func TestConsumeTraces(t *testing.T) {
@@ -100,13 +107,14 @@ func TestConsumeTraces(t *testing.T) {
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		rwMutex:             &sync.RWMutex{},
 	}
-	helper := newMetricHelper(testLogger, &testConfig, &spanMatcher{})
+	helper := newMetricHelper(testLogger, &testConfig)
 	_ = helper.registerMetrics()
 	p := assertsProcessorImpl{
 		logger:        testLogger,
 		config:        &testConfig,
 		nextConsumer:  dConsumer,
 		metricBuilder: helper,
+		spanEnricher:  &mockEnrichmentProcessor{},
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,
@@ -115,7 +123,6 @@ func TestConsumeTraces(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			spanMatcher:        &spanMatcher{},
 			metricHelper:       buildMetricHelper(),
 		},
 		rwMutex: &sync.RWMutex{},
@@ -133,17 +140,33 @@ func TestConsumeTraces(t *testing.T) {
 	rootSpan.SetStartTimestamp(1e9)
 	rootSpan.SetEndTimestamp(1e9 + 4e8)
 
-	nestedSpan := scopeSpans.Spans().AppendEmpty()
-	nestedSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	nestedSpan.SetParentSpanID(rootSpan.SpanID())
-	nestedSpan.SetKind(ptrace.SpanKindClient)
-	nestedSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
-	nestedSpan.Attributes().PutBool("error", true)
-	nestedSpan.SetStartTimestamp(1e9)
-	nestedSpan.SetEndTimestamp(1e9 + 4e8)
+	internalSpan := scopeSpans.Spans().AppendEmpty()
+	internalSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 7})
+	internalSpan.SetParentSpanID(rootSpan.SpanID())
+	internalSpan.SetKind(ptrace.SpanKindInternal)
+
+	clientSpan := scopeSpans.Spans().AppendEmpty()
+	clientSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
+	clientSpan.SetParentSpanID(rootSpan.SpanID())
+	clientSpan.SetKind(ptrace.SpanKindClient)
+	clientSpan.Attributes().PutStr("http.url", "https://localhost:8030/api-server/v4/rules")
+	clientSpan.Attributes().PutBool("error", true)
+	clientSpan.SetStartTimestamp(1e9)
+	clientSpan.SetEndTimestamp(1e9 + 4e8)
 
 	err := p.ConsumeTraces(ctx, testTrace)
 	assert.Nil(t, err)
+
+	value, _ := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
+	assert.NotNil(t, value)
+	assert.Equal(t, "/mock-request-context", value.Str())
+
+	value, _ = clientSpan.Attributes().Get(AssertsRequestContextAttribute)
+	assert.NotNil(t, value)
+	assert.Equal(t, "/mock-request-context", value.Str())
+
+	_, found := internalSpan.Attributes().Get(AssertsRequestContextAttribute)
+	assert.False(t, found)
 }
 
 func TestProcessorIsUpdated(t *testing.T) {
