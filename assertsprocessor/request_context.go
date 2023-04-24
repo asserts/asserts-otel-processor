@@ -64,21 +64,20 @@ func (rCB *requestContextBuilderImpl) compileRequestContextRegexps(config *Confi
 }
 
 func (rCB *requestContextBuilderImpl) getRequest(span *ptrace.Span, serviceKey string) string {
+	var request string
 	if rCB.requestConfigs[serviceKey] != nil {
-		request := getRequest(span, rCB.requestConfigs[serviceKey])
-		if request != "" {
-			return request
-		}
+		request = getRequest(span, rCB.requestConfigs[serviceKey])
+	} else if rCB.requestConfigs["default"] != nil {
+		request = getRequest(span, rCB.requestConfigs["default"])
 	}
-
-	if rCB.requestConfigs["default"] != nil {
-		request := getRequest(span, rCB.requestConfigs["default"])
-		if request != "" {
-			return request
-		}
+	if request == "" {
+		request = span.Name()
 	}
-
-	return span.Name()
+	rCB.logger.Debug("Set request context",
+		zap.String("Trace Id", span.TraceID().String()),
+		zap.String("Span Id", span.SpanID().String()),
+		zap.String("Request", request))
+	return request
 }
 
 // configListener interface implementation

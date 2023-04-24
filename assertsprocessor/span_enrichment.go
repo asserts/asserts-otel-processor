@@ -65,10 +65,9 @@ func buildEnrichmentProcessor(config *Config) *spanEnrichmentProcessorImpl {
 }
 
 func (ep *spanEnrichmentProcessorImpl) enrichSpan(namespace string, service string, span *ptrace.Span) {
-	ep.addErrorType(span)
 	ep.addRequestType(span)
-	request := ep.requestBuilder.getRequest(span, namespace+"#"+service)
-	span.Attributes().PutStr(AssertsRequestContextAttribute, request)
+	ep.addRequestContext(namespace, service, span)
+	ep.addErrorType(span)
 }
 
 func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {
@@ -81,6 +80,11 @@ func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {
 	} else if kind == ptrace.SpanKindInternal {
 		span.Attributes().PutStr(AssertsRequestTypeAttribute, AssertsRequestTypeInternal)
 	}
+}
+
+func (ep *spanEnrichmentProcessorImpl) addRequestContext(namespace string, service string, span *ptrace.Span) {
+	request := ep.requestBuilder.getRequest(span, namespace+"#"+service)
+	span.Attributes().PutStr(AssertsRequestContextAttribute, request)
 }
 
 func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {

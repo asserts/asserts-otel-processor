@@ -94,7 +94,9 @@ func TestGetRequestMatch(t *testing.T) {
 	testSpan.SetKind(ptrace.SpanKindServer)
 	serverExp, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
 	clientExp, _ := regexp.Compile("(.+)")
+	production, _ := zap.NewProduction()
 	matcher := requestContextBuilderImpl{
+		logger: production,
 		requestConfigs: map[string][]*requestConfigCompiled{
 			"namespace#service": {
 				{
@@ -141,7 +143,9 @@ func TestGetRequestMatchMultipleGroups(t *testing.T) {
 	testSpan.SetKind(ptrace.SpanKindServer)
 	compile1, _ := regexp.Compile("http://user:8080(/check)/anonymous-.*")
 	compile2, _ := regexp.Compile("http://cart:8080(/add)/[0-9]+/([A-Z]+)/[0-9]+")
+	production, _ := zap.NewProduction()
 	matcher := requestContextBuilderImpl{
+		logger: production,
 		requestConfigs: map[string][]*requestConfigCompiled{
 			"robot-shop#user": {
 				{
@@ -179,7 +183,9 @@ func TestGetRequestNoMatch(t *testing.T) {
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")
+	production, _ := zap.NewProduction()
 	matcher := requestContextBuilderImpl{
+		logger: production,
 		requestConfigs: map[string][]*requestConfigCompiled{
 			"default": {
 				{
