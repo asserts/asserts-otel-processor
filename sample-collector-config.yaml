@@ -19,9 +19,17 @@ processors:
   assertsprocessor:
     asserts_server:
       endpoint: https://chief.app.dev.asserts.ai/api-server
+      username: HcbAlB7nUFhXpm3rJKvi
+      password: Ri7q1J/Fq+/rwfQDeP/bbBfYpK0JydvMInEitdqr
     asserts_env: dev
     asserts_site: dev
     capture_metrics: true
+    error_type_config:
+      "http.status_code":
+        - error_type: client_errors
+          value_match_regex: 4..
+        - error_type: server_errors
+          value_match_regex: 5..
     request_context_regex:
       robot-shop#payment:
         - attr_name: "http.url"

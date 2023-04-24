@@ -31,8 +31,12 @@ func (rCB *requestContextBuilderImpl) compileRequestContextRegexps(config *Confi
 			configs := make([]*requestConfigCompiled, 0)
 			for _, matcher := range serviceRequestContextExps {
 				compile, err := regexp.Compile(matcher.Regex)
+				if matcher.SpanKind == "" {
+					matcher.SpanKind = "Server"
+				}
 				rCB.logger.Debug("Compiled request context regex",
 					zap.String("Service", serviceKey),
+					zap.String("Span Kind", matcher.SpanKind),
 					zap.String("AttrName", matcher.AttrName),
 					zap.String("Regex", matcher.Regex),
 					zap.String("Replacement", matcher.Replacement),

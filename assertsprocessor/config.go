@@ -40,11 +40,6 @@ func (config *Config) Validate() error {
 					message: fmt.Sprintf("Invalid regexp %s: for service: %s, span_kind: %s and attribute: %s",
 						attrRegex.Regex, serviceKey, attrRegex.SpanKind, attrRegex.AttrName),
 				}
-			} else if attrRegex.SpanKind == "" {
-				return ValidationError{
-					message: fmt.Sprintf("Span kind not specified for regexp %s: for service: %s, attribute: %s",
-						attrRegex.Regex, serviceKey, attrRegex.AttrName),
-				}
 			}
 		}
 	}
