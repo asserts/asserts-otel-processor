@@ -86,11 +86,6 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 		if traceStruct.hasError() {
 			// For all the spans which have error, add the request context
 			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
-			for _, span := range traceStruct.exitSpans {
-				if spanHasError(span) {
-					span.Attributes().PutStr(AssertsRequestContextAttribute, request)
-				}
-			}
 
 			s.logger.Debug("Capturing error trace",
 				zap.String("traceId", traceStruct.getMainSpan().TraceID().String()),
@@ -158,7 +153,6 @@ func (s *sampler) captureNormalSample(item *Item) bool {
 
 			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
 			item.trace.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeNormal)
-
 			requestState.slowQueue.push(item)
 		}
 	} else {
