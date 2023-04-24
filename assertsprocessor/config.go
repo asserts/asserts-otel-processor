@@ -12,19 +12,20 @@ type MatcherDto struct {
 }
 
 type Config struct {
-	AssertsServer                  *map[string]string       `mapstructure:"asserts_server"`
-	Env                            string                   `mapstructure:"asserts_env"`
-	Site                           string                   `mapstructure:"asserts_site"`
-	CaptureMetrics                 bool                     `mapstructure:"capture_metrics"`
-	RequestContextExps             map[string][]*MatcherDto `mapstructure:"request_context_regex"`
-	CaptureAttributesInMetric      []string                 `mapstructure:"attributes_as_metric_labels"`
-	DefaultLatencyThreshold        float64                  `mapstructure:"sampling_latency_threshold_seconds"`
-	LimitPerService                int                      `mapstructure:"trace_rate_limit_per_service"`
-	LimitPerRequestPerService      int                      `mapstructure:"trace_rate_limit_per_service_per_request"`
-	RequestContextCacheTTL         int                      `mapstructure:"request_context_cache_ttl_minutes"`
-	NormalSamplingFrequencyMinutes int                      `mapstructure:"normal_trace_sampling_rate_minutes"`
-	PrometheusExporterPort         uint64                   `mapstructure:"prometheus_exporter_port"`
-	TraceFlushFrequencySeconds     int                      `mapstructure:"trace_flush_frequency_seconds"`
+	AssertsServer                  *map[string]string            `mapstructure:"asserts_server"`
+	Env                            string                        `mapstructure:"asserts_env"`
+	Site                           string                        `mapstructure:"asserts_site"`
+	CaptureMetrics                 bool                          `mapstructure:"capture_metrics"`
+	RequestContextExps             map[string][]*MatcherDto      `mapstructure:"request_context_regex"`
+	ErrorTypeConfigs               map[string][]*ErrorTypeConfig `mapstructure:"error_type_config"`
+	CaptureAttributesInMetric      []string                      `mapstructure:"attributes_as_metric_labels"`
+	DefaultLatencyThreshold        float64                       `mapstructure:"sampling_latency_threshold_seconds"`
+	LimitPerService                int                           `mapstructure:"trace_rate_limit_per_service"`
+	LimitPerRequestPerService      int                           `mapstructure:"trace_rate_limit_per_service_per_request"`
+	RequestContextCacheTTL         int                           `mapstructure:"request_context_cache_ttl_minutes"`
+	NormalSamplingFrequencyMinutes int                           `mapstructure:"normal_trace_sampling_rate_minutes"`
+	PrometheusExporterPort         uint64                        `mapstructure:"prometheus_exporter_port"`
+	TraceFlushFrequencySeconds     int                           `mapstructure:"trace_flush_frequency_seconds"`
 }
 
 // Validate implements the component.ConfigValidator interface.
@@ -35,6 +36,18 @@ func (config *Config) Validate() error {
 			_, err := regexp.Compile(attrRegex.Regex)
 			if err != nil {
 				return err
+			}
+		}
+	}
+
+	for attrName, errorTypeConfigs := range config.ErrorTypeConfigs {
+		for _, theConfig := range errorTypeConfigs {
+			_, err := theConfig.compile()
+			if err != nil {
+				return ValidationError{
+					message: fmt.Sprintf("Invalid regexp %s: for attribute: %s and error type: %s",
+						theConfig.ValueExpr, attrName, theConfig.ErrorType),
+				}
 			}
 		}
 	}

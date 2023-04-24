@@ -16,6 +16,14 @@ func TestValidateNoError(t *testing.T) {
 				},
 			},
 		},
+		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
+			"http.status_code": {
+				&ErrorTypeConfig{
+					ValueExpr: "4..",
+					ErrorType: "client_errors",
+				},
+			},
+		},
 	}
 	err := dto.Validate()
 	assert.Nil(t, err)
@@ -28,6 +36,37 @@ func TestValidateRequestExpError(t *testing.T) {
 				{
 					AttrName: "attribute",
 					Regex:    "+",
+				},
+			},
+		},
+		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
+			"http.status_code": {
+				&ErrorTypeConfig{
+					ValueExpr: "4..",
+					ErrorType: "client_errors",
+				},
+			},
+		},
+	}
+	err := dto.Validate()
+	assert.NotNil(t, err)
+}
+
+func TestValidateErrorTypeConfigError(t *testing.T) {
+	dto := Config{
+		RequestContextExps: map[string][]*MatcherDto{
+			"default": {
+				{
+					AttrName: "attribute",
+					Regex:    ".+",
+				},
+			},
+		},
+		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
+			"http.status_code": {
+				&ErrorTypeConfig{
+					ValueExpr: "+",
+					ErrorType: "client_errors",
 				},
 			},
 		},
