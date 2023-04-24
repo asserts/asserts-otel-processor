@@ -81,8 +81,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		return nil, err
 	}
 
-	_spanEnrichmentProcessor := buildEnrichmentProcessor(pConfig)
-	_spanEnrichmentProcessor.requestBuilder = requestBuilder
+	_spanEnrichmentProcessor := buildEnrichmentProcessor(pConfig, requestBuilder)
 
 	thresholdsHelper := thresholdHelper{
 		config:              pConfig,

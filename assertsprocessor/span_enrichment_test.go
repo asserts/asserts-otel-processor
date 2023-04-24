@@ -57,7 +57,7 @@ func TestBuildErrorProcessor(t *testing.T) {
 				&clientErrorConfig, &serverErrorConfig,
 			},
 		},
-	})
+	}, &requestContextBuilderImpl{})
 	assert.NotNil(t, processor)
 	assert.NotNil(t, processor.errorTypeConfigs)
 	assert.NotNil(t, processor.errorTypeConfigs["http.status_code"])

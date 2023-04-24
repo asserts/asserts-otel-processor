@@ -67,7 +67,8 @@ func (rCB *requestContextBuilderImpl) getRequest(span *ptrace.Span, serviceKey s
 	var request string
 	if rCB.requestConfigs[serviceKey] != nil {
 		request = getRequest(span, rCB.requestConfigs[serviceKey])
-	} else if rCB.requestConfigs["default"] != nil {
+	}
+	if request == "" && rCB.requestConfigs["default"] != nil {
 		request = getRequest(span, rCB.requestConfigs["default"])
 	}
 	if request == "" {

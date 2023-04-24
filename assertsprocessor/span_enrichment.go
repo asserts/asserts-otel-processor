@@ -46,9 +46,10 @@ type spanEnrichmentProcessorImpl struct {
 	requestBuilder   requestContextBuilder
 }
 
-func buildEnrichmentProcessor(config *Config) *spanEnrichmentProcessorImpl {
+func buildEnrichmentProcessor(config *Config, requestBuilder requestContextBuilder) *spanEnrichmentProcessorImpl {
 	processor := spanEnrichmentProcessorImpl{
 		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{},
+		requestBuilder:   requestBuilder,
 	}
 	for attrName, errorConfigs := range config.ErrorTypeConfigs {
 		processor.errorTypeConfigs[attrName] = make([]*errorTypeCompiledConfig, 0)
