@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
-	"regexp"
 	"testing"
 )
 
@@ -19,7 +18,6 @@ func TestRegisterMetrics(t *testing.T) {
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
 				"aws.table.name", "aws.queue.url", "host.name"},
 		},
-		&spanMatcher{},
 	)
 	assert.Nil(t, p.registerMetrics())
 	assert.NotNil(t, p.prometheusRegistry)
@@ -38,7 +36,6 @@ func TestBuildLabels(t *testing.T) {
 			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
 				"aws.table.name", "aws.queue.url", "host.name"},
 		},
-		&spanMatcher{},
 	)
 
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
@@ -46,6 +43,8 @@ func TestBuildLabels(t *testing.T) {
 
 	testSpan := ptrace.NewSpan()
 	testSpan.SetKind(ptrace.SpanKindClient)
+	testSpan.Attributes().PutStr(AssertsRequestTypeAttribute, "outbound")
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "GetItem")
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
 	testSpan.Attributes().PutStr("rpc.method", "GetItem")
@@ -57,6 +56,8 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels[namespaceLabel] = "ride-services"
 	expectedLabels[serviceLabel] = "payment"
 	expectedLabels[requestContextLabel] = "GetItem"
+	expectedLabels[requestTypeLabel] = "outbound"
+	expectedLabels[errorTypeLabel] = ""
 	expectedLabels["rpc_service"] = "DynamoDb"
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
@@ -71,19 +72,7 @@ func TestBuildLabels(t *testing.T) {
 
 func TestCaptureMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	compile, _ := regexp.Compile("(.+)")
 
-	matcher := spanMatcher{
-		spanAttrMatchers: map[string][]*spanAttrMatcher{
-			"default": {
-				{
-					attrName:    "rpc.method",
-					regex:       compile,
-					replacement: "$1",
-				},
-			},
-		},
-	}
 	p := newMetricHelper(
 		logger,
 		&Config{
@@ -93,7 +82,6 @@ func TestCaptureMetrics(t *testing.T) {
 				"aws.table.name", "aws.queue.url", "host.name"},
 			LimitPerService: 100,
 		},
-		&matcher,
 	)
 	err := p.registerMetrics()
 	assert.Nil(t, err)
@@ -127,18 +115,7 @@ func TestCaptureMetrics(t *testing.T) {
 
 func TestMetricCardinalityLimit(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	compile, _ := regexp.Compile("https?://.+?(/.+?/.+)")
-	matcher := spanMatcher{
-		spanAttrMatchers: map[string][]*spanAttrMatcher{
-			"default": {
-				{
-					attrName:    "http.url",
-					regex:       compile,
-					replacement: "$1",
-				},
-			},
-		},
-	}
+
 	p := newMetricHelper(
 		logger,
 		&Config{
@@ -146,32 +123,29 @@ func TestMetricCardinalityLimit(t *testing.T) {
 			Site:            "us-west-2",
 			LimitPerService: 2,
 		},
-		&matcher,
 	)
 	_ = p.registerMetrics()
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()
-	testSpan.Attributes().PutStr("http.url", "http://cart:8080/cart/anonymous-1")
-
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
-
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val1")
 	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
 	assert.Equal(t, 1, p.requestContextsByService.Size())
 	cache, _ := p.requestContextsByService.Load("robot-shop#cart")
 	assert.Equal(t, 1, cache.Len())
 
-	testSpan.Attributes().PutStr("http.url", "http://cart:8080/cart/anonymous-2")
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val2")
 	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
 	assert.Equal(t, 2, cache.Len())
 
-	testSpan.Attributes().PutStr("http.url", "http://cart:8080/cart/anonymous-3")
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val3")
 	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
 	assert.Equal(t, 2, cache.Len())
-	assert.NotNil(t, cache.Get("/cart/anonymous-1"))
-	assert.NotNil(t, cache.Get("/cart/anonymous-2"))
-	assert.Nil(t, cache.Get("/cart/anonymous-3"))
+	assert.NotNil(t, cache.Get("/cart/#val1"))
+	assert.NotNil(t, cache.Get("/cart/#val2"))
+	assert.Nil(t, cache.Get("/cart/#val3"))
 }
 
 func TestMetricHelperIsUpdated(t *testing.T) {
@@ -184,7 +158,6 @@ func TestMetricHelperIsUpdated(t *testing.T) {
 	p := newMetricHelper(
 		logger,
 		currConfig,
-		&spanMatcher{},
 	)
 
 	assert.False(t, p.isUpdated(currConfig, currConfig))
@@ -204,7 +177,6 @@ func TestMetricHelperOnUpdate(t *testing.T) {
 	p := newMetricHelper(
 		logger,
 		currConfig,
-		&spanMatcher{},
 	)
 	_ = p.registerMetrics()
 	p.startExporter()

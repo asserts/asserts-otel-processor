@@ -73,13 +73,15 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		pConfig.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
 	}
 
-	spanMatcher := &spanMatcher{
+	requestBuilder := &requestContextBuilderImpl{
 		logger: logger,
 	}
-	err := spanMatcher.compileRequestContextRegexps(pConfig)
+	err := requestBuilder.compileRequestContextRegexps(pConfig)
 	if err != nil {
 		return nil, err
 	}
+
+	_spanEnrichmentProcessor := buildEnrichmentProcessor(pConfig, requestBuilder)
 
 	thresholdsHelper := thresholdHelper{
 		config:              pConfig,
@@ -92,7 +94,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		rwMutex:             &sync.RWMutex{},
 	}
 
-	metricsHelper := newMetricHelper(logger, pConfig, spanMatcher)
+	metricsHelper := newMetricHelper(logger, pConfig)
 	err = metricsHelper.registerMetrics()
 	if err != nil {
 		return nil, err
@@ -104,7 +106,6 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		topTracesByService: &sync.Map{},
 		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Duration(pConfig.TraceFlushFrequencySeconds) * time.Second),
 		nextConsumer:       nextConsumer,
-		spanMatcher:        spanMatcher,
 		stop:               make(chan bool),
 		metricHelper:       metricsHelper,
 	}
@@ -112,6 +113,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	p := &assertsProcessorImpl{
 		logger:        logger,
 		config:        pConfig,
+		spanEnricher:  _spanEnrichmentProcessor,
 		nextConsumer:  nextConsumer,
 		metricBuilder: metricsHelper,
 		sampler:       &traceSampler,
@@ -119,7 +121,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	listeners := make([]configListener, 0)
-	listeners = append(listeners, spanMatcher)
+	listeners = append(listeners, requestBuilder)
 	listeners = append(listeners, &thresholdsHelper)
 	listeners = append(listeners, metricsHelper)
 	listeners = append(listeners, p)

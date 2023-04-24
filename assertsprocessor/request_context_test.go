@@ -10,7 +10,7 @@ import (
 
 func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{
+	matcher := requestContextBuilderImpl{
 		logger: logger,
 	}
 	err := matcher.compileRequestContextRegexps(&Config{
@@ -19,52 +19,59 @@ func TestCompileRequestContextRegexpsSuccess(t *testing.T) {
 				{
 					AttrName:    "attribute1",
 					Regex:       "Foo",
+					SpanKind:    "Client",
 					Replacement: "$1",
 				},
 				{
 					AttrName: "attribute2",
+					SpanKind: "Server",
 					Regex:    "Bar.+",
 				},
 			},
 			"default": {
 				{
 					AttrName: "attribute3",
+					SpanKind: "Server",
 					Regex:    "Baz.+",
 				},
 			},
 		},
 	})
 	assert.Nil(t, err)
-	assert.NotNil(t, matcher.spanAttrMatchers)
-	assert.Equal(t, 2, len(matcher.spanAttrMatchers))
-	assert.Equal(t, 2, len(matcher.spanAttrMatchers["namespace#service"]))
-	assert.Equal(t, 1, len(matcher.spanAttrMatchers["default"]))
+	assert.NotNil(t, matcher.requestConfigs)
+	assert.Equal(t, 2, len(matcher.requestConfigs))
+	assert.Equal(t, 2, len(matcher.requestConfigs["namespace#service"]))
+	assert.Equal(t, 1, len(matcher.requestConfigs["default"]))
 
-	regExp := matcher.spanAttrMatchers["namespace#service"][0].regex
+	regExp := matcher.requestConfigs["namespace#service"][0].regex
 	assert.NotNil(t, regExp)
-	assert.Equal(t, "attribute1", matcher.spanAttrMatchers["namespace#service"][0].attrName)
+	assert.Equal(t, "attribute1", matcher.requestConfigs["namespace#service"][0].attrName)
+	assert.Equal(t, "Client", matcher.requestConfigs["namespace#service"][0].spanKind)
 	assert.True(t, regExp.MatchString("Foo"))
 
-	regExp = matcher.spanAttrMatchers["namespace#service"][1].regex
+	regExp = matcher.requestConfigs["namespace#service"][1].regex
 	assert.NotNil(t, regExp)
-	assert.Equal(t, "attribute2", matcher.spanAttrMatchers["namespace#service"][1].attrName)
+	assert.Equal(t, "attribute2", matcher.requestConfigs["namespace#service"][1].attrName)
+	assert.Equal(t, "Server", matcher.requestConfigs["namespace#service"][1].spanKind)
 	assert.True(t, regExp.MatchString("Bart"))
 
-	regExp = matcher.spanAttrMatchers["default"][0].regex
+	regExp = matcher.requestConfigs["default"][0].regex
 	assert.NotNil(t, regExp)
-	assert.Equal(t, "attribute3", matcher.spanAttrMatchers["default"][0].attrName)
+	assert.Equal(t, "attribute3", matcher.requestConfigs["default"][0].attrName)
+	assert.Equal(t, "Server", matcher.requestConfigs["default"][0].spanKind)
 	assert.True(t, regExp.MatchString("Bazz"))
 }
 
 func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{
+	matcher := requestContextBuilderImpl{
 		logger: logger,
 	}
 	err := matcher.compileRequestContextRegexps(&Config{
 		RequestContextExps: map[string][]*MatcherDto{
 			"namespace#service": {
 				{
+					SpanKind:    "Server",
 					AttrName:    "attribute1",
 					Regex:       "+",
 					Replacement: "$1",
@@ -72,6 +79,7 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 			},
 			"default": {
 				{
+					SpanKind: "Server",
 					AttrName: "attribute2",
 					Regex:    "Bar.+",
 				},
@@ -83,14 +91,24 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 
 func TestGetRequestMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
-
-	compile, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
-	matcher := spanMatcher{
-		spanAttrMatchers: map[string][]*spanAttrMatcher{
+	testSpan.SetKind(ptrace.SpanKindServer)
+	serverExp, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
+	clientExp, _ := regexp.Compile("(.+)")
+	production, _ := zap.NewProduction()
+	matcher := requestContextBuilderImpl{
+		logger: production,
+		requestConfigs: map[string][]*requestConfigCompiled{
 			"namespace#service": {
 				{
+					spanKind:    "Server",
 					attrName:    "http.url",
-					regex:       compile,
+					regex:       serverExp,
+					replacement: "$1",
+				},
+				{
+					spanKind:    "Client",
+					attrName:    "http.url",
+					regex:       clientExp,
 					replacement: "$1",
 				},
 			},
@@ -114,17 +132,24 @@ func TestGetRequestMatch(t *testing.T) {
 
 	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar/baz?a=b")
 	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan, "namespace#service"))
+
+	testSpan.SetKind(ptrace.SpanKindClient)
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo")
+	assert.Equal(t, "https://some.domain.com/foo", matcher.getRequest(&testSpan, "namespace#service"))
 }
 
 func TestGetRequestMatchMultipleGroups(t *testing.T) {
 	testSpan := ptrace.NewSpan()
-
+	testSpan.SetKind(ptrace.SpanKindServer)
 	compile1, _ := regexp.Compile("http://user:8080(/check)/anonymous-.*")
 	compile2, _ := regexp.Compile("http://cart:8080(/add)/[0-9]+/([A-Z]+)/[0-9]+")
-	matcher := spanMatcher{
-		spanAttrMatchers: map[string][]*spanAttrMatcher{
+	production, _ := zap.NewProduction()
+	matcher := requestContextBuilderImpl{
+		logger: production,
+		requestConfigs: map[string][]*requestConfigCompiled{
 			"robot-shop#user": {
 				{
+					spanKind:    "Server",
 					attrName:    "http.url",
 					regex:       compile1,
 					replacement: "$1/#val",
@@ -132,6 +157,7 @@ func TestGetRequestMatchMultipleGroups(t *testing.T) {
 			},
 			"robot-shop#cart": {
 				{
+					spanKind:    "Server",
 					attrName:    "http.url",
 					regex:       compile2,
 					replacement: "$1/$2",
@@ -153,13 +179,17 @@ func TestGetRequestMatchMultipleGroups(t *testing.T) {
 func TestGetRequestNoMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 	testSpan.SetName("BackgroundJob")
+	testSpan.SetKind(ptrace.SpanKindServer)
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")
-	matcher := spanMatcher{
-		spanAttrMatchers: map[string][]*spanAttrMatcher{
+	production, _ := zap.NewProduction()
+	matcher := requestContextBuilderImpl{
+		logger: production,
+		requestConfigs: map[string][]*requestConfigCompiled{
 			"default": {
 				{
+					spanKind:    "Server",
 					attrName:    "http.url",
 					regex:       compile,
 					replacement: "$1",
@@ -176,17 +206,20 @@ func TestSpanMatcherIsUpdated(t *testing.T) {
 	prevExps := map[string][]*MatcherDto{
 		"namespace#service": {
 			{
+				SpanKind:    "Server",
 				AttrName:    "attribute1",
 				Regex:       "(Foo)",
 				Replacement: "$1",
 			},
 			{
+				SpanKind: "Server",
 				AttrName: "attribute2",
 				Regex:    "(Bar).+",
 			},
 		},
 		"default": {
 			{
+				SpanKind: "Server",
 				AttrName: "attribute3",
 				Regex:    "(Baz).+",
 			},
@@ -198,17 +231,20 @@ func TestSpanMatcherIsUpdated(t *testing.T) {
 	currentExps := map[string][]*MatcherDto{
 		"namespace#service": {
 			{
+				SpanKind:    "Server",
 				AttrName:    "attribute1",
 				Regex:       "(Foo)",
 				Replacement: "$1",
 			},
 			{
+				SpanKind: "Server",
 				AttrName: "attribute2",
 				Regex:    "(Bar).+",
 			},
 		},
 		"default": {
 			{
+				SpanKind: "Server",
 				AttrName: "attribute3",
 				Regex:    "(Baz).+",
 			},
@@ -219,7 +255,7 @@ func TestSpanMatcherIsUpdated(t *testing.T) {
 	}
 
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{
+	matcher := requestContextBuilderImpl{
 		logger: logger,
 	}
 
@@ -237,6 +273,7 @@ func TestSpanMatcherOnUpdateSuccess(t *testing.T) {
 		RequestContextExps: map[string][]*MatcherDto{
 			"default": {
 				{
+					SpanKind:    "Server",
 					AttrName:    "attribute1",
 					Regex:       "(Foo)",
 					Replacement: "$1",
@@ -246,15 +283,15 @@ func TestSpanMatcherOnUpdateSuccess(t *testing.T) {
 	}
 
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{
+	matcher := requestContextBuilderImpl{
 		logger: logger,
 	}
 
-	assert.Nil(t, matcher.spanAttrMatchers)
+	assert.Nil(t, matcher.requestConfigs)
 	err := matcher.onUpdate(config)
 	assert.Nil(t, err)
-	assert.NotNil(t, matcher.spanAttrMatchers)
-	assert.Equal(t, 1, len(matcher.spanAttrMatchers))
+	assert.NotNil(t, matcher.requestConfigs)
+	assert.Equal(t, 1, len(matcher.requestConfigs))
 }
 
 func TestSpanMatcherOnUpdateError(t *testing.T) {
@@ -262,6 +299,7 @@ func TestSpanMatcherOnUpdateError(t *testing.T) {
 		RequestContextExps: map[string][]*MatcherDto{
 			"default": {
 				{
+					SpanKind:    "Server",
 					AttrName:    "attribute1",
 					Regex:       "+",
 					Replacement: "$1",
@@ -271,12 +309,12 @@ func TestSpanMatcherOnUpdateError(t *testing.T) {
 	}
 
 	logger, _ := zap.NewProduction()
-	matcher := spanMatcher{
+	matcher := requestContextBuilderImpl{
 		logger: logger,
 	}
 
-	assert.Nil(t, matcher.spanAttrMatchers)
+	assert.Nil(t, matcher.requestConfigs)
 	err := matcher.onUpdate(config)
 	assert.NotNil(t, err)
-	assert.Nil(t, matcher.spanAttrMatchers)
+	assert.Nil(t, matcher.requestConfigs)
 }

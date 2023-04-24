@@ -25,6 +25,8 @@ const (
 	siteLabel            = "asserts_site"
 	namespaceLabel       = "namespace"
 	serviceLabel         = "service"
+	requestTypeLabel     = "asserts_request_type"
+	errorTypeLabel       = "asserts_error_type"
 	requestContextLabel  = "asserts_request_context"
 	spanKind             = "span_kind"
 	traceSampleTypeLabel = "sample_type"
@@ -35,7 +37,6 @@ type metricHelper struct {
 	config             *Config
 	httpServer         *http.Server
 	prometheusRegistry *prometheus.Registry
-	spanMatcher        *spanMatcher
 	latencyHistogram   *prometheus.HistogramVec
 	totalTraceCount    *prometheus.CounterVec
 	sampledTraceCount  *prometheus.CounterVec
@@ -45,12 +46,11 @@ type metricHelper struct {
 	rwMutex *sync.RWMutex
 }
 
-func newMetricHelper(logger *zap.Logger, config *Config, spanMatcher *spanMatcher) *metricHelper {
+func newMetricHelper(logger *zap.Logger, config *Config) *metricHelper {
 	return &metricHelper{
 		logger:                   logger,
 		config:                   config,
 		prometheusRegistry:       prometheus.NewRegistry(),
-		spanMatcher:              spanMatcher,
 		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
 		rwMutex:                  &sync.RWMutex{},
 	}
@@ -101,7 +101,7 @@ func (p *metricHelper) registerMetrics() error {
 }
 
 func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []string) error {
-	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestContextLabel, spanKind}
+	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestTypeLabel, requestContextLabel, errorTypeLabel, spanKind}
 
 	if captureAttributesInMetric != nil {
 		for _, label := range captureAttributesInMetric {
@@ -127,9 +127,9 @@ func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []stri
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span,
 	resourceSpan *ptrace.ResourceSpans) {
-
 	serviceKey := namespace + "#" + service
-	requestContext := p.spanMatcher.getRequest(span, serviceKey)
+	attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
+	requestContext := attrValue.Str()
 
 	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {
 		cache := ttlcache.New[string, string](
@@ -167,12 +167,16 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
+	requestTypeAtt, _ := span.Attributes().Get(AssertsRequestTypeAttribute)
+	errorTypeAtt, _ := span.Attributes().Get(AssertsErrorTypeAttribute)
 	labels := prometheus.Labels{
 		envLabel:            p.config.Env,
 		siteLabel:           p.config.Site,
 		namespaceLabel:      namespace,
 		serviceLabel:        service,
 		requestContextLabel: requestContext,
+		requestTypeLabel:    requestTypeAtt.Str(),
+		errorTypeLabel:      errorTypeAtt.Str(),
 	}
 
 	capturedResourceAttributes := make([]string, 0)

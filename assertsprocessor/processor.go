@@ -15,6 +15,7 @@ type assertsProcessorImpl struct {
 	logger        *zap.Logger
 	config        *Config
 	nextConsumer  consumer.Traces
+	spanEnricher  spanEnrichmentProcessor
 	metricBuilder *metricHelper
 	sampler       *sampler
 	configRefresh *configRefresh
@@ -51,24 +52,29 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 }
 
 func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourceTraces) error {
-	p.sampler.sampleTraces(ctx, traces)
-
-	if p.captureMetrics() {
-		for _, aTrace := range *traces.traceById {
-			if aTrace.rootSpan != nil {
+	for _, aTrace := range *traces.traceById {
+		if aTrace.rootSpan != nil {
+			p.spanEnricher.enrichSpan(traces.namespace, traces.service, aTrace.rootSpan)
+			if p.captureMetrics() {
 				p.metricBuilder.captureMetrics(traces.namespace, traces.service, aTrace.rootSpan, aTrace.resourceSpan)
 			}
+		}
 
-			for _, entrySpan := range aTrace.entrySpans {
+		for _, entrySpan := range aTrace.entrySpans {
+			p.spanEnricher.enrichSpan(traces.namespace, traces.service, entrySpan)
+			if p.captureMetrics() {
 				p.metricBuilder.captureMetrics(traces.namespace, traces.service, entrySpan, aTrace.resourceSpan)
 			}
+		}
 
-			for _, exitSpan := range aTrace.exitSpans {
+		for _, exitSpan := range aTrace.exitSpans {
+			p.spanEnricher.enrichSpan(traces.namespace, traces.service, exitSpan)
+			if p.captureMetrics() {
 				p.metricBuilder.captureMetrics(traces.namespace, traces.service, exitSpan, aTrace.resourceSpan)
 			}
 		}
 	}
-
+	p.sampler.sampleTraces(ctx, traces)
 	return nil
 }
 

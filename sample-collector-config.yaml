@@ -22,19 +22,30 @@ processors:
     asserts_env: dev
     asserts_site: dev
     capture_metrics: true
+    error_type_config:
+      "http.status_code":
+        - error_type: client_errors
+          value_match_regex: 4..
+        - error_type: server_errors
+          value_match_regex: 5..
     request_context_regex:
       robot-shop#payment:
         - attr_name: "http.url"
+          span_kind: "Server"
           regex: "http://cart:8080(/cart)/anonymous-.*"
         - attr_name: "http.url"
+          span_kind: "Server"
           regex: "http://user:8080(/check)/anonymous-.*"
       robot-shop#shipping:
         - attr_name: "http.url"
+          span_kind: "Server"
           regex: "http://cart:8080(/shipping)/anonymous-.*"
       default:
         - attr_name: "http.route"
           regex: "(.+)"
+          span_kind: "Server"
         - attr_name: "http.url"
+          span_kind: "Server"
           regex: "https?://.+?((/[^/?]+){1,2}).*"
     attributes_as_metric_labels:
       - "rpc.system"
