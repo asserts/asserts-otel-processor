@@ -105,11 +105,13 @@ func (rCB *requestContextBuilderImpl) onUpdate(newConfig *Config) error {
 
 func getRequest(span *ptrace.Span, serviceSpanAttrMatchers []*requestConfigCompiled) string {
 	for _, matcher := range serviceSpanAttrMatchers {
-		value, found := span.Attributes().Get(matcher.attrName)
-		if found {
-			subMatch := matcher.regex.FindStringSubmatch(value.AsString())
-			if len(subMatch) >= 1 {
-				return matcher.regex.ReplaceAllString(value.AsString(), matcher.replacement)
+		if matcher.spanKind == span.Kind().String() {
+			value, found := span.Attributes().Get(matcher.attrName)
+			if found {
+				subMatch := matcher.regex.FindStringSubmatch(value.AsString())
+				if len(subMatch) >= 1 {
+					return matcher.regex.ReplaceAllString(value.AsString(), matcher.replacement)
+				}
 			}
 		}
 	}

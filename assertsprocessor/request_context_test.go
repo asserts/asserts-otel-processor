@@ -91,15 +91,22 @@ func TestCompileRequestContextRegexpsFailure(t *testing.T) {
 
 func TestGetRequestMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
-
-	compile, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
+	testSpan.SetKind(ptrace.SpanKindServer)
+	serverExp, _ := regexp.Compile("https?://.+?((/[^/?]+){1,2}).*")
+	clientExp, _ := regexp.Compile("(.+)")
 	matcher := requestContextBuilderImpl{
 		requestConfigs: map[string][]*requestConfigCompiled{
 			"namespace#service": {
 				{
 					spanKind:    "Server",
 					attrName:    "http.url",
-					regex:       compile,
+					regex:       serverExp,
+					replacement: "$1",
+				},
+				{
+					spanKind:    "Client",
+					attrName:    "http.url",
+					regex:       clientExp,
 					replacement: "$1",
 				},
 			},
@@ -123,11 +130,15 @@ func TestGetRequestMatch(t *testing.T) {
 
 	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar/baz?a=b")
 	assert.Equal(t, "/foo/bar", matcher.getRequest(&testSpan, "namespace#service"))
+
+	testSpan.SetKind(ptrace.SpanKindClient)
+	testSpan.Attributes().PutStr("http.url", "https://some.domain.com/foo")
+	assert.Equal(t, "https://some.domain.com/foo", matcher.getRequest(&testSpan, "namespace#service"))
 }
 
 func TestGetRequestMatchMultipleGroups(t *testing.T) {
 	testSpan := ptrace.NewSpan()
-
+	testSpan.SetKind(ptrace.SpanKindServer)
 	compile1, _ := regexp.Compile("http://user:8080(/check)/anonymous-.*")
 	compile2, _ := regexp.Compile("http://cart:8080(/add)/[0-9]+/([A-Z]+)/[0-9]+")
 	matcher := requestContextBuilderImpl{
@@ -164,6 +175,7 @@ func TestGetRequestMatchMultipleGroups(t *testing.T) {
 func TestGetRequestNoMatch(t *testing.T) {
 	testSpan := ptrace.NewSpan()
 	testSpan.SetName("BackgroundJob")
+	testSpan.SetKind(ptrace.SpanKindServer)
 	testSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	compile, _ := regexp.Compile("https?://foo.+?(/.+?/.+)")

@@ -43,6 +43,8 @@ func TestBuildLabels(t *testing.T) {
 
 	testSpan := ptrace.NewSpan()
 	testSpan.SetKind(ptrace.SpanKindClient)
+	testSpan.Attributes().PutStr(AssertsRequestTypeAttribute, "outbound")
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "GetItem")
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
 	testSpan.Attributes().PutStr("rpc.method", "GetItem")
@@ -54,6 +56,8 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels[namespaceLabel] = "ride-services"
 	expectedLabels[serviceLabel] = "payment"
 	expectedLabels[requestContextLabel] = "GetItem"
+	expectedLabels[requestTypeLabel] = "outbound"
+	expectedLabels[errorTypeLabel] = ""
 	expectedLabels["rpc_service"] = "DynamoDb"
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
