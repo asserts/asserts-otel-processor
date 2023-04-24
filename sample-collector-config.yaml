@@ -19,8 +19,6 @@ processors:
   assertsprocessor:
     asserts_server:
       endpoint: https://chief.app.dev.asserts.ai/api-server
-      username: HcbAlB7nUFhXpm3rJKvi
-      password: Ri7q1J/Fq+/rwfQDeP/bbBfYpK0JydvMInEitdqr
     asserts_env: dev
     asserts_site: dev
     capture_metrics: true
