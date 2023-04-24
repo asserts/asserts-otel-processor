@@ -24,6 +24,7 @@ var config = Config{
 	DefaultLatencyThreshold:    0.5,
 	LimitPerService:            2,
 	LimitPerRequestPerService:  5,
+	PrometheusExporterPort:     9466,
 	TraceFlushFrequencySeconds: 30,
 }
 
@@ -32,6 +33,7 @@ var th = thresholdHelper{
 	config:     &config,
 	entityKeys: &sync.Map{},
 	thresholds: &sync.Map{},
+	rwMutex:    &sync.RWMutex{},
 }
 
 func TestLatencyIsHighTrue(t *testing.T) {
@@ -408,7 +410,7 @@ func TestFlushTraces(t *testing.T) {
 				},
 			},
 		},
-		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Second),
+		traceFlushTicker: clock.FromContext(ctx).NewTicker(time.Millisecond),
 		nextConsumer:     dConsumer,
 		stop:             make(chan bool, 5),
 		metricHelper:     buildMetricHelper(),
@@ -498,7 +500,7 @@ func TestFlushTraces(t *testing.T) {
 
 	serviceNames = make([]string, 0)
 	go func() { s.startTraceFlusher() }()
-	time.Sleep(2 * time.Second)
+	time.Sleep(2 * time.Millisecond)
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
 		serviceNames = append(serviceNames, key.(string))
@@ -512,7 +514,7 @@ func TestFlushTraces(t *testing.T) {
 	assert.Equal(t, []string{"{env=dev, namespace=platform, site=us-west-2}#Service#api-server"}, serviceNames)
 	assert.Equal(t, []string{"/api-server/v4/rules"}, requests)
 	s.stopProcessing()
-	time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Millisecond)
 }
 
 func buildMetricHelper() *metricHelper {

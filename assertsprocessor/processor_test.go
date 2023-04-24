@@ -55,6 +55,14 @@ func TestStartAndShutdown(t *testing.T) {
 		entityKeys:          &sync.Map{},
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		rc:                  &assertsClient{},
+	}
+	configRefresh := configRefresh{
+		config:           &testConfig,
+		logger:           logger,
+		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		stop:             make(chan bool),
+		restClient:       &assertsClient{},
 	}
 	p := assertsProcessorImpl{
 		logger:        testLogger,
@@ -71,6 +79,7 @@ func TestStartAndShutdown(t *testing.T) {
 			thresholdHelper:    &_th,
 			spanMatcher:        &spanMatcher{},
 		},
+		configRefresh: &configRefresh,
 	}
 	assert.Nil(t, p.Start(ctx, nil))
 	assert.Nil(t, p.Shutdown(ctx))
@@ -89,9 +98,10 @@ func TestConsumeTraces(t *testing.T) {
 		entityKeys:          &sync.Map{},
 		thresholds:          &sync.Map{},
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		rwMutex:             &sync.RWMutex{},
 	}
 	helper := newMetricHelper(testLogger, &testConfig, &spanMatcher{})
-	_ = helper.init()
+	_ = helper.registerMetrics()
 	p := assertsProcessorImpl{
 		logger:        testLogger,
 		config:        &testConfig,
@@ -108,6 +118,7 @@ func TestConsumeTraces(t *testing.T) {
 			spanMatcher:        &spanMatcher{},
 			metricHelper:       buildMetricHelper(),
 		},
+		rwMutex: &sync.RWMutex{},
 	}
 
 	testTrace := ptrace.NewTraces()
@@ -133,4 +144,44 @@ func TestConsumeTraces(t *testing.T) {
 
 	err := p.ConsumeTraces(ctx, testTrace)
 	assert.Nil(t, err)
+}
+
+func TestProcessorIsUpdated(t *testing.T) {
+	currConfig := &Config{
+		CaptureMetrics: false,
+	}
+	newConfig := &Config{
+		CaptureMetrics: true,
+	}
+
+	testLogger, _ := zap.NewProduction()
+	p := assertsProcessorImpl{
+		logger:  testLogger,
+		config:  currConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.False(t, p.isUpdated(currConfig, currConfig))
+	assert.True(t, p.isUpdated(currConfig, newConfig))
+}
+
+func TestProcessorOnUpdate(t *testing.T) {
+	currConfig := &Config{
+		CaptureMetrics: false,
+	}
+	newConfig := &Config{
+		CaptureMetrics: true,
+	}
+
+	testLogger, _ := zap.NewProduction()
+	p := assertsProcessorImpl{
+		logger:  testLogger,
+		config:  currConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.False(t, p.captureMetrics())
+	err := p.onUpdate(newConfig)
+	assert.Nil(t, err)
+	assert.True(t, p.captureMetrics())
 }

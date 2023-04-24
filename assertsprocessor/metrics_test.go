@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestInit(t *testing.T) {
+func TestRegisterMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	p := newMetricHelper(
 		logger,
@@ -21,7 +21,7 @@ func TestInit(t *testing.T) {
 		},
 		&spanMatcher{},
 	)
-	assert.Nil(t, p.init())
+	assert.Nil(t, p.registerMetrics())
 	assert.NotNil(t, p.prometheusRegistry)
 	assert.NotNil(t, p.latencyHistogram)
 	assert.NotNil(t, p.sampledTraceCount)
@@ -95,7 +95,7 @@ func TestCaptureMetrics(t *testing.T) {
 		},
 		&matcher,
 	)
-	err := p.init()
+	err := p.registerMetrics()
 	assert.Nil(t, err)
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
@@ -148,7 +148,7 @@ func TestMetricCardinalityLimit(t *testing.T) {
 		},
 		&matcher,
 	)
-	_ = p.init()
+	_ = p.registerMetrics()
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()
@@ -172,4 +172,42 @@ func TestMetricCardinalityLimit(t *testing.T) {
 	assert.NotNil(t, cache.Get("/cart/anonymous-1"))
 	assert.NotNil(t, cache.Get("/cart/anonymous-2"))
 	assert.Nil(t, cache.Get("/cart/anonymous-3"))
+}
+
+func TestMetricHelperIsUpdated(t *testing.T) {
+	currConfig := &Config{
+		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
+	}
+	newConfig := &Config{
+		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
+	}
+	p := newMetricHelper(
+		logger,
+		currConfig,
+		&spanMatcher{},
+	)
+
+	assert.False(t, p.isUpdated(currConfig, currConfig))
+	assert.True(t, p.isUpdated(currConfig, newConfig))
+}
+
+func TestMetricHelperOnUpdate(t *testing.T) {
+	currConfig := &Config{
+		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
+		PrometheusExporterPort:    9466,
+	}
+	newConfig := &Config{
+		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
+	}
+
+	logger, _ := zap.NewProduction()
+	p := newMetricHelper(
+		logger,
+		currConfig,
+		&spanMatcher{},
+	)
+	_ = p.registerMetrics()
+	p.startExporter()
+
+	assert.Nil(t, p.onUpdate(newConfig))
 }
