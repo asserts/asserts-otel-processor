@@ -44,7 +44,7 @@ func (ac *assertsClient) invoke(method string, api string, payload any) ([]byte,
 	// Build request
 	assertsServer := *ac.config.AssertsServer
 	url := assertsServer["endpoint"] + api
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(requestBody))
+	req, err := http.NewRequest(method, url, bytes.NewReader(requestBody))
 	if err != nil {
 		ac.logger.Error("Error creating new http request", zap.Error(err))
 		return nil, err

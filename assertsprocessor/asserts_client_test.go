@@ -55,7 +55,7 @@ func TestInvoke(t *testing.T) {
 			Env:  "dev",
 			Site: "us-west-2",
 			AssertsServer: &map[string]string{
-				"endpoint": "http://localhost:8030",
+				"endpoint": "http://localhost:8031",
 				"user":     "asserts",
 				"password": "asserts",
 			},
