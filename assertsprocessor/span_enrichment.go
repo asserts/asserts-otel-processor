@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
 	"regexp"
 )
 
@@ -42,16 +43,19 @@ type spanEnrichmentProcessor interface {
 }
 
 type spanEnrichmentProcessorImpl struct {
+	logger           *zap.Logger
 	errorTypeConfigs map[string][]*errorTypeCompiledConfig
 	requestBuilder   requestContextBuilder
 }
 
-func buildEnrichmentProcessor(config *Config, requestBuilder requestContextBuilder) *spanEnrichmentProcessorImpl {
+func buildEnrichmentProcessor(logger *zap.Logger, config *Config, requestBuilder requestContextBuilder) *spanEnrichmentProcessorImpl {
 	processor := spanEnrichmentProcessorImpl{
+		logger:           logger,
 		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{},
 		requestBuilder:   requestBuilder,
 	}
 	for attrName, errorConfigs := range config.ErrorTypeConfigs {
+		logger.Debug("Compiling error type configs for", zap.String("attribute", attrName))
 		processor.errorTypeConfigs[attrName] = make([]*errorTypeCompiledConfig, 0)
 		for _, errorConfig := range errorConfigs {
 			compile, _ := regexp.Compile(errorConfig.ValueExpr)
@@ -60,6 +64,9 @@ func buildEnrichmentProcessor(config *Config, requestBuilder requestContextBuild
 					errorType:    errorConfig.ErrorType,
 					valueMatcher: compile,
 				})
+			logger.Debug("Compiled and added error type config",
+				zap.String("error type", errorConfig.ErrorType),
+				zap.String("attr value regexp", errorConfig.ValueExpr))
 		}
 	}
 	return &processor
@@ -92,9 +99,14 @@ func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
 	for attrName, errorConfigs := range ep.errorTypeConfigs {
 		value, present := span.Attributes().Get(attrName)
 		if present {
+			stringValue := value.AsString()
 			for _, errorConfig := range errorConfigs {
-				if errorConfig.valueMatcher.MatchString(value.Str()) {
+				if errorConfig.valueMatcher.MatchString(stringValue) {
 					span.Attributes().PutStr(AssertsErrorTypeAttribute, errorConfig.errorType)
+					ep.logger.Debug("Added error type",
+						zap.String("span id", span.SpanID().String()),
+						zap.String(attrName, stringValue),
+						zap.String("error type", errorConfig.errorType))
 					return
 				}
 			}
