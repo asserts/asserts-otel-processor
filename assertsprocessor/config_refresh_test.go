@@ -29,11 +29,11 @@ func TestFetchConfig(t *testing.T) {
 
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
-			"CaptureMetrics": true,
-			"RequestContextExps": {"default":[{"AttrName":"attribute1","Regex":"(Foo).+","Replacement":"$1"}]},
-			"CaptureAttributesInMetric": ["rpc.system", "rpc.service"],
-			"DefaultLatencyThreshold": 0.51,
-			"Unknown": "foo"
+			"capture_metrics": true,
+			"request_context_regex": {"default":[{"attr_name":"attribute1","regex":"(Foo).+","replacement":"$1"}]},
+			"attributes_as_metric_labels": ["rpc.system", "rpc.service"],
+			"sampling_latency_threshold_seconds": 0.51,
+			"unknown": "foo"
 		}`),
 		expectedErr: nil,
 	}
@@ -145,7 +145,7 @@ func TestUpdateConfigError(t *testing.T) {
 func TestFetchAndUpdateConfig(t *testing.T) {
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
-			"DefaultLatencyThreshold": 0.51
+			"sampling_latency_threshold_seconds": 0.51
 		}`),
 		expectedErr: nil,
 	}

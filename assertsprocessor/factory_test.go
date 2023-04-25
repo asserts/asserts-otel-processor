@@ -116,10 +116,10 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
-			"CaptureMetrics": true,
-			"RequestContextExps": {"default":[{"AttrName":"attribute1","Regex":"+","Replacement":"$1"}]},
-			"CaptureAttributesInMetric": ["rpc.system", "rpc.service"],
-			"DefaultLatencyThreshold": 0.51
+			"capture_metrics": true,
+			"request_context_regex": {"default":[{"attr_name":"attribute1","regex":"+","replacement":"$1"}]},
+			"attributes_as_metric_labels": ["rpc.system", "rpc.service"],
+			"sampling_latency_threshold_seconds": 0.51
 		}`),
 		expectedErr: nil,
 	}
