@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	configApi            = "/v1/otel-collector-config"
+	configApi            = "/v1/config/otel-collector"
 	latencyThresholdsApi = "/v1/latency-thresholds"
 )
 
