@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
 	"regexp"
 )
 
@@ -42,12 +43,14 @@ type spanEnrichmentProcessor interface {
 }
 
 type spanEnrichmentProcessorImpl struct {
+	logger           *zap.Logger
 	errorTypeConfigs map[string][]*errorTypeCompiledConfig
 	requestBuilder   requestContextBuilder
 }
 
-func buildEnrichmentProcessor(config *Config, requestBuilder requestContextBuilder) *spanEnrichmentProcessorImpl {
+func buildEnrichmentProcessor(logger *zap.Logger, config *Config, requestBuilder requestContextBuilder) *spanEnrichmentProcessorImpl {
 	processor := spanEnrichmentProcessorImpl{
+		logger:           logger,
 		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{},
 		requestBuilder:   requestBuilder,
 	}
@@ -95,6 +98,10 @@ func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
 			for _, errorConfig := range errorConfigs {
 				if errorConfig.valueMatcher.MatchString(value.Str()) {
 					span.Attributes().PutStr(AssertsErrorTypeAttribute, errorConfig.errorType)
+					ep.logger.Debug("Added error type",
+						zap.String("span id", span.SpanID().String()),
+						zap.String(attrName, value.Str()),
+						zap.String("error type", errorConfig.errorType))
 					return
 				}
 			}

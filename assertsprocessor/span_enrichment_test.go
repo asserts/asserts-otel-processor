@@ -3,6 +3,7 @@ package assertsprocessor
 import (
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"go.uber.org/zap"
 	"regexp"
 	"testing"
 )
@@ -51,7 +52,8 @@ func TestBuildErrorProcessor(t *testing.T) {
 		ValueExpr: "5..",
 	}
 
-	processor := buildEnrichmentProcessor(&Config{
+	_logger, _ := zap.NewProduction()
+	processor := buildEnrichmentProcessor(_logger, &Config{
 		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
 			"http.status_code": {
 				&clientErrorConfig, &serverErrorConfig,
@@ -71,7 +73,9 @@ func TestBuildErrorProcessor(t *testing.T) {
 func TestEnrichSpan(t *testing.T) {
 	clientMatcher, _ := regexp.Compile("4..")
 	serverMatcher, _ := regexp.Compile("5..")
+	_logger, _ := zap.NewProduction()
 	processor := spanEnrichmentProcessorImpl{
+		logger: _logger,
 		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{
 			"http.status_code": {
 				&errorTypeCompiledConfig{

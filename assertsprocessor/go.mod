@@ -3,7 +3,6 @@ module github.com/asserts/asserts-otel-processor/assertsprocessor
 go 1.19
 
 require (
-	github.com/google/go-cmp v0.5.9
 	github.com/jellydator/ttlcache/v3 v3.0.1
 	github.com/prometheus/client_golang v1.14.0
 	github.com/puzpuzpuz/xsync/v2 v2.4.0
