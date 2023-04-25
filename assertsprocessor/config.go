@@ -6,27 +6,27 @@ import (
 )
 
 type MatcherDto struct {
-	SpanKind    string `mapstructure:"span_kind"`
-	AttrName    string `mapstructure:"attr_name"`
-	Regex       string `mapstructure:"regex"`
-	Replacement string `mapstructure:"replacement"`
+	SpanKind    string `json:"span_kind"`
+	AttrName    string `json:"attr_name"`
+	Regex       string `json:"regex"`
+	Replacement string `json:"replacement"`
 }
 
 type Config struct {
-	AssertsServer                  *map[string]string            `mapstructure:"asserts_server"`
-	Env                            string                        `mapstructure:"asserts_env"`
-	Site                           string                        `mapstructure:"asserts_site"`
-	CaptureMetrics                 bool                          `mapstructure:"capture_metrics"`
-	RequestContextExps             map[string][]*MatcherDto      `mapstructure:"request_context_regex"`
-	ErrorTypeConfigs               map[string][]*ErrorTypeConfig `mapstructure:"error_type_config"`
-	CaptureAttributesInMetric      []string                      `mapstructure:"attributes_as_metric_labels"`
-	DefaultLatencyThreshold        float64                       `mapstructure:"sampling_latency_threshold_seconds"`
-	LimitPerService                int                           `mapstructure:"trace_rate_limit_per_service"`
-	LimitPerRequestPerService      int                           `mapstructure:"trace_rate_limit_per_service_per_request"`
-	RequestContextCacheTTL         int                           `mapstructure:"request_context_cache_ttl_minutes"`
-	NormalSamplingFrequencyMinutes int                           `mapstructure:"normal_trace_sampling_rate_minutes"`
-	PrometheusExporterPort         uint64                        `mapstructure:"prometheus_exporter_port"`
-	TraceFlushFrequencySeconds     int                           `mapstructure:"trace_flush_frequency_seconds"`
+	AssertsServer                  *map[string]string            `json:"asserts_server"`
+	Env                            string                        `json:"asserts_env"`
+	Site                           string                        `json:"asserts_site"`
+	CaptureMetrics                 bool                          `json:"capture_metrics"`
+	RequestContextExps             map[string][]*MatcherDto      `json:"request_context_regex"`
+	ErrorTypeConfigs               map[string][]*ErrorTypeConfig `json:"error_type_config"`
+	CaptureAttributesInMetric      []string                      `json:"attributes_as_metric_labels"`
+	DefaultLatencyThreshold        float64                       `json:"sampling_latency_threshold_seconds"`
+	LimitPerService                int                           `json:"trace_rate_limit_per_service"`
+	LimitPerRequestPerService      int                           `json:"trace_rate_limit_per_service_per_request"`
+	RequestContextCacheTTL         int                           `json:"request_context_cache_ttl_minutes"`
+	NormalSamplingFrequencyMinutes int                           `json:"normal_trace_sampling_rate_minutes"`
+	PrometheusExporterPort         uint64                        `json:"prometheus_exporter_port"`
+	TraceFlushFrequencySeconds     int                           `json:"trace_flush_frequency_seconds"`
 }
 
 // Validate implements the component.ConfigValidator interface.
