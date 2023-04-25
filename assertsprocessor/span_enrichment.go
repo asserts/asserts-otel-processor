@@ -96,37 +96,20 @@ func (ep *spanEnrichmentProcessorImpl) addRequestContext(namespace string, servi
 }
 
 func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
-	ep.logger.Debug("Adding error type", zap.String("span id", span.SpanID().String()))
 	for attrName, errorConfigs := range ep.errorTypeConfigs {
 		value, present := span.Attributes().Get(attrName)
 		if present {
 			stringValue := value.AsString()
-			ep.logger.Debug("Matching error type config for",
-				zap.String("span id", span.SpanID().String()),
-				zap.String(attrName, stringValue))
 			for _, errorConfig := range errorConfigs {
 				if errorConfig.valueMatcher.MatchString(stringValue) {
-					ep.logger.Debug("Matched",
-						zap.String("span id", span.SpanID().String()),
-						zap.String("expr", errorConfig.valueMatcher.String()),
-						zap.String("value", stringValue))
 					span.Attributes().PutStr(AssertsErrorTypeAttribute, errorConfig.errorType)
 					ep.logger.Debug("Added error type",
 						zap.String("span id", span.SpanID().String()),
 						zap.String(attrName, stringValue),
 						zap.String("error type", errorConfig.errorType))
 					return
-				} else {
-					ep.logger.Debug("Did not match",
-						zap.String("span id", span.SpanID().String()),
-						zap.String("expr", errorConfig.valueMatcher.String()),
-						zap.String("value", stringValue))
 				}
 			}
-		} else {
-			ep.logger.Debug("Attribute missing. Won't add error type",
-				zap.String("span id", span.SpanID().String()),
-				zap.String("attribute", attrName))
 		}
 	}
 }
