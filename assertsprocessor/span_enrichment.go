@@ -55,6 +55,7 @@ func buildEnrichmentProcessor(logger *zap.Logger, config *Config, requestBuilder
 		requestBuilder:   requestBuilder,
 	}
 	for attrName, errorConfigs := range config.ErrorTypeConfigs {
+		logger.Debug("Compiling error type configs for", zap.String("attribute", attrName))
 		processor.errorTypeConfigs[attrName] = make([]*errorTypeCompiledConfig, 0)
 		for _, errorConfig := range errorConfigs {
 			compile, _ := regexp.Compile(errorConfig.ValueExpr)
@@ -63,6 +64,9 @@ func buildEnrichmentProcessor(logger *zap.Logger, config *Config, requestBuilder
 					errorType:    errorConfig.ErrorType,
 					valueMatcher: compile,
 				})
+			logger.Debug("Compiled and added error type config",
+				zap.String("error type", errorConfig.ErrorType),
+				zap.String("attr value regexp", errorConfig.ValueExpr))
 		}
 	}
 	return &processor
@@ -92,19 +96,36 @@ func (ep *spanEnrichmentProcessorImpl) addRequestContext(namespace string, servi
 }
 
 func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
+	ep.logger.Debug("Adding error type", zap.String("span id", span.SpanID().String()))
 	for attrName, errorConfigs := range ep.errorTypeConfigs {
 		value, present := span.Attributes().Get(attrName)
 		if present {
+			ep.logger.Debug("Matching error type config for",
+				zap.String("span id", span.SpanID().String()),
+				zap.String(attrName, value.Str()))
 			for _, errorConfig := range errorConfigs {
 				if errorConfig.valueMatcher.MatchString(value.Str()) {
+					ep.logger.Debug("Matched",
+						zap.String("span id", span.SpanID().String()),
+						zap.String("expr", errorConfig.valueMatcher.String()),
+						zap.String("value", value.Str()))
 					span.Attributes().PutStr(AssertsErrorTypeAttribute, errorConfig.errorType)
 					ep.logger.Debug("Added error type",
 						zap.String("span id", span.SpanID().String()),
 						zap.String(attrName, value.Str()),
 						zap.String("error type", errorConfig.errorType))
 					return
+				} else {
+					ep.logger.Debug("Did not match",
+						zap.String("span id", span.SpanID().String()),
+						zap.String("expr", errorConfig.valueMatcher.String()),
+						zap.String("value", value.Str()))
 				}
 			}
+		} else {
+			ep.logger.Debug("Attribute missing. Won't add error type",
+				zap.String("span id", span.SpanID().String()),
+				zap.String("attribute", attrName))
 		}
 	}
 }
