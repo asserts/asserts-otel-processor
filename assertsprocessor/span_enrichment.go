@@ -100,26 +100,27 @@ func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
 	for attrName, errorConfigs := range ep.errorTypeConfigs {
 		value, present := span.Attributes().Get(attrName)
 		if present {
+			stringValue := value.AsString()
 			ep.logger.Debug("Matching error type config for",
 				zap.String("span id", span.SpanID().String()),
-				zap.String(attrName, value.Str()))
+				zap.String(attrName, stringValue))
 			for _, errorConfig := range errorConfigs {
-				if errorConfig.valueMatcher.MatchString(value.Str()) {
+				if errorConfig.valueMatcher.MatchString(stringValue) {
 					ep.logger.Debug("Matched",
 						zap.String("span id", span.SpanID().String()),
 						zap.String("expr", errorConfig.valueMatcher.String()),
-						zap.String("value", value.Str()))
+						zap.String("value", stringValue))
 					span.Attributes().PutStr(AssertsErrorTypeAttribute, errorConfig.errorType)
 					ep.logger.Debug("Added error type",
 						zap.String("span id", span.SpanID().String()),
-						zap.String(attrName, value.Str()),
+						zap.String(attrName, stringValue),
 						zap.String("error type", errorConfig.errorType))
 					return
 				} else {
 					ep.logger.Debug("Did not match",
 						zap.String("span id", span.SpanID().String()),
 						zap.String("expr", errorConfig.valueMatcher.String()),
-						zap.String("value", value.Str()))
+						zap.String("value", stringValue))
 				}
 			}
 		} else {
