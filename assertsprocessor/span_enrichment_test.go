@@ -93,7 +93,7 @@ func TestEnrichSpan(t *testing.T) {
 	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
 	span := scopeSpans.Spans().AppendEmpty()
 
-	span.Attributes().PutStr("http.status_code", "404")
+	span.Attributes().PutInt("http.status_code", 404)
 	span.SetKind(ptrace.SpanKindClient)
 	processor.enrichSpan("asserts", "api-server", &span)
 
