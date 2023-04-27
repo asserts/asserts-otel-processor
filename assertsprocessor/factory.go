@@ -68,7 +68,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		// If config is fetched successfully from api server then for the following
 		// attributes it takes precedence over the local collector config
 		pConfig.CaptureMetrics = newConfig.CaptureMetrics
-		pConfig.setCaptureAttributesInMetric(newConfig.CaptureAttributesInMetric)
+		pConfig.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
 		pConfig.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
 		pConfig.CustomAttributeConfigs = newConfig.CustomAttributeConfigs
 	}

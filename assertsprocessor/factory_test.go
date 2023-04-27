@@ -180,7 +180,7 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["default"]))
 	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["asserts#api-server"]))
 	assert.NotNil(t, config.CaptureAttributesInMetric)
-	assert.Equal(t, 5, len(config.CaptureAttributesInMetric))
+	assert.Equal(t, 2, len(config.CaptureAttributesInMetric))
 	assert.Equal(t, "rpc.system", config.CaptureAttributesInMetric[0])
 	assert.Equal(t, "rpc.service", config.CaptureAttributesInMetric[1])
 	assert.Equal(t, 0.51, config.DefaultLatencyThreshold)

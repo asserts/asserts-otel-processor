@@ -96,7 +96,18 @@ func (p *metricHelper) registerMetrics() error {
 		return err
 	}
 
-	return p.registerLatencyHistogram(p.config.CaptureAttributesInMetric)
+	return p.registerLatencyHistogram(p.getAttributesAsLabels())
+}
+
+func (p *metricHelper) getAttributesAsLabels() []string {
+	attributes := make([]string, 0)
+	for _, att := range p.config.CaptureAttributesInMetric {
+		attributes = append(attributes, att)
+	}
+	attributes = append(attributes, AssertsRequestTypeAttribute)
+	attributes = append(attributes, AssertsRequestContextAttribute)
+	attributes = append(attributes, AssertsErrorTypeAttribute)
+	return attributes
 }
 
 func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []string) error {
@@ -175,7 +186,7 @@ func (p *metricHelper) buildLabels(namespace string, service string, span *ptrac
 
 	capturedResourceAttributes := make([]string, 0)
 	capturedSpanAttributes := make([]string, 0)
-	for _, labelName := range p.config.CaptureAttributesInMetric {
+	for _, labelName := range p.getAttributesAsLabels() {
 		value, present := span.Attributes().Get(labelName)
 		if !present {
 			value, present = resourceSpan.Resource().Attributes().Get(labelName)
@@ -298,7 +309,7 @@ func (p *metricHelper) onUpdate(newConfig *Config) error {
 	if err == nil {
 		currConfigCaptureAttributesInMetric := p.config.CaptureAttributesInMetric
 		// use new config
-		p.config.setCaptureAttributesInMetric(newConfig.CaptureAttributesInMetric)
+		p.config.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
 
 		// create new prometheus registry and register metrics
 		err = p.registerMetrics()
@@ -312,7 +323,7 @@ func (p *metricHelper) onUpdate(newConfig *Config) error {
 			)
 			// latency histogram registration failed, reverting to old config
 			// create new prometheus registry and register metrics again
-			p.config.setCaptureAttributesInMetric(currConfigCaptureAttributesInMetric)
+			p.config.CaptureAttributesInMetric = currConfigCaptureAttributesInMetric
 			_ = p.registerMetrics()
 		}
 

@@ -20,13 +20,6 @@ type Config struct {
 	TraceFlushFrequencySeconds     int                                            `mapstructure:"trace_flush_frequency_seconds" json:"trace_flush_frequency_seconds"`
 }
 
-func (config *Config) setCaptureAttributesInMetric(attributes []string) {
-	config.CaptureAttributesInMetric = attributes
-	config.CaptureAttributesInMetric = append(config.CaptureAttributesInMetric, AssertsRequestContextAttribute)
-	config.CaptureAttributesInMetric = append(config.CaptureAttributesInMetric, AssertsRequestTypeAttribute)
-	config.CaptureAttributesInMetric = append(config.CaptureAttributesInMetric, AssertsErrorTypeAttribute)
-}
-
 // Validate implements the component.ConfigValidator interface.
 // Checks for any invalid regexp
 func (config *Config) Validate() error {

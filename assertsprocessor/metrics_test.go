@@ -16,7 +16,7 @@ func TestRegisterMetrics(t *testing.T) {
 		Env:  "dev",
 		Site: "us-west-2",
 	}
-	c.setCaptureAttributesInMetric(attributes)
+	config.CaptureAttributesInMetric = attributes
 	p := newMetricHelper(
 		logger,
 		c,
@@ -33,10 +33,11 @@ func TestBuildLabels(t *testing.T) {
 	attributes := []string{"rpc.system", "rpc.service", "rpc.method",
 		"aws.table.name", "aws.queue.url", "host.name"}
 	c := &Config{
-		Env:  "dev",
-		Site: "us-west-2",
+		Env:                       "dev",
+		Site:                      "us-west-2",
+		CaptureAttributesInMetric: attributes,
 	}
-	c.setCaptureAttributesInMetric(attributes)
+	config.CaptureAttributesInMetric = attributes
 	p := newMetricHelper(
 		logger,
 		c,
@@ -84,7 +85,7 @@ func TestCaptureMetrics(t *testing.T) {
 		Site:            "us-west-2",
 		LimitPerService: 100,
 	}
-	c.setCaptureAttributesInMetric(attributes)
+	config.CaptureAttributesInMetric = attributes
 	p := newMetricHelper(
 		logger,
 		c,
@@ -130,7 +131,7 @@ func TestMetricCardinalityLimit(t *testing.T) {
 		Site:            "us-west-2",
 		LimitPerService: 2,
 	}
-	c.setCaptureAttributesInMetric([]string{})
+	config.CaptureAttributesInMetric = []string{}
 	p := newMetricHelper(
 		logger,
 		c,
