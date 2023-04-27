@@ -41,13 +41,11 @@ func buildEnrichmentProcessor(logger *zap.Logger, config *Config) (*spanEnrichme
 }
 
 func buildCompiledConfig(logger *zap.Logger, config *Config) (map[string]map[string][]*customAttributeConfigCompiled, error) {
-	compiledAttributes := map[string]map[string][]*customAttributeConfigCompiled{}
+	compiled := map[string]map[string][]*customAttributeConfigCompiled{}
 	for targetAtt, attrConfigsByServiceKey := range config.CustomAttributeConfigs {
-		compiledAttributes[targetAtt] = map[string][]*customAttributeConfigCompiled{}
+		compiled[targetAtt] = map[string][]*customAttributeConfigCompiled{}
 		for serviceKey, attrConfigs := range attrConfigsByServiceKey {
-			if compiledAttributes[targetAtt][serviceKey] == nil {
-				compiledAttributes[targetAtt][serviceKey] = make([]*customAttributeConfigCompiled, 0)
-			}
+			compiled[targetAtt][serviceKey] = make([]*customAttributeConfigCompiled, 0)
 			// Make one pass to ensure all configurations are valid
 			for _, attrConfig := range attrConfigs {
 				err := attrConfig.validate(targetAtt, serviceKey)
@@ -62,11 +60,11 @@ func buildCompiledConfig(logger *zap.Logger, config *Config) (map[string]map[str
 					zap.String("Source Attributes", "["+strings.Join(attrConfig.SourceAttributes, ", ")+"]"),
 					zap.String("Regex", attrConfig.RegExp),
 					zap.String("Replacement", attrConfig.Replacement))
-				compiledAttributes[targetAtt][serviceKey] = append(compiledAttributes[targetAtt][serviceKey], attrConfig.compile())
+				compiled[targetAtt][serviceKey] = append(compiled[targetAtt][serviceKey], attrConfig.compile())
 			}
 		}
 	}
-	return compiledAttributes, nil
+	return compiled, nil
 }
 
 // configListener interface implementation
@@ -104,14 +102,28 @@ func (ep *spanEnrichmentProcessorImpl) enrichSpan(namespace string, service stri
 	currentConfig := ep.customAttributes
 	ep.configRWMutex.RUnlock()
 	for targetAtt, configByServiceKey := range currentConfig {
-		if configByServiceKey[namespace+"#"+service] != nil {
-			for _, config := range configByServiceKey[namespace+"#"+service] {
-				config.addCustomAttribute(targetAtt, span)
+		serviceKey := getServiceKey(namespace, service)
+		customAttValue := ""
+		if configByServiceKey[serviceKey] != nil {
+			for _, config := range configByServiceKey[serviceKey] {
+				customAttValue = config.getCustomAttribute(span)
+				if customAttValue != "" {
+					break
+				}
 			}
-		} else {
+		}
+
+		if customAttValue == "" && configByServiceKey["default"] != nil {
 			for _, config := range configByServiceKey["default"] {
-				config.addCustomAttribute(targetAtt, span)
+				customAttValue = config.getCustomAttribute(span)
+				if customAttValue != "" {
+					break
+				}
 			}
+		}
+
+		if customAttValue != "" {
+			span.Attributes().PutStr(targetAtt, customAttValue)
 		}
 	}
 	// If request context is not added set the span name as request context

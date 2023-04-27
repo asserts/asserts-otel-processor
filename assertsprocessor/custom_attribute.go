@@ -21,12 +21,6 @@ func (cAC *CustomAttributeConfig) validate(targetAtt string, serviceKey string) 
 				"regex not specified for source_attributes: [%s], value_expr: %s", targetAtt, serviceKey,
 				strings.Join(cAC.SourceAttributes, "\", \""), cAC.Replacement),
 		}
-	} else if cAC.Replacement == "" {
-		return ValidationError{
-			message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s,"+
-				"value_expr not specified for source_attributes: [%s], regex: %s", targetAtt, serviceKey,
-				strings.Join(cAC.SourceAttributes, "\", \""), cAC.RegExp),
-		}
 	} else if len(cAC.SourceAttributes) == 0 {
 		return ValidationError{
 			message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s,"+
@@ -62,11 +56,16 @@ func (cAC *CustomAttributeConfig) compile() *customAttributeConfigCompiled {
 	if _spanKind == nil || len(_spanKind) == 0 {
 		_spanKind = append(_spanKind, "Server")
 	}
+	replacementString := cAC.Replacement
+	if replacementString == "" {
+		replacementString = "$1"
+	}
+
 	return &customAttributeConfigCompiled{
 		spanKinds:        _spanKind,
 		sourceAttributes: cAC.SourceAttributes,
 		regExp:           compiled,
-		replacement:      cAC.Replacement,
+		replacement:      replacementString,
 	}
 }
 
@@ -77,7 +76,7 @@ type customAttributeConfigCompiled struct {
 	replacement      string
 }
 
-func (cACC *customAttributeConfigCompiled) addCustomAttribute(targetAtt string, span *ptrace.Span) {
+func (cACC *customAttributeConfigCompiled) getCustomAttribute(span *ptrace.Span) string {
 	for _, _spanKind := range cACC.spanKinds {
 		if _spanKind == span.Kind().String() {
 			values := make([]string, 0)
@@ -85,15 +84,17 @@ func (cACC *customAttributeConfigCompiled) addCustomAttribute(targetAtt string, 
 				att, present := span.Attributes().Get(sourceAtt)
 				if present {
 					values = append(values, att.AsString())
-				} else {
-					return
 				}
 			}
-			joined := strings.Join(values, ";")
-			subMatch := cACC.regExp.FindStringSubmatch(joined)
-			if len(subMatch) >= 1 {
-				span.Attributes().PutStr(targetAtt, cACC.regExp.ReplaceAllString(joined, cACC.replacement))
+			// Match only when all the Source attributes are present
+			if len(values) == len(cACC.sourceAttributes) {
+				joined := strings.Join(values, ";")
+				subMatch := cACC.regExp.FindStringSubmatch(joined)
+				if len(subMatch) >= 1 {
+					return cACC.regExp.ReplaceAllString(joined, cACC.replacement)
+				}
 			}
 		}
 	}
+	return ""
 }

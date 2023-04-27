@@ -98,8 +98,6 @@ func TestCaptureMetrics(t *testing.T) {
 	testSpan.Attributes().PutStr(AssertsRequestTypeAttribute, "inbound")
 	testSpan.Attributes().PutStr(AssertsErrorTypeAttribute, "client_errors")
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
-	testSpan.Attributes().PutStr("rpc.system", "aws-api")
-	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
 	testSpan.Attributes().PutStr("rpc.method", "GetItem")
 	testSpan.Attributes().PutStr("aws.table.name", "ride-bookings")

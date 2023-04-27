@@ -18,6 +18,13 @@ func TestValidateValidConfig(t *testing.T) {
 		Replacement:      "$1:$2",
 	}
 	assert.Nil(t, attrConfig.validate("target", "namespace#service"))
+	compiled := attrConfig.compile()
+	assert.NotNil(t, compiled)
+	assert.NotNil(t, compiled.regExp)
+	assert.Equal(t, "$1:$2", compiled.replacement)
+	assert.Equal(t, 2, len(compiled.sourceAttributes))
+	assert.Equal(t, "attr1", compiled.sourceAttributes[0])
+	assert.Equal(t, "attr2", compiled.sourceAttributes[1])
 }
 
 func TestValidateInvalidConfig_Regexp_Missing(t *testing.T) {
@@ -45,7 +52,11 @@ func TestValidateInvalidConfig_Replacement_Missing(t *testing.T) {
 		RegExp:           "(.+);(.+)",
 	}
 	err := attrConfig.validate("target", "namespace#service")
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
+
+	compiledConfig := attrConfig.compile()
+	assert.NotNil(t, compiledConfig)
+	assert.Equal(t, "$1", compiledConfig.replacement)
 }
 
 func TestValidateInvalidConfig_Source_Missing(t *testing.T) {
@@ -186,9 +197,7 @@ func TestAddCustomAttribute_SpanDoesNotMatch(t *testing.T) {
 	span.Attributes().PutStr("attr1", "foo")
 	span.Attributes().PutStr("attr2", "bar")
 
-	attrConfig.addCustomAttribute("target", &span)
-	_, found := span.Attributes().Get("target")
-	assert.False(t, found)
+	assert.Equal(t, "", attrConfig.getCustomAttribute(&span))
 }
 
 func TestAddCustomAttribute_SpanMatches_RegexpDoesNotMatch(t *testing.T) {
@@ -208,9 +217,7 @@ func TestAddCustomAttribute_SpanMatches_RegexpDoesNotMatch(t *testing.T) {
 	span.Attributes().PutStr("attr1", "foo1")
 	span.Attributes().PutStr("attr2", "bar")
 
-	attrConfig.addCustomAttribute("target", &span)
-	_, found := span.Attributes().Get("target")
-	assert.False(t, found)
+	assert.Equal(t, "", attrConfig.getCustomAttribute(&span))
 }
 
 func TestAddCustomAttribute_SpanMatches_RegexpMatch(t *testing.T) {
@@ -230,8 +237,5 @@ func TestAddCustomAttribute_SpanMatches_RegexpMatch(t *testing.T) {
 	span.Attributes().PutStr("attr1", "foo")
 	span.Attributes().PutStr("attr2", "bar")
 
-	attrConfig.addCustomAttribute("target", &span)
-	att, found := span.Attributes().Get("target")
-	assert.True(t, found)
-	assert.Equal(t, "foo:bar", att.AsString())
+	assert.Equal(t, "foo:bar", attrConfig.getCustomAttribute(&span))
 }

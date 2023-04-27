@@ -38,25 +38,20 @@ processors:
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
             regex: "http://cart:8080(/cart)/anonymous-.*"
-            value_expr: "$$1"
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
             regex: "http://user:8080(/check)/anonymous-.*"
-            value_expr: "$$1"
         robot-shop#shipping:
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
             regex: "http://cart:8080(/shipping)/anonymous-.*"
-            value_expr: "$$1"
         default:
           - source_attributes: ["http.route"]
             regex: "(.+)"
             span_kinds: ["Server"]
-            value_expr: "$$1"
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
             regex: "https?://.+?((/[^/?]+){1,2}).*"
-            value_expr: "$$1"
     attributes_as_metric_labels:
       - "rpc.system"
       - "rpc.service"
