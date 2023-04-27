@@ -70,7 +70,7 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels["span_kind"] = "Client"
 	expectedLabels["aws_queue_url"] = ""
 
-	actualLabels := p.buildLabels("ride-services", "payment", "GetItem", &testSpan, &resourceSpans)
+	actualLabels := p.buildLabels("ride-services", "payment", &testSpan, &resourceSpans)
 	assert.Equal(t, expectedLabels, actualLabels)
 }
 

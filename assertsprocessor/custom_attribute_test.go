@@ -150,6 +150,13 @@ func TestUnmarshalFromYAMLComplex(t *testing.T) {
 
 	// Print out the new struct
 	assert.NotNil(t, configs)
+	for targetAtt, byKey := range configs {
+		for serviceKey, attrConfigs := range byKey {
+			for _, attrConfig := range attrConfigs {
+				assert.Nil(t, attrConfig.validate(targetAtt, serviceKey))
+			}
+		}
+	}
 }
 
 func TestValidateInvalidConfig_InvalidSourceAttribute(t *testing.T) {
