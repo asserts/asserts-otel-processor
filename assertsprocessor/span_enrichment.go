@@ -4,6 +4,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -27,7 +28,7 @@ type spanEnrichmentProcessorImpl struct {
 }
 
 func buildEnrichmentProcessor(logger *zap.Logger, config *Config) (*spanEnrichmentProcessorImpl, error) {
-	compiledAttributes, err := buildCompiledConfig(config)
+	compiledAttributes, err := buildCompiledConfig(logger, config)
 	if err == nil {
 		processor := spanEnrichmentProcessorImpl{
 			logger:           logger,
@@ -39,7 +40,7 @@ func buildEnrichmentProcessor(logger *zap.Logger, config *Config) (*spanEnrichme
 	}
 }
 
-func buildCompiledConfig(config *Config) (map[string]map[string][]*customAttributeConfigCompiled, error) {
+func buildCompiledConfig(logger *zap.Logger, config *Config) (map[string]map[string][]*customAttributeConfigCompiled, error) {
 	compiledAttributes := map[string]map[string][]*customAttributeConfigCompiled{}
 	for targetAtt, attrConfigsByServiceKey := range config.CustomAttributeConfigs {
 		compiledAttributes[targetAtt] = map[string][]*customAttributeConfigCompiled{}
@@ -47,13 +48,21 @@ func buildCompiledConfig(config *Config) (map[string]map[string][]*customAttribu
 			if compiledAttributes[targetAtt][serviceKey] == nil {
 				compiledAttributes[targetAtt][serviceKey] = make([]*customAttributeConfigCompiled, 0)
 			}
+			// Make one pass to ensure all configurations are valid
 			for _, attrConfig := range attrConfigs {
 				err := attrConfig.validate(targetAtt, serviceKey)
-				if err == nil {
-					compiledAttributes[targetAtt][serviceKey] = append(compiledAttributes[targetAtt][serviceKey], attrConfig.compile())
-				} else {
+				if err != nil {
 					return nil, err
 				}
+			}
+			for _, attrConfig := range attrConfigs {
+				logger.Debug("Added custom attribute for ",
+					zap.String("TargetAttribute", targetAtt),
+					zap.String("Service Key", serviceKey),
+					zap.String("Source Attributes", "["+strings.Join(attrConfig.SourceAttributes, ", ")+"]"),
+					zap.String("Regex", attrConfig.RegExp),
+					zap.String("Replacement", attrConfig.Replacement))
+				compiledAttributes[targetAtt][serviceKey] = append(compiledAttributes[targetAtt][serviceKey], attrConfig.compile())
 			}
 		}
 	}
@@ -75,7 +84,7 @@ func (ep *spanEnrichmentProcessorImpl) isUpdated(currConfig *Config, newConfig *
 }
 
 func (ep *spanEnrichmentProcessorImpl) onUpdate(newConfig *Config) error {
-	newAttributes, err := buildCompiledConfig(newConfig)
+	newAttributes, err := buildCompiledConfig(ep.logger, newConfig)
 	if err == nil {
 		ep.logger.Info("Updated config RequestContextExps",
 			zap.Any("New", newConfig.CustomAttributeConfigs),
