@@ -59,7 +59,7 @@ func TestValidateInvalidConfig_Source_Missing(t *testing.T) {
 
 func TestUnmarshalFromJSON(t *testing.T) {
 	attrConfig := &CustomAttributeConfig{}
-	err := json.Unmarshal([]byte(`{"replacement": "server_errors",
+	err := json.Unmarshal([]byte(`{"value_expr": "server_errors",
             "regex": "5..",
             "source_attributes": ["http.status_code"],
             "span_kinds": ["Client", "Server"]}`), attrConfig)
@@ -78,7 +78,7 @@ func TestUnmarshalFromYAMLSimple(t *testing.T) {
 	var bytes = []byte(`source_attributes: ["http.url"]
 span_kinds: ["Server"]
 regex: "http://user:8080(/check)/anonymous-.*"
-replacement: "$1"`)
+value_expr: "$1"`)
 	// Unmarshal our input YAML file into empty interface
 	if err := yaml.Unmarshal(bytes, &raw); err != nil {
 		log.Fatal(err)
@@ -104,11 +104,11 @@ func TestUnmarshalFromYAMLComplex(t *testing.T) {
 	var raw interface{}
 	var bytes = []byte(`"asserts.error.type":
   "default":
-    - replacement: client_errors
+    - value_expr: client_errors
       regex: 4..
       source_attributes: ["http.status_code"]
       span_kinds: ["Client", "Server"]
-    - replacement: server_errors
+    - value_expr: server_errors
       regex: 5..
       source_attributes: ["http.status_code"]
       span_kinds: ["Client", "Server"]
@@ -117,25 +117,25 @@ func TestUnmarshalFromYAMLComplex(t *testing.T) {
     - source_attributes: ["http.url"]
       span_kinds: ["Server"]
       regex: "http://cart:8080(/cart)/anonymous-.*"
-      replacement: "$1"
+      value_expr: "$1"
     - source_attributes: ["http.url"]
       span_kinds: ["Server"]
       regex: "http://user:8080(/check)/anonymous-.*"
-      replacement: "$1"
+      value_expr: "$1"
   robot-shop#shipping:
     - source_attributes: ["http.url"]
       span_kinds: ["Server"]
       regex: "http://cart:8080(/shipping)/anonymous-.*"
-      replacement: "$1"
+      value_expr: "$1"
   default:
     - source_attributes: ["http.route"]
       regex: "(.+)"
       span_kinds: ["Server"]
-      replacement: "$1"
+      value_expr: "$1"
     - source_attributes: ["http.url"]
       span_kinds: ["Server"]
       regex: "https?://.+?((/[^/?]+){1,2}).*"
-      replacement: "$1"`)
+      value_expr: "$1"`)
 
 	// Unmarshal our input YAML file into empty interface
 	if err := yaml.Unmarshal(bytes, &raw); err != nil {

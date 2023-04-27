@@ -11,26 +11,26 @@ type CustomAttributeConfig struct {
 	SpanKinds        []string `mapstructure:"span_kinds" json:"span_kinds"`
 	SourceAttributes []string `mapstructure:"source_attributes" json:"source_attributes"`
 	RegExp           string   `mapstructure:"regex" json:"regex"`
-	Replacement      string   `mapstructure:"replacement" json:"replacement"`
+	Replacement      string   `mapstructure:"value_expr" json:"value_expr"`
 }
 
 func (cAC *CustomAttributeConfig) validate(targetAtt string, serviceKey string) error {
 	if cAC.RegExp == "" {
 		return ValidationError{
 			message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s,"+
-				"regex not specified for source_attributes: [%s], replacement: %s", targetAtt, serviceKey,
+				"regex not specified for source_attributes: [%s], value_expr: %s", targetAtt, serviceKey,
 				strings.Join(cAC.SourceAttributes, "\", \""), cAC.Replacement),
 		}
 	} else if cAC.Replacement == "" {
 		return ValidationError{
 			message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s,"+
-				"replacement not specified for source_attributes: [%s], regex: %s", targetAtt, serviceKey,
+				"value_expr not specified for source_attributes: [%s], regex: %s", targetAtt, serviceKey,
 				strings.Join(cAC.SourceAttributes, "\", \""), cAC.RegExp),
 		}
 	} else if len(cAC.SourceAttributes) == 0 {
 		return ValidationError{
 			message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s,"+
-				"source_attributes not specified for regex: %s, replacement: %s", targetAtt, serviceKey,
+				"source_attributes not specified for regex: %s, value_expr: %s", targetAtt, serviceKey,
 				cAC.RegExp, cAC.Replacement),
 		}
 	} else {
@@ -38,7 +38,7 @@ func (cAC *CustomAttributeConfig) validate(targetAtt string, serviceKey string) 
 			if value == "" {
 				return ValidationError{
 					message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s,"+
-						"empty attribute in source_attributes: [%s], regex: %s, replacement: %s", targetAtt, serviceKey,
+						"empty attribute in source_attributes: [%s], regex: %s, value_expr: %s", targetAtt, serviceKey,
 						strings.Join(cAC.SourceAttributes, "\", \""), cAC.RegExp, cAC.Replacement),
 				}
 			}
@@ -48,7 +48,7 @@ func (cAC *CustomAttributeConfig) validate(targetAtt string, serviceKey string) 
 	if err != nil {
 		return ValidationError{
 			message: fmt.Sprintf("Invalid custom attribute config for target attribute: %s. and service key: %s, "+
-				"Invalid regex in source_attributes: [%s] regex: %s, replacement: %s: ", targetAtt, serviceKey,
+				"Invalid regex in source_attributes: [%s] regex: %s, value_expr: %s: ", targetAtt, serviceKey,
 				strings.Join(cAC.SourceAttributes, "\", \""), cAC.RegExp, cAC.Replacement),
 			error: err,
 		}
