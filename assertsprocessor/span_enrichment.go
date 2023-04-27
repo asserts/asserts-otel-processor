@@ -3,7 +3,8 @@ package assertsprocessor
 import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
-	"regexp"
+	"reflect"
+	"sync"
 )
 
 const (
@@ -15,67 +16,95 @@ const (
 	AssertsRequestTypeInternal     = "internal"
 )
 
-type ErrorTypeConfig struct {
-	ValueExpr string `mapstructure:"value_match_regex"`
-	ErrorType string `mapstructure:"error_type"`
-}
-
-func (eTC *ErrorTypeConfig) compile() (*errorTypeCompiledConfig, error) {
-	compile, err := regexp.Compile(eTC.ValueExpr)
-	if err != nil {
-		return nil, err
-	} else {
-		e := &errorTypeCompiledConfig{
-			errorType:    eTC.ErrorType,
-			valueMatcher: compile,
-		}
-		return e, nil
-	}
-}
-
-type errorTypeCompiledConfig struct {
-	valueMatcher *regexp.Regexp
-	errorType    string
-}
-
 type spanEnrichmentProcessor interface {
 	enrichSpan(namespace string, service string, span *ptrace.Span)
 }
 
 type spanEnrichmentProcessorImpl struct {
 	logger           *zap.Logger
-	errorTypeConfigs map[string][]*errorTypeCompiledConfig
-	requestBuilder   requestContextBuilder
+	customAttributes map[string]map[string][]*customAttributeConfigCompiled
+	configRWMutex    sync.RWMutex
 }
 
-func buildEnrichmentProcessor(logger *zap.Logger, config *Config, requestBuilder requestContextBuilder) *spanEnrichmentProcessorImpl {
-	processor := spanEnrichmentProcessorImpl{
-		logger:           logger,
-		errorTypeConfigs: map[string][]*errorTypeCompiledConfig{},
-		requestBuilder:   requestBuilder,
+func buildEnrichmentProcessor(logger *zap.Logger, config *Config) (*spanEnrichmentProcessorImpl, error) {
+	compiledAttributes, err := buildCompiledConfig(config)
+	if err == nil {
+		processor := spanEnrichmentProcessorImpl{
+			logger:           logger,
+			customAttributes: compiledAttributes,
+		}
+		return &processor, err
+	} else {
+		return nil, err
 	}
-	for attrName, errorConfigs := range config.ErrorTypeConfigs {
-		logger.Debug("Compiling error type configs for", zap.String("attribute", attrName))
-		processor.errorTypeConfigs[attrName] = make([]*errorTypeCompiledConfig, 0)
-		for _, errorConfig := range errorConfigs {
-			compile, _ := regexp.Compile(errorConfig.ValueExpr)
-			processor.errorTypeConfigs[attrName] = append(processor.errorTypeConfigs[attrName],
-				&errorTypeCompiledConfig{
-					errorType:    errorConfig.ErrorType,
-					valueMatcher: compile,
-				})
-			logger.Debug("Compiled and added error type config",
-				zap.String("error type", errorConfig.ErrorType),
-				zap.String("attr value regexp", errorConfig.ValueExpr))
+}
+
+func buildCompiledConfig(config *Config) (map[string]map[string][]*customAttributeConfigCompiled, error) {
+	compiledAttributes := map[string]map[string][]*customAttributeConfigCompiled{}
+	for targetAtt, attrConfigsByServiceKey := range config.CustomAttributeConfigs {
+		compiledAttributes[targetAtt] = map[string][]*customAttributeConfigCompiled{}
+		for serviceKey, attrConfigs := range attrConfigsByServiceKey {
+			if compiledAttributes[targetAtt][serviceKey] == nil {
+				compiledAttributes[targetAtt][serviceKey] = make([]*customAttributeConfigCompiled, 0)
+			}
+			for _, attrConfig := range attrConfigs {
+				err := attrConfig.validate(targetAtt, serviceKey)
+				if err == nil {
+					compiledAttributes[targetAtt][serviceKey] = append(compiledAttributes[targetAtt][serviceKey], attrConfig.compile())
+				} else {
+					return nil, err
+				}
+			}
 		}
 	}
-	return &processor
+	return compiledAttributes, nil
+}
+
+// configListener interface implementation
+func (ep *spanEnrichmentProcessorImpl) isUpdated(currConfig *Config, newConfig *Config) bool {
+	updated := !reflect.DeepEqual(currConfig.CustomAttributeConfigs, newConfig.CustomAttributeConfigs)
+	if updated {
+		ep.logger.Info("Change detected in config CustomAttributeConfigs",
+			zap.Any("Current", currConfig.CustomAttributeConfigs),
+			zap.Any("New", newConfig.CustomAttributeConfigs),
+		)
+	} else {
+		ep.logger.Debug("No change detected in config CustomAttributeConfigs")
+	}
+	return updated
+}
+
+func (ep *spanEnrichmentProcessorImpl) onUpdate(newConfig *Config) error {
+	newAttributes, err := buildCompiledConfig(newConfig)
+	if err == nil {
+		ep.logger.Info("Updated config RequestContextExps",
+			zap.Any("New", newConfig.CustomAttributeConfigs),
+		)
+		ep.configRWMutex.Lock()
+		ep.customAttributes = newAttributes
+		ep.configRWMutex.Unlock()
+	} else {
+		ep.logger.Error("Ignoring config RequestContextExps due to regex compilation error", zap.Error(err))
+	}
+	return err
 }
 
 func (ep *spanEnrichmentProcessorImpl) enrichSpan(namespace string, service string, span *ptrace.Span) {
 	ep.addRequestType(span)
-	ep.addRequestContext(namespace, service, span)
-	ep.addErrorType(span)
+	ep.configRWMutex.RLock()
+	currentConfig := ep.customAttributes
+	ep.configRWMutex.RUnlock()
+	for targetAtt, configByServiceKey := range currentConfig {
+		if configByServiceKey[namespace+"#"+service] != nil {
+			for _, config := range configByServiceKey[namespace+"#"+service] {
+				config.addCustomAttribute(targetAtt, span)
+			}
+		} else {
+			for _, config := range configByServiceKey["default"] {
+				config.addCustomAttribute(targetAtt, span)
+			}
+		}
+	}
 }
 
 func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {
@@ -87,29 +116,5 @@ func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {
 		span.Attributes().PutStr(AssertsRequestTypeAttribute, AssertsRequestTypeInbound)
 	} else if kind == ptrace.SpanKindInternal {
 		span.Attributes().PutStr(AssertsRequestTypeAttribute, AssertsRequestTypeInternal)
-	}
-}
-
-func (ep *spanEnrichmentProcessorImpl) addRequestContext(namespace string, service string, span *ptrace.Span) {
-	request := ep.requestBuilder.getRequest(span, namespace+"#"+service)
-	span.Attributes().PutStr(AssertsRequestContextAttribute, request)
-}
-
-func (ep *spanEnrichmentProcessorImpl) addErrorType(span *ptrace.Span) {
-	for attrName, errorConfigs := range ep.errorTypeConfigs {
-		value, present := span.Attributes().Get(attrName)
-		if present {
-			stringValue := value.AsString()
-			for _, errorConfig := range errorConfigs {
-				if errorConfig.valueMatcher.MatchString(stringValue) {
-					span.Attributes().PutStr(AssertsErrorTypeAttribute, errorConfig.errorType)
-					ep.logger.Debug("Added error type",
-						zap.String("span id", span.SpanID().String()),
-						zap.String(attrName, stringValue),
-						zap.String("error type", errorConfig.errorType))
-					return
-				}
-			}
-		}
 	}
 }

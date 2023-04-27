@@ -59,7 +59,6 @@ func newMetricHelper(logger *zap.Logger, config *Config) *metricHelper {
 func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds float64) {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
-
 	p.latencyHistogram.With(labels).Observe(latencySeconds)
 }
 
@@ -101,7 +100,7 @@ func (p *metricHelper) registerMetrics() error {
 }
 
 func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []string) error {
-	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestTypeLabel, requestContextLabel, errorTypeLabel, spanKind}
+	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, spanKind}
 
 	if captureAttributesInMetric != nil {
 		for _, label := range captureAttributesInMetric {
@@ -181,6 +180,11 @@ func (p *metricHelper) buildLabels(namespace string, service string, requestCont
 
 	capturedResourceAttributes := make([]string, 0)
 	capturedSpanAttributes := make([]string, 0)
+	attributes := make([]string, 0)
+	attributes = append(attributes, AssertsRequestTypeAttribute)
+	attributes = append(attributes, AssertsRequestContextAttribute)
+	attributes = append(attributes, AssertsErrorTypeAttribute)
+
 	for _, labelName := range p.config.CaptureAttributesInMetric {
 		value, present := span.Attributes().Get(labelName)
 		if !present {
@@ -304,7 +308,7 @@ func (p *metricHelper) onUpdate(newConfig *Config) error {
 	if err == nil {
 		currConfigCaptureAttributesInMetric := p.config.CaptureAttributesInMetric
 		// use new config
-		p.config.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
+		p.config.setCaptureAttributesInMetric(newConfig.CaptureAttributesInMetric)
 
 		// create new prometheus registry and register metrics
 		err = p.registerMetrics()
@@ -318,7 +322,7 @@ func (p *metricHelper) onUpdate(newConfig *Config) error {
 			)
 			// latency histogram registration failed, reverting to old config
 			// create new prometheus registry and register metrics again
-			p.config.CaptureAttributesInMetric = currConfigCaptureAttributesInMetric
+			p.config.setCaptureAttributesInMetric(currConfigCaptureAttributesInMetric)
 			_ = p.registerMetrics()
 		}
 

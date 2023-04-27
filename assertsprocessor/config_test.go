@@ -8,20 +8,15 @@ import (
 
 func TestValidateNoError(t *testing.T) {
 	dto := Config{
-		RequestContextExps: map[string][]*MatcherDto{
-			"default": {
-				{
-					AttrName: "attribute",
-					SpanKind: "Client",
-					Regex:    ".+",
-				},
-			},
-		},
-		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
-			"http.status_code": {
-				&ErrorTypeConfig{
-					ValueExpr: "4..",
-					ErrorType: "client_errors",
+		CustomAttributeConfigs: map[string]map[string][]*CustomAttributeConfig{
+			"asserts.request.context": {
+				"default": {
+					{
+						SourceAttributes: []string{"attribute"},
+						SpanKinds:        []string{"Client"},
+						RegExp:           "(.+)",
+						Replacement:      "$1",
+					},
 				},
 			},
 		},
@@ -30,62 +25,17 @@ func TestValidateNoError(t *testing.T) {
 	assert.Nil(t, err)
 }
 
-func TestValidateRequestExpError(t *testing.T) {
-	dto := Config{
-		RequestContextExps: map[string][]*MatcherDto{
-			"default": {
-				{
-					AttrName: "attribute",
-					SpanKind: "Client",
-					Regex:    "+",
-				},
-			},
-		},
-		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
-			"http.status_code": {
-				&ErrorTypeConfig{
-					ValueExpr: "4..",
-					ErrorType: "client_errors",
-				},
-			},
-		},
-	}
-	err := dto.Validate()
-	assert.NotNil(t, err)
-}
-
-func TestValidateErrorTypeConfigError(t *testing.T) {
-	dto := Config{
-		RequestContextExps: map[string][]*MatcherDto{
-			"default": {
-				{
-					AttrName: "attribute",
-					SpanKind: "Client",
-					Regex:    ".+",
-				},
-			},
-		},
-		ErrorTypeConfigs: map[string][]*ErrorTypeConfig{
-			"http.status_code": {
-				&ErrorTypeConfig{
-					ValueExpr: "+",
-					ErrorType: "client_errors",
-				},
-			},
-		},
-	}
-	err := dto.Validate()
-	assert.NotNil(t, err)
-}
-
 func TestValidateLimits(t *testing.T) {
 	dto := Config{
-		RequestContextExps: map[string][]*MatcherDto{
-			"default": {
-				{
-					AttrName: "attribute",
-					SpanKind: "Client",
-					Regex:    ".+",
+		CustomAttributeConfigs: map[string]map[string][]*CustomAttributeConfig{
+			"asserts.request.context": {
+				"default": {
+					{
+						SourceAttributes: []string{"attribute"},
+						SpanKinds:        []string{"Client"},
+						RegExp:           "(.+)",
+						Replacement:      "$1",
+					},
 				},
 			},
 		},

@@ -29,12 +29,37 @@ func TestFetchConfig(t *testing.T) {
 
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
-			"capture_metrics": true,
-			"request_context_regex": {"default":[{"attr_name":"attribute1","regex":"(Foo).+","replacement":"$1"}]},
-			"attributes_as_metric_labels": ["rpc.system", "rpc.service"],
-			"sampling_latency_threshold_seconds": 0.51,
-			"unknown": "foo"
-		}`),
+      "capture_metrics": true,
+      "custom_attributes": {
+        "asserts.request.context": {
+          "asserts#api-server": [
+            {
+              "source_attributes": [
+                "attr1",
+                "attr2"
+              ],
+              "regexp": "(.+?);(.+)",
+              "replacement": "$1:$2"
+            }
+          ],
+          "default": [
+            {
+              "source_attributes": [
+                "attr1"
+              ],
+              "regexp": "(.+)",
+              "replacement": "$1"
+            }
+          ]
+        }
+      },
+      "attributes_as_metric_labels": [
+        "rpc.system",
+        "rpc.service"
+      ],
+      "sampling_latency_threshold_seconds": 0.51,
+      "unknown": "foo"
+    }`),
 		expectedErr: nil,
 	}
 	config, err := cr.fetchConfig(mockClient)
@@ -45,12 +70,11 @@ func TestFetchConfig(t *testing.T) {
 
 	assert.NotNil(t, config)
 	assert.True(t, config.CaptureMetrics)
-	assert.NotNil(t, config.RequestContextExps)
-	assert.Equal(t, 1, len(config.RequestContextExps))
-	assert.Equal(t, 1, len(config.RequestContextExps["default"]))
-	assert.Equal(t, "attribute1", config.RequestContextExps["default"][0].AttrName)
-	assert.Equal(t, "(Foo).+", config.RequestContextExps["default"][0].Regex)
-	assert.Equal(t, "$1", config.RequestContextExps["default"][0].Replacement)
+	assert.NotNil(t, config.CustomAttributeConfigs)
+	assert.Equal(t, 1, len(config.CustomAttributeConfigs))
+	assert.Equal(t, 2, len(config.CustomAttributeConfigs["asserts.request.context"]))
+	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["default"]))
+	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["asserts#api-server"]))
 	assert.NotNil(t, config.CaptureAttributesInMetric)
 	assert.Equal(t, 2, len(config.CaptureAttributesInMetric))
 	assert.Equal(t, "rpc.system", config.CaptureAttributesInMetric[0])
