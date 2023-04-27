@@ -6,6 +6,14 @@ import (
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 )
 
+func getServiceKey(namespace string, service string) string {
+	if namespace != "" {
+		return namespace + "#" + service
+	} else {
+		return service
+	}
+}
+
 func buildEntityKey(config *Config, namespace string, service string) EntityKeyDto {
 	return EntityKeyDto{
 		Type: "Service",

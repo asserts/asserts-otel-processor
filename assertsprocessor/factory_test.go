@@ -116,11 +116,37 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
-			"capture_metrics": true,
-			"request_context_regex": {"default":[{"attr_name":"attribute1","regex":"+","replacement":"$1"}]},
-			"attributes_as_metric_labels": ["rpc.system", "rpc.service"],
-			"sampling_latency_threshold_seconds": 0.51
-		}`),
+      "capture_metrics": true,
+      "custom_attributes": {
+        "asserts.request.context": {
+          "asserts#api-server": [
+            {
+              "source_attributes": [
+                "attr1",
+                "attr2"
+              ],
+              "regex": "(.+?);(.+)",
+              "replacement": "$1:$2"
+            }
+          ],
+          "default": [
+            {
+              "source_attributes": [
+                "attr1"
+              ],
+              "regex": "+",
+              "replacement": "$1"
+            }
+          ]
+        }
+      },
+      "attributes_as_metric_labels": [
+        "rpc.system",
+        "rpc.service"
+      ],
+      "sampling_latency_threshold_seconds": 0.51,
+      "unknown": "foo"
+    }`),
 		expectedErr: nil,
 	}
 	restClientFactory = func(logger *zap.Logger, pConfig *Config) restClient {
@@ -128,7 +154,7 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 	}
 
 	assert.False(t, config.CaptureMetrics)
-	assert.Nil(t, config.RequestContextExps)
+	assert.Nil(t, config.CustomAttributeConfigs)
 	assert.Nil(t, config.CaptureAttributesInMetric)
 	assert.Equal(t, 0.5, config.DefaultLatencyThreshold)
 
@@ -146,12 +172,13 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 	assert.Nil(t, mockClient.expectedPayload)
 
 	assert.True(t, config.CaptureMetrics)
-	assert.NotNil(t, config.RequestContextExps)
-	assert.Equal(t, 1, len(config.RequestContextExps))
-	assert.Equal(t, 1, len(config.RequestContextExps["default"]))
-	assert.Equal(t, "attribute1", config.RequestContextExps["default"][0].AttrName)
-	assert.Equal(t, "+", config.RequestContextExps["default"][0].Regex)
-	assert.Equal(t, "$1", config.RequestContextExps["default"][0].Replacement)
+	assert.NotNil(t, config)
+	assert.True(t, config.CaptureMetrics)
+	assert.NotNil(t, config.CustomAttributeConfigs)
+	assert.Equal(t, 1, len(config.CustomAttributeConfigs))
+	assert.Equal(t, 2, len(config.CustomAttributeConfigs["asserts.request.context"]))
+	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["default"]))
+	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["asserts#api-server"]))
 	assert.NotNil(t, config.CaptureAttributesInMetric)
 	assert.Equal(t, 2, len(config.CaptureAttributesInMetric))
 	assert.Equal(t, "rpc.system", config.CaptureAttributesInMetric[0])

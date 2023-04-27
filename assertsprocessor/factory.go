@@ -68,20 +68,15 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		// If config is fetched successfully from api server then for the following
 		// attributes it takes precedence over the local collector config
 		pConfig.CaptureMetrics = newConfig.CaptureMetrics
-		pConfig.RequestContextExps = newConfig.RequestContextExps
 		pConfig.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
 		pConfig.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
+		pConfig.CustomAttributeConfigs = newConfig.CustomAttributeConfigs
 	}
 
-	requestBuilder := &requestContextBuilderImpl{
-		logger: logger,
-	}
-	err := requestBuilder.compileRequestContextRegexps(pConfig)
+	_spanEnrichmentProcessor, err := buildEnrichmentProcessor(logger, pConfig)
 	if err != nil {
 		return nil, err
 	}
-
-	_spanEnrichmentProcessor := buildEnrichmentProcessor(logger, pConfig, requestBuilder)
 
 	thresholdsHelper := thresholdHelper{
 		config:              pConfig,
@@ -121,7 +116,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	}
 
 	listeners := make([]configListener, 0)
-	listeners = append(listeners, requestBuilder)
+	listeners = append(listeners, _spanEnrichmentProcessor)
 	listeners = append(listeners, &thresholdsHelper)
 	listeners = append(listeners, metricsHelper)
 	listeners = append(listeners, p)

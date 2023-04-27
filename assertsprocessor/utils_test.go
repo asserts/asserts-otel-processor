@@ -9,6 +9,11 @@ import (
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 )
 
+func TestGetServiceKey(t *testing.T) {
+	assert.Equal(t, "service", getServiceKey("", "service"))
+	assert.Equal(t, "namespace#service", getServiceKey("namespace", "service"))
+}
+
 func TestBuildEntityKey(t *testing.T) {
 	assert.Equal(t, EntityKeyDto{
 		Type: "Service", Name: "payment-service",

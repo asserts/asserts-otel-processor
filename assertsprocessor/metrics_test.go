@@ -10,14 +10,16 @@ import (
 
 func TestRegisterMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
+	attributes := []string{"rpc.system", "rpc.service", "rpc.method",
+		"aws.table.name", "aws.queue.url", "host.name"}
+	c := &Config{
+		Env:  "dev",
+		Site: "us-west-2",
+	}
+	config.CaptureAttributesInMetric = attributes
 	p := newMetricHelper(
 		logger,
-		&Config{
-			Env:  "dev",
-			Site: "us-west-2",
-			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
-				"aws.table.name", "aws.queue.url", "host.name"},
-		},
+		c,
 	)
 	assert.Nil(t, p.registerMetrics())
 	assert.NotNil(t, p.prometheusRegistry)
@@ -28,14 +30,17 @@ func TestRegisterMetrics(t *testing.T) {
 
 func TestBuildLabels(t *testing.T) {
 	logger, _ := zap.NewProduction()
+	attributes := []string{"rpc.system", "rpc.service", "rpc.method",
+		"aws.table.name", "aws.queue.url", "host.name"}
+	c := &Config{
+		Env:                       "dev",
+		Site:                      "us-west-2",
+		CaptureAttributesInMetric: attributes,
+	}
+	config.CaptureAttributesInMetric = attributes
 	p := newMetricHelper(
 		logger,
-		&Config{
-			Env:  "dev",
-			Site: "us-west-2",
-			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
-				"aws.table.name", "aws.queue.url", "host.name"},
-		},
+		c,
 	)
 
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
@@ -66,28 +71,33 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels["span_kind"] = "Client"
 	expectedLabels["aws_queue_url"] = ""
 
-	actualLabels := p.buildLabels("ride-services", "payment", "GetItem", &testSpan, &resourceSpans)
+	actualLabels := p.buildLabels("ride-services", "payment", &testSpan, &resourceSpans)
 	assert.Equal(t, expectedLabels, actualLabels)
 }
 
 func TestCaptureMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
 
+	attributes := []string{"rpc.system", "rpc.service", "rpc.method",
+		"aws.table.name", "aws.queue.url", "host.name"}
+	c := &Config{
+		Env:             "dev",
+		Site:            "us-west-2",
+		LimitPerService: 100,
+	}
+	config.CaptureAttributesInMetric = attributes
 	p := newMetricHelper(
 		logger,
-		&Config{
-			Env:  "dev",
-			Site: "us-west-2",
-			CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method",
-				"aws.table.name", "aws.queue.url", "host.name"},
-			LimitPerService: 100,
-		},
+		c,
 	)
 	err := p.registerMetrics()
 	assert.Nil(t, err)
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
 	testSpan := ptrace.NewSpan()
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/request")
+	testSpan.Attributes().PutStr(AssertsRequestTypeAttribute, "inbound")
+	testSpan.Attributes().PutStr(AssertsErrorTypeAttribute, "client_errors")
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
 	testSpan.Attributes().PutStr("rpc.service", "DynamoDb")
 	testSpan.Attributes().PutStr("rpc.method", "GetItem")
@@ -116,13 +126,15 @@ func TestCaptureMetrics(t *testing.T) {
 func TestMetricCardinalityLimit(t *testing.T) {
 	logger, _ := zap.NewProduction()
 
+	c := &Config{
+		Env:             "dev",
+		Site:            "us-west-2",
+		LimitPerService: 2,
+	}
+	config.CaptureAttributesInMetric = []string{}
 	p := newMetricHelper(
 		logger,
-		&Config{
-			Env:             "dev",
-			Site:            "us-west-2",
-			LimitPerService: 2,
-		},
+		c,
 	)
 	_ = p.registerMetrics()
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()

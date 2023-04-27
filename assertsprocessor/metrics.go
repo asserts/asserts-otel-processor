@@ -59,7 +59,6 @@ func newMetricHelper(logger *zap.Logger, config *Config) *metricHelper {
 func (p *metricHelper) recordLatency(labels prometheus.Labels, latencySeconds float64) {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
-
 	p.latencyHistogram.With(labels).Observe(latencySeconds)
 }
 
@@ -97,11 +96,22 @@ func (p *metricHelper) registerMetrics() error {
 		return err
 	}
 
-	return p.registerLatencyHistogram(p.config.CaptureAttributesInMetric)
+	return p.registerLatencyHistogram(p.getAttributesAsLabels())
+}
+
+func (p *metricHelper) getAttributesAsLabels() []string {
+	attributes := make([]string, 0)
+	for _, att := range p.config.CaptureAttributesInMetric {
+		attributes = append(attributes, att)
+	}
+	attributes = append(attributes, AssertsRequestTypeAttribute)
+	attributes = append(attributes, AssertsRequestContextAttribute)
+	attributes = append(attributes, AssertsErrorTypeAttribute)
+	return attributes
 }
 
 func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []string) error {
-	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, requestTypeLabel, requestContextLabel, errorTypeLabel, spanKind}
+	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, spanKind}
 
 	if captureAttributesInMetric != nil {
 		for _, label := range captureAttributesInMetric {
@@ -127,9 +137,9 @@ func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []stri
 
 func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span,
 	resourceSpan *ptrace.ResourceSpans) {
-	serviceKey := namespace + "#" + service
+	serviceKey := getServiceKey(namespace, service)
 	attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
-	requestContext := attrValue.Str()
+	requestContext := attrValue.AsString()
 
 	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {
 		cache := ttlcache.New[string, string](
@@ -150,7 +160,7 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 				zap.String("request context", requestContext),
 			)
 		}
-		labels := p.buildLabels(namespace, service, requestContext, span, resourceSpan)
+		labels := p.buildLabels(namespace, service, span, resourceSpan)
 		latencySeconds := computeLatency(span)
 		p.recordLatency(labels, latencySeconds)
 	} else {
@@ -161,27 +171,22 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	}
 }
 
-func (p *metricHelper) buildLabels(namespace string, service string, requestContext string, span *ptrace.Span,
+func (p *metricHelper) buildLabels(namespace string, service string, span *ptrace.Span,
 	resourceSpan *ptrace.ResourceSpans) prometheus.Labels {
 
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
-	requestTypeAtt, _ := span.Attributes().Get(AssertsRequestTypeAttribute)
-	errorTypeAtt, _ := span.Attributes().Get(AssertsErrorTypeAttribute)
 	labels := prometheus.Labels{
-		envLabel:            p.config.Env,
-		siteLabel:           p.config.Site,
-		namespaceLabel:      namespace,
-		serviceLabel:        service,
-		requestContextLabel: requestContext,
-		requestTypeLabel:    requestTypeAtt.Str(),
-		errorTypeLabel:      errorTypeAtt.Str(),
+		envLabel:       p.config.Env,
+		siteLabel:      p.config.Site,
+		namespaceLabel: namespace,
+		serviceLabel:   service,
 	}
 
 	capturedResourceAttributes := make([]string, 0)
 	capturedSpanAttributes := make([]string, 0)
-	for _, labelName := range p.config.CaptureAttributesInMetric {
+	for _, labelName := range p.getAttributesAsLabels() {
 		value, present := span.Attributes().Get(labelName)
 		if !present {
 			value, present = resourceSpan.Resource().Attributes().Get(labelName)
