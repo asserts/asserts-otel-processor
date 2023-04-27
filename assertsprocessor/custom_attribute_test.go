@@ -1,8 +1,12 @@
 package assertsprocessor
 
 import (
+	"encoding/json"
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	"gopkg.in/yaml.v3"
+	"log"
 	"regexp"
 	"testing"
 )
@@ -51,6 +55,101 @@ func TestValidateInvalidConfig_Source_Missing(t *testing.T) {
 	}
 	err := attrConfig.validate("target", "namespace#service")
 	assert.NotNil(t, err)
+}
+
+func TestUnmarshalFromJSON(t *testing.T) {
+	attrConfig := &CustomAttributeConfig{}
+	err := json.Unmarshal([]byte(`{"replacement": "server_errors",
+            "regex": "5..",
+            "source_attributes": ["http.status_code"],
+            "span_kinds": ["Client", "Server"]}`), attrConfig)
+	assert.Nil(t, err)
+	assert.Equal(t, "server_errors", attrConfig.Replacement)
+	assert.Equal(t, "5..", attrConfig.RegExp)
+	assert.Equal(t, 1, len(attrConfig.SourceAttributes))
+	assert.Equal(t, 2, len(attrConfig.SpanKinds))
+	assert.Nil(t, attrConfig.validate("target", "service-key"))
+}
+
+func TestUnmarshalFromYAMLSimple(t *testing.T) {
+	var attrConfig CustomAttributeConfig
+	var raw interface{}
+
+	var bytes = []byte(`source_attributes: ["http.url"]
+span_kinds: ["Server"]
+regex: "http://user:8080(/check)/anonymous-.*"
+replacement: "$1"`)
+	// Unmarshal our input YAML file into empty interface
+	if err := yaml.Unmarshal(bytes, &raw); err != nil {
+		log.Fatal(err)
+	}
+
+	// Use mapstructure to convert our interface{} to CustomAttributeConfig (var attrConfig)
+	decoder, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{WeaklyTypedInput: true, Result: &attrConfig})
+	if err := decoder.Decode(raw); err != nil {
+		log.Fatal(err)
+	}
+
+	// Print out the new struct
+	assert.NotNil(t, attrConfig)
+	assert.Equal(t, "$1", attrConfig.Replacement)
+	assert.Equal(t, "http://user:8080(/check)/anonymous-.*", attrConfig.RegExp)
+	assert.Equal(t, 1, len(attrConfig.SpanKinds))
+	assert.Equal(t, 1, len(attrConfig.SourceAttributes))
+	assert.Nil(t, attrConfig.validate("target", "service-key"))
+}
+
+func TestUnmarshalFromYAMLComplex(t *testing.T) {
+	var configs map[string]map[string][]*CustomAttributeConfig
+	var raw interface{}
+	var bytes = []byte(`"asserts.error.type":
+  "default":
+    - replacement: client_errors
+      regex: 4..
+      source_attributes: ["http.status_code"]
+      span_kinds: ["Client", "Server"]
+    - replacement: server_errors
+      regex: 5..
+      source_attributes: ["http.status_code"]
+      span_kinds: ["Client", "Server"]
+"asserts.request.context":
+  robot-shop#payment:
+    - source_attributes: ["http.url"]
+      span_kinds: ["Server"]
+      regex: "http://cart:8080(/cart)/anonymous-.*"
+      replacement: "$1"
+    - source_attributes: ["http.url"]
+      span_kinds: ["Server"]
+      regex: "http://user:8080(/check)/anonymous-.*"
+      replacement: "$1"
+  robot-shop#shipping:
+    - source_attributes: ["http.url"]
+      span_kinds: ["Server"]
+      regex: "http://cart:8080(/shipping)/anonymous-.*"
+      replacement: "$1"
+  default:
+    - source_attributes: ["http.route"]
+      regex: "(.+)"
+      span_kinds: ["Server"]
+      replacement: "$1"
+    - source_attributes: ["http.url"]
+      span_kinds: ["Server"]
+      regex: "https?://.+?((/[^/?]+){1,2}).*"
+      replacement: "$1"`)
+
+	// Unmarshal our input YAML file into empty interface
+	if err := yaml.Unmarshal(bytes, &raw); err != nil {
+		log.Fatal(err)
+	}
+
+	// Use mapstructure to convert our interface{} to CustomAttributeConfig (var configs)
+	decoder, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{WeaklyTypedInput: true, Result: &configs})
+	if err := decoder.Decode(raw); err != nil {
+		log.Fatal(err)
+	}
+
+	// Print out the new struct
+	assert.NotNil(t, configs)
 }
 
 func TestValidateInvalidConfig_InvalidSourceAttribute(t *testing.T) {
