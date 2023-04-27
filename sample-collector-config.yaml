@@ -26,18 +26,18 @@ processors:
       "asserts.error.type":
         "default":
           - replacement: client_errors
-            regexp: 4..
+            regex: 4..
             source_attributes: ["http.status_code"]
             span_kinds: ["Client", "Server"]
           - replacement: server_errors
-            regexp: 5..
+            regex: 5..
             source_attributes: ["http.status_code"]
             span_kinds: ["Client", "Server"]
       "asserts.request.context":
         robot-shop#payment:
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
-            regexp: "http://cart:8080(/cart)/anonymous-.*"
+            regex: "http://cart:8080(/cart)/anonymous-.*"
             replacement: $1
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
@@ -46,16 +46,16 @@ processors:
         robot-shop#shipping:
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
-            regexp: "http://cart:8080(/shipping)/anonymous-.*"
+            regex: "http://cart:8080(/shipping)/anonymous-.*"
             replacement: $1
         default:
           - source_attributes: ["http.route"]
-            regexp: "(.+)"
+            regex: "(.+)"
             span_kinds: ["Server"]
             replacement: $1
           - source_attributes: ["http.url"]
             span_kinds: ["Server"]
-            regexp: "https?://.+?((/[^/?]+){1,2}).*"
+            regex: "https?://.+?((/[^/?]+){1,2}).*"
             replacement: $1
     attributes_as_metric_labels:
       - "rpc.system"

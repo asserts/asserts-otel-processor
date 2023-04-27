@@ -38,7 +38,7 @@ func TestFetchConfig(t *testing.T) {
                 "attr1",
                 "attr2"
               ],
-              "regexp": "(.+?);(.+)",
+              "regex": "(.+?);(.+)",
               "replacement": "$1:$2"
             }
           ],
@@ -47,7 +47,7 @@ func TestFetchConfig(t *testing.T) {
               "source_attributes": [
                 "attr1"
               ],
-              "regexp": "(.+)",
+              "regex": "(.+)",
               "replacement": "$1"
             }
           ]

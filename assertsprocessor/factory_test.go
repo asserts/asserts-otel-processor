@@ -125,7 +125,7 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
                 "attr1",
                 "attr2"
               ],
-              "regexp": "(.+?);(.+)",
+              "regex": "(.+?);(.+)",
               "replacement": "$1:$2"
             }
           ],
@@ -134,7 +134,7 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
               "source_attributes": [
                 "attr1"
               ],
-              "regexp": "+",
+              "regex": "+",
               "replacement": "$1"
             }
           ]
