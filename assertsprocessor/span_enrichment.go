@@ -114,6 +114,11 @@ func (ep *spanEnrichmentProcessorImpl) enrichSpan(namespace string, service stri
 			}
 		}
 	}
+	// If request context is not added set the span name as request context
+	_, present := span.Attributes().Get(AssertsRequestContextAttribute)
+	if !present {
+		span.Attributes().PutStr(AssertsRequestContextAttribute, span.Name())
+	}
 }
 
 func (ep *spanEnrichmentProcessorImpl) addRequestType(span *ptrace.Span) {

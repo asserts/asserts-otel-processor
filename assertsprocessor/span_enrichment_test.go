@@ -111,6 +111,7 @@ func TestEnrichSpanRequestContextErrorType(t *testing.T) {
 	span.Attributes().PutStr("http.url", "https://some.domain.com/foo/bar/baz?a=b")
 	span.Attributes().PutInt("http.status_code", 404)
 	span.SetKind(ptrace.SpanKindServer)
+	span.SetName("span-name")
 
 	processor.enrichSpan("asserts", "api-server", &span)
 	contextAtt, _ := span.Attributes().Get(AssertsRequestContextAttribute)
@@ -139,6 +140,13 @@ func TestEnrichSpanRequestContextErrorType(t *testing.T) {
 	att, _ = span.Attributes().Get(AssertsErrorTypeAttribute)
 	assert.NotNil(t, att)
 	assert.Equal(t, "server_errors", att.Str())
+
+	clearAssertsAttributes(span)
+	span.Attributes().PutStr("http.url", "will-not-match")
+	processor.enrichSpan("asserts", "api-server", &span)
+	contextAtt, _ = span.Attributes().Get(AssertsRequestContextAttribute)
+	assert.NotNil(t, contextAtt)
+	assert.Equal(t, "span-name", contextAtt.Str())
 }
 
 func TestIsUpdated(t *testing.T) {
