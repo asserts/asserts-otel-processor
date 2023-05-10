@@ -6,6 +6,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 	"testing"
+	"time"
 )
 
 func TestRegisterMetrics(t *testing.T) {
@@ -158,6 +159,41 @@ func TestMetricCardinalityLimit(t *testing.T) {
 	assert.NotNil(t, cache.Get("/cart/#val1"))
 	assert.NotNil(t, cache.Get("/cart/#val2"))
 	assert.Nil(t, cache.Get("/cart/#val3"))
+}
+
+func TestCacheEviction(t *testing.T) {
+	logger, _ := zap.NewProduction()
+
+	c := &Config{
+		Env:                    "dev",
+		Site:                   "us-west-2",
+		LimitPerService:        2,
+		RequestContextCacheTTL: 1,
+	}
+	config.CaptureAttributesInMetric = []string{}
+	p := newMetricHelper(
+		logger,
+		c,
+	)
+	// overwrite ttl to a smaller value of 5 millis in this unit test
+	p.ttl = time.Millisecond * time.Duration(p.config.RequestContextCacheTTL)
+	_ = p.registerMetrics()
+	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
+
+	testSpan := ptrace.NewSpan()
+	testSpan.SetStartTimestamp(1e9)
+	testSpan.SetEndTimestamp(1e9 + 6e8)
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val1")
+	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	assert.Equal(t, 1, p.requestContextsByService.Size())
+	cache, _ := p.requestContextsByService.Load("robot-shop#cart")
+	assert.Equal(t, 1, cache.Len())
+
+	time.Sleep(5 * time.Millisecond)
+
+	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val2")
+	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	assert.Equal(t, 1, cache.Len())
 }
 
 func TestMetricHelperIsUpdated(t *testing.T) {

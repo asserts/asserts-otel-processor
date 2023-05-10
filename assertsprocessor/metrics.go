@@ -41,7 +41,8 @@ type metricHelper struct {
 	totalTraceCount    *prometheus.CounterVec
 	sampledTraceCount  *prometheus.CounterVec
 	// limit cardinality of request contexts for which metrics are captured
-	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, string]]
+	requestContextsByService *xsync.MapOf[string, *ttlcache.Cache[string, prometheus.Labels]]
+	ttl                      time.Duration
 	// guard access to config.CaptureAttributesInMetric and latencyHistogram
 	rwMutex *sync.RWMutex
 }
@@ -50,8 +51,9 @@ func newMetricHelper(logger *zap.Logger, config *Config) *metricHelper {
 	return &metricHelper{
 		logger:                   logger,
 		config:                   config,
+		ttl:                      time.Minute * time.Duration(config.RequestContextCacheTTL),
 		prometheusRegistry:       prometheus.NewRegistry(),
-		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, string]](),
+		requestContextsByService: xsync.NewMapOf[*ttlcache.Cache[string, prometheus.Labels]](),
 		rwMutex:                  &sync.RWMutex{},
 	}
 }
@@ -141,10 +143,24 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
 	requestContext := attrValue.AsString()
 
-	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, string] {
-		cache := ttlcache.New[string, string](
-			ttlcache.WithTTL[string, string](time.Minute*time.Duration(p.config.RequestContextCacheTTL)),
-			ttlcache.WithCapacity[string, string](uint64(p.config.LimitPerService)),
+	cache, _ := p.requestContextsByService.LoadOrCompute(serviceKey, func() *ttlcache.Cache[string, prometheus.Labels] {
+		cache := ttlcache.New[string, prometheus.Labels](
+			ttlcache.WithTTL[string, prometheus.Labels](p.ttl),
+			ttlcache.WithCapacity[string, prometheus.Labels](uint64(p.config.LimitPerService)),
+		)
+		cache.OnEviction(
+			func(ctx context.Context, reason ttlcache.EvictionReason, item *ttlcache.Item[string, prometheus.Labels]) {
+				p.logger.Info("Evicted request context from cache",
+					zap.String("service", serviceKey),
+					zap.String("request context", item.Key()),
+				)
+
+				p.latencyHistogram.Delete(item.Value())
+
+				p.logger.Info("Deleted stale metric",
+					zap.Any("label values", item.Value()),
+				)
+			},
 		)
 		p.logger.Debug("Created a cache of known request contexts for service - " + serviceKey)
 
@@ -153,14 +169,14 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	})
 
 	if val := cache.Get(requestContext); cache.Len() < p.config.LimitPerService || val != nil {
+		labels := p.buildLabels(namespace, service, span, resourceSpan)
 		if val == nil {
-			cache.Set(requestContext, requestContext, ttlcache.DefaultTTL)
+			cache.Set(requestContext, labels, ttlcache.DefaultTTL)
 			p.logger.Info("Adding request context to cache",
 				zap.String("service", serviceKey),
 				zap.String("request context", requestContext),
 			)
 		}
-		labels := p.buildLabels(namespace, service, span, resourceSpan)
 		latencySeconds := computeLatency(span)
 		p.recordLatency(labels, latencySeconds)
 	} else {
