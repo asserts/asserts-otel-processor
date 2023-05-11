@@ -155,10 +155,11 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 					zap.String("request context", item.Key()),
 				)
 
-				p.latencyHistogram.Delete(item.Value())
+				deletedCount := p.latencyHistogram.DeletePartialMatch(item.Value())
 
-				p.logger.Info("Deleted stale metric",
-					zap.Any("label values", item.Value()),
+				p.logger.Info("Deleted stale metrics",
+					zap.Int("count", deletedCount),
+					zap.Any("having label values", item.Value()),
 				)
 			},
 		)
@@ -171,7 +172,14 @@ func (p *metricHelper) captureMetrics(namespace string, service string, span *pt
 	if val := cache.Get(requestContext); cache.Len() < p.config.LimitPerService || val != nil {
 		labels := p.buildLabels(namespace, service, span, resourceSpan)
 		if val == nil {
-			cache.Set(requestContext, labels, ttlcache.DefaultTTL)
+			// build labels map that will be used as a key to delete stale
+			// metrics when the request context cache entry is evicted
+			metricLabels := prometheus.Labels{
+				namespaceLabel: namespace,
+				serviceLabel:   service,
+				p.applyPromConventions(AssertsRequestContextAttribute): requestContext,
+			}
+			cache.Set(requestContext, metricLabels, ttlcache.DefaultTTL)
 			p.logger.Info("Adding request context to cache",
 				zap.String("service", serviceKey),
 				zap.String("request context", requestContext),

@@ -188,6 +188,13 @@ func TestCacheEviction(t *testing.T) {
 	assert.Equal(t, 1, p.requestContextsByService.Size())
 	cache, _ := p.requestContextsByService.Load("robot-shop#cart")
 	assert.Equal(t, 1, cache.Len())
+	assert.Equal(t,
+		prometheus.Labels{
+			namespaceLabel: "robot-shop",
+			serviceLabel:   "cart",
+			p.applyPromConventions(AssertsRequestContextAttribute): "/cart/#val1",
+		},
+		cache.Get("/cart/#val1").Value())
 
 	time.Sleep(5 * time.Millisecond)
 
