@@ -1,0 +1,70 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  googlecloud:
+  googlecloud/customname:
+    project: $GCP_PROJECT_NAME
+    log:
+      default_log_name: opentelemetry.io/collector-exported-log
+  prometheus:
+    namespace: default
+    endpoint: 0.0.0.0:8889
+
+processors:
+  resourcedetection:
+    detectors: [gcp]
+    timeout: 10s
+  assertsprocessor:
+    asserts_server:
+      endpoint: $ASSERTS_SERVER_API_ENDPOINT
+      user: $ASSERTS_SERVER_USERNAME
+      password: $ASSERTS_SERVER_PASSWORD
+    asserts_env: $ASSERTS_ENV
+    asserts_site: $ASSERTS_SITE
+    capture_metrics: true
+    custom_attributes:
+      "asserts.error.type":
+        "default":
+          - value_expr: client_errors
+            regex: 4..
+            source_attributes: ["http.status_code"]
+            span_kinds: ["Client", "Server"]
+          - value_expr: server_errors
+            regex: 5..
+            source_attributes: ["http.status_code"]
+            span_kinds: ["Client", "Server"]
+      "asserts.request.context":
+        default:
+          - source_attributes: ["http.route"]
+            regex: "(.+)"
+            span_kinds: ["Server"]
+          - source_attributes: ["http.url"]
+            span_kinds: ["Server", "Client"]
+            regex: "https?://.+?((/[^/?]+){1,2}).*"
+    attributes_as_metric_labels:
+      - "rpc.system"
+      - "rpc.service"
+      - "rpc.method"
+      - "aws.table.name"
+      - "aws.queue.url"
+      - "aws.bucket.name"
+      - "db.operation"
+      - "db.system"
+service:
+  telemetry:
+    logs:
+      level: $LOG_LEVEL
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [assertsprocessor]
+      exporters: [googlecloud]
+    metrics:
+      receivers: [otlp]
+      exporters: [prometheus]
