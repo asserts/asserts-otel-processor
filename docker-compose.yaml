@@ -1,0 +1,15 @@
+version: '3'
+services:
+  asserts-otel-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ecs
+    image: asserts/otel-collector:v0.0.78
+    ports:
+      - "8888:8888"
+      - "8889:8889"
+      - "9465:9465"
+      - "4317:4317"
+      - "4318:4318"
+    env_file:
+      - ecs-test-env.properties

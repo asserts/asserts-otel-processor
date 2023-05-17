@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Asserts OTEL Collector Security Group Stack
+Parameters:
+  AssertsEnvironment:
+    Type: String
+    Description: The installation environment name
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: "Id of VPC in which Asserts OTEL Collector is being installed"
+  ALBIngressSourceCIDR:
+    Type: String
+    Description: "Source IP CIDR for ALB Ingress"
+Resources:
+  AssertsOTELCollectorALBSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "Asserts OTEL Collector"
+        - Key: Environment
+          Value: !Ref AssertsEnvironment
+      GroupDescription: "security group for ALB"
+      GroupName: !Join [ "-", [ "Asserts-OTEL-Collector-ALB-SG", !Ref AssertsEnvironment ] ]
+      VpcId: !Ref VpcId
+
+#  OTELCollectorALBGRPCIngress:
+#    Type: AWS::EC2::SecurityGroupIngress
+#    Properties:
+#      CidrIp: !Ref ALBIngressSourceCIDR
+#      Description: Allow HTTP
+#      FromPort: 4317
+#      IpProtocol: TCP
+#      ToPort: 4317
+#      GroupId:
+#        Ref: AssertsOTELCollectorALBSecurityGroup
+
+  OTELCollectorALBHTTPIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      CidrIp: !Ref ALBIngressSourceCIDR
+      Description: Allow HTTP
+      FromPort: 4318
+      IpProtocol: TCP
+      ToPort: 4318
+      GroupId:
+        Ref: AssertsOTELCollectorALBSecurityGroup
+
+  AssertsOTELCollectorSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "Asserts OTEL Collector"
+      GroupDescription: asserts-aws-integration Security Group for default network
+      GroupName: !Join [ "-", [ "Asserts-OTEL-SG", !Ref AssertsEnvironment ] ]
+      VpcId: !Ref VpcId
+
+#  ALBToCollectorGRPCIngress:
+#    Type: AWS::EC2::SecurityGroupIngress
+#    Properties:
+#      SourceSecurityGroupId: !Ref AssertsOTELCollectorSecurityGroup
+#      Description: otlp:4317/grpc
+#      FromPort: 4317
+#      GroupId:
+#        Ref: AssertsOTELCollectorSecurityGroup
+#      IpProtocol: TCP
+#      ToPort: 4317
+
+  ALBToCollectorHTTPIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      SourceSecurityGroupId: !Ref AssertsOTELCollectorALBSecurityGroup
+      Description: otlp:4318/http
+      FromPort: 4318
+      GroupId:
+        Ref: AssertsOTELCollectorSecurityGroup
+      IpProtocol: TCP
+      ToPort: 4318
+
+  CollectorScrapeIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      SourceSecurityGroupId: !Ref AssertsOTELCollectorALBSecurityGroup
+      Description: 9465/http
+      FromPort: 9465
+      GroupId:
+        Ref: AssertsOTELCollectorSecurityGroup
+      IpProtocol: TCP
+      ToPort: 9465
+
+Outputs:
+  ALBSecurityGroupId:
+    Description: "The DNS name for the load balancer."
+    Value: !GetAtt AssertsOTELCollectorALBSecurityGroup.GroupId
+  ECSSecurityGroupId:
+    Description: "The DNS name for the load balancer."
+    Value: !GetAtt AssertsOTELCollectorSecurityGroup.GroupId
