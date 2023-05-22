@@ -47,7 +47,12 @@ func TestLatencyIsHighTrue(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 
-	assert.True(t, s.isSlow("platform", "api-server", &testSpan, "/api"))
+	ts := &traceStruct{
+		rootSpan: &testSpan,
+	}
+	s.updateTrace("platform", "api-server", ts)
+
+	assert.True(t, s.isSlow("platform", "api-server", ts))
 }
 
 func TestLatencyIsHighFalse(t *testing.T) {
@@ -62,7 +67,12 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
 
-	assert.False(t, s.isSlow("platform", "api-server", &testSpan, "/api"))
+	ts := &traceStruct{
+		rootSpan: &testSpan,
+	}
+	s.updateTrace("platform", "api-server", ts)
+
+	assert.False(t, s.isSlow("platform", "api-server", ts))
 }
 
 func TestSampleTraceWithError(t *testing.T) {

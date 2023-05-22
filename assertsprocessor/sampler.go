@@ -7,7 +7,6 @@ import (
 
 	"github.com/tilinna/clock"
 	"go.opentelemetry.io/collector/consumer"
-	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 )
 
@@ -84,7 +83,6 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 		}
 		s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
 		if traceStruct.hasError() {
-			// For all the spans which have error, add the request context
 			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
 
 			s.logger.Debug("Capturing error trace",
@@ -94,15 +92,8 @@ func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
 				zap.Float64("latency", traceStruct.latency))
 			requestState.errorQueue.push(&item)
 			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeError
-		} else if traceStruct.isSlow {
+		} else if s.isSlow(traces.namespace, traces.service, traceStruct) {
 			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
-
-			s.logger.Debug("Capturing slow trace",
-				zap.String("traceId", traceStruct.getMainSpan().TraceID().String()),
-				zap.String("service", entityKeyString),
-				zap.String("request", traceStruct.requestKey.request),
-				zap.Float64("latencyThreshold", traceStruct.latencyThreshold),
-				zap.Float64("latency", traceStruct.latency))
 			requestState.slowQueue.push(&item)
 			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeSlow
 		} else {
@@ -168,10 +159,6 @@ func (s *sampler) updateTrace(namespace string, service string, trace *traceStru
 	entityKey := buildEntityKey(s.config, namespace, service)
 	attrValue, _ := trace.getMainSpan().Attributes().Get(AssertsRequestContextAttribute)
 	request := attrValue.Str()
-	trace.isSlow = s.isSlow(namespace, service, trace.getMainSpan(), request)
-	if trace.isSlow {
-		trace.latencyThreshold = s.thresholdHelper.getThreshold(namespace, service, request)
-	}
 	trace.latency = computeLatency(trace.getMainSpan())
 	trace.requestKey = &RequestKey{
 		entityKey: entityKey,
@@ -179,8 +166,23 @@ func (s *sampler) updateTrace(namespace string, service string, trace *traceStru
 	}
 }
 
-func (s *sampler) isSlow(namespace string, serviceName string, mainSpan *ptrace.Span, request string) bool {
-	return computeLatency(mainSpan) > s.thresholdHelper.getThreshold(namespace, serviceName, request)
+func (s *sampler) isSlow(namespace string, service string, trace *traceStruct) bool {
+	for _, span := range trace.getSpans() {
+		attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
+		request := attrValue.Str()
+		latencyThreshold := s.thresholdHelper.getThreshold(namespace, service, request)
+		latency := computeLatency(span)
+		if latency > latencyThreshold {
+			s.logger.Debug("Capturing slow trace",
+				zap.String("traceId", trace.getMainSpan().TraceID().String()),
+				zap.String("service", trace.requestKey.entityKey.AsString()),
+				zap.String("request", request),
+				zap.Float64("latencyThreshold", latencyThreshold),
+				zap.Float64("latency", latency))
+			return true
+		}
+	}
+	return false
 }
 
 func (s *sampler) stopTraceFlusher() {

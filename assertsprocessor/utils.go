@@ -39,42 +39,36 @@ type resourceTraces struct {
 }
 
 type traceStruct struct {
-	resourceSpan     *ptrace.ResourceSpans
-	requestKey       *RequestKey
-	latency          float64
-	isSlow           bool
-	latencyThreshold float64
-	rootSpan         *ptrace.Span
-	internalSpans    []*ptrace.Span
-	entrySpans       []*ptrace.Span
-	exitSpans        []*ptrace.Span
+	resourceSpan  *ptrace.ResourceSpans
+	requestKey    *RequestKey
+	latency       float64
+	rootSpan      *ptrace.Span
+	internalSpans []*ptrace.Span
+	entrySpans    []*ptrace.Span
+	exitSpans     []*ptrace.Span
+}
+
+func (t *traceStruct) getSpans() []*ptrace.Span {
+	spans := make([]*ptrace.Span, 0, len(t.entrySpans)+len(t.exitSpans)+1)
+	if t.rootSpan != nil {
+		spans = append(spans, t.rootSpan)
+	}
+	spans = append(spans, t.entrySpans...)
+	spans = append(spans, t.exitSpans...)
+	return spans
 }
 
 func (t *traceStruct) getMainSpan() *ptrace.Span {
 	// A distributed trace will have only one root span. Trace fragments that come from a downstream service
 	// will not have a root span. In such a scenario, use the first entry or exit span as the main span
-	if t.rootSpan != nil {
-		return t.rootSpan
-	} else if len(t.entrySpans) > 0 {
-		return t.entrySpans[0]
-	} else if len(t.exitSpans) > 0 {
-		return t.exitSpans[0]
+	for _, span := range t.getSpans() {
+		return span
 	}
 	return nil
 }
 
 func (t *traceStruct) hasError() bool {
-	if t.rootSpan != nil && spanHasError(t.rootSpan) {
-		return true
-	}
-
-	for _, span := range t.entrySpans {
-		if spanHasError(span) {
-			return true
-		}
-	}
-
-	for _, span := range t.exitSpans {
+	for _, span := range t.getSpans() {
 		if spanHasError(span) {
 			return true
 		}
@@ -145,22 +139,10 @@ func buildTrace(trace *traceStruct) *ptrace.Traces {
 	trace.resourceSpan.Resource().CopyTo(rs.Resource())
 	ils := rs.ScopeSpans().AppendEmpty()
 
-	if trace.rootSpan != nil {
-		rootSpan := ils.Spans().AppendEmpty()
-		trace.rootSpan.CopyTo(rootSpan)
-	}
+	spans := trace.getSpans()
+	spans = append(spans, trace.internalSpans...)
 
-	for _, span := range trace.internalSpans {
-		sp := ils.Spans().AppendEmpty()
-		span.CopyTo(sp)
-	}
-
-	for _, span := range trace.entrySpans {
-		sp := ils.Spans().AppendEmpty()
-		span.CopyTo(sp)
-	}
-
-	for _, span := range trace.exitSpans {
+	for _, span := range spans {
 		sp := ils.Spans().AppendEmpty()
 		span.CopyTo(sp)
 	}
