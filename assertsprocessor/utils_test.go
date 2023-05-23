@@ -154,18 +154,18 @@ func TestBuildTrace(t *testing.T) {
 	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 	rootSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	nestedSpan1 := scopeSpans.Spans().AppendEmpty()
-	nestedSpan1.SetTraceID(rootSpan.TraceID())
-	nestedSpan1.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
-	nestedSpan1.SetParentSpanID(rootSpan.SpanID())
-	nestedSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
-
 	exitSpan := scopeSpans.Spans().AppendEmpty()
 	exitSpan.SetTraceID(rootSpan.TraceID())
 	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
 	exitSpan.SetKind(ptrace.SpanKindClient)
 	exitSpan.SetParentSpanID(rootSpan.SpanID())
 	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	nestedSpan1 := scopeSpans.Spans().AppendEmpty()
+	nestedSpan1.SetTraceID(rootSpan.TraceID())
+	nestedSpan1.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
+	nestedSpan1.SetParentSpanID(rootSpan.SpanID())
+	nestedSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
 	assert.Equal(t, &expectedTrace, buildTrace(&traceStruct{
 		resourceSpan:  &resourceSpans,
