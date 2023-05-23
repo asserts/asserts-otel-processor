@@ -78,6 +78,8 @@ func (t *traceStruct) hasError() bool {
 
 func spanIterator(ctx context.Context, traces ptrace.Traces,
 	callback func(context.Context, *resourceTraces) error) error {
+
+	var tracesMap = map[string]resourceTraces{}
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		resources := traces.ResourceSpans().At(i)
 		resourceAttributes := resources.Resource().Attributes()
@@ -96,10 +98,17 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 		}
 		serviceName := serviceAttr.Str()
 
-		var tracesInResource = resourceTraces{}
-		tracesInResource.traceById = &map[string]*traceStruct{}
-		tracesInResource.namespace = namespace
-		tracesInResource.service = serviceName
+		serviceKey := getServiceKey(namespace, serviceName)
+		tracesInResource, exists := tracesMap[serviceKey]
+		if !exists {
+			tracesInResource = resourceTraces{
+				traceById: &map[string]*traceStruct{},
+				namespace: namespace,
+				service:   serviceName,
+			}
+			tracesMap[serviceKey] = tracesInResource
+		}
+
 		scopes := resources.ScopeSpans()
 		for j := 0; j < scopes.Len(); j++ {
 			scope := scopes.At(j)
@@ -125,7 +134,9 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 				}
 			}
 		}
+	}
 
+	for _, tracesInResource := range tracesMap {
 		if err := callback(ctx, &tracesInResource); err != nil {
 			return err
 		}
