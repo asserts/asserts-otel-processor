@@ -49,7 +49,7 @@ type traceStruct struct {
 }
 
 func (t *traceStruct) getSpans() []*ptrace.Span {
-	spans := make([]*ptrace.Span, 0, len(t.entrySpans)+len(t.exitSpans)+1)
+	spans := make([]*ptrace.Span, 0, len(t.entrySpans)+len(t.exitSpans))
 	if t.rootSpan != nil {
 		spans = append(spans, t.rootSpan)
 	}
