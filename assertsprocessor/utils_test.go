@@ -1,7 +1,6 @@
 package assertsprocessor
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,68 +36,7 @@ func TestSpanHasError(t *testing.T) {
 	assert.True(t, spanHasError(&testSpan))
 }
 
-func TestGetMainSpan(t *testing.T) {
-	rootSpan := ptrace.NewSpan()
-	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-	entrySpan := ptrace.NewSpan()
-	entrySpan.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
-	exitSpan := ptrace.NewSpan()
-	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
-
-	ts1 := traceStruct{
-		rootSpan:   &rootSpan,
-		entrySpans: []*ptrace.Span{&entrySpan},
-		exitSpans:  []*ptrace.Span{&exitSpan},
-	}
-	ts2 := traceStruct{
-		entrySpans: []*ptrace.Span{&entrySpan},
-		exitSpans:  []*ptrace.Span{&exitSpan},
-	}
-	ts3 := traceStruct{
-		exitSpans: []*ptrace.Span{&exitSpan},
-	}
-
-	assert.Equal(t, &rootSpan, ts1.getMainSpan())
-	assert.Equal(t, &entrySpan, ts2.getMainSpan())
-	assert.Equal(t, &exitSpan, ts3.getMainSpan())
-}
-
-func TestHasError(t *testing.T) {
-	rootSpan := ptrace.NewSpan()
-	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
-	entrySpan := ptrace.NewSpan()
-	entrySpan.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
-	exitSpan := ptrace.NewSpan()
-	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
-
-	ts1 := traceStruct{
-		rootSpan:   &rootSpan,
-		entrySpans: []*ptrace.Span{&entrySpan},
-		exitSpans:  []*ptrace.Span{&exitSpan},
-	}
-	ts2 := traceStruct{
-		entrySpans: []*ptrace.Span{&entrySpan},
-		exitSpans:  []*ptrace.Span{&exitSpan},
-	}
-	ts3 := traceStruct{
-		exitSpans: []*ptrace.Span{&exitSpan},
-	}
-
-	assert.False(t, ts1.hasError())
-	rootSpan.Status().SetCode(ptrace.StatusCodeError)
-	assert.True(t, ts1.hasError())
-
-	assert.False(t, ts2.hasError())
-	entrySpan.Status().SetCode(ptrace.StatusCodeError)
-	assert.True(t, ts2.hasError())
-
-	assert.False(t, ts3.hasError())
-	exitSpan.Status().SetCode(ptrace.StatusCodeError)
-	assert.True(t, ts3.hasError())
-}
-
 func TestSpanIterator(t *testing.T) {
-	ctx := context.Background()
 	testTrace := ptrace.NewTraces()
 	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
 	resourceSpans.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
@@ -123,27 +61,22 @@ func TestSpanIterator(t *testing.T) {
 	exitSpan.SetParentSpanID(rootSpan.SpanID())
 	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	err := spanIterator(ctx, testTrace,
-		func(context context.Context, spanStructs *resourceTraces) error {
-			assert.Equal(t, "platform", spanStructs.namespace)
-			assert.Equal(t, "api-server", spanStructs.service)
-			assert.Equal(t, 1, len(*spanStructs.traceById))
+	traces := convertToTraces(testTrace)
+	assert.Equal(t, 1, len(traces))
+	assert.Equal(t, 1, len(traces[0].segments))
 
-			traceIdAsString := rootSpan.TraceID().String()
-			trace := (*spanStructs.traceById)[traceIdAsString]
-			assert.NotNil(t, trace)
-			assert.Equal(t, &rootSpan, trace.rootSpan)
-			assert.Equal(t, 1, len(trace.exitSpans))
-			assert.Equal(t, 1, len(trace.internalSpans))
-			assert.Equal(t, &exitSpan, trace.exitSpans[0])
-			assert.Equal(t, &nestedSpan, trace.internalSpans[0])
-			return nil
-		})
-	assert.Nil(t, err)
+	ts := traces[0].segments[0]
+	assert.Equal(t, rootSpan.TraceID().String(), ts.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts.namespace)
+	assert.Equal(t, "api-server", ts.service)
+	assert.Equal(t, &rootSpan, ts.rootSpan)
+	assert.Equal(t, 1, len(ts.exitSpans))
+	assert.Equal(t, 1, len(ts.internalSpans))
+	assert.Equal(t, &exitSpan, ts.exitSpans[0])
+	assert.Equal(t, &nestedSpan, ts.internalSpans[0])
 }
 
 func TestSpansOfATraceSplitAcrossMultipleResourceSpans(t *testing.T) {
-	ctx := context.Background()
 	testTrace := ptrace.NewTraces()
 	resourceSpans1 := testTrace.ResourceSpans().AppendEmpty()
 	resourceSpans1.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
@@ -178,23 +111,19 @@ func TestSpansOfATraceSplitAcrossMultipleResourceSpans(t *testing.T) {
 	exitSpan.SetParentSpanID(rootSpan.SpanID())
 	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	err := spanIterator(ctx, testTrace,
-		func(context context.Context, spanStructs *resourceTraces) error {
-			assert.Equal(t, "platform", spanStructs.namespace)
-			assert.Equal(t, "api-server", spanStructs.service)
-			assert.Equal(t, 1, len(*spanStructs.traceById))
+	traces := convertToTraces(testTrace)
+	assert.Equal(t, 1, len(traces))
+	assert.Equal(t, 1, len(traces[0].segments))
 
-			traceIdAsString := rootSpan.TraceID().String()
-			trace := (*spanStructs.traceById)[traceIdAsString]
-			assert.NotNil(t, trace)
-			assert.Equal(t, &rootSpan, trace.rootSpan)
-			assert.Equal(t, 1, len(trace.exitSpans))
-			assert.Equal(t, 1, len(trace.internalSpans))
-			assert.Equal(t, &exitSpan, trace.exitSpans[0])
-			assert.Equal(t, &nestedSpan, trace.internalSpans[0])
-			return nil
-		})
-	assert.Nil(t, err)
+	ts := traces[0].segments[0]
+	assert.Equal(t, rootSpan.TraceID().String(), ts.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts.namespace)
+	assert.Equal(t, "api-server", ts.service)
+	assert.Equal(t, &rootSpan, ts.rootSpan)
+	assert.Equal(t, 1, len(ts.exitSpans))
+	assert.Equal(t, 1, len(ts.internalSpans))
+	assert.Equal(t, &exitSpan, ts.exitSpans[0])
+	assert.Equal(t, &nestedSpan, ts.internalSpans[0])
 }
 
 func TestBuildTrace(t *testing.T) {
@@ -222,10 +151,13 @@ func TestBuildTrace(t *testing.T) {
 	nestedSpan1.SetParentSpanID(rootSpan.SpanID())
 	nestedSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
 
-	assert.Equal(t, &expectedTrace, buildTrace(&traceStruct{
-		resourceSpan:  &resourceSpans,
-		rootSpan:      &rootSpan,
-		internalSpans: []*ptrace.Span{&nestedSpan1},
-		exitSpans:     []*ptrace.Span{&exitSpan},
-	}))
+	tr := newTrace(
+		&traceSegment{
+			resourceSpans: &resourceSpans,
+			rootSpan:      &rootSpan,
+			internalSpans: []*ptrace.Span{&nestedSpan1},
+			exitSpans:     []*ptrace.Span{&exitSpan},
+		},
+	)
+	assert.Equal(t, &expectedTrace, buildTrace(tr))
 }

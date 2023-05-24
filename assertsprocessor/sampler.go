@@ -51,68 +51,70 @@ func (s *sampler) stopProcessing() {
 	s.stopTraceFlusher()
 }
 
-func (s *sampler) sampleTraces(ctx context.Context, traces *resourceTraces) {
-	for _, traceStruct := range *traces.traceById {
-		if traceStruct.getMainSpan() == nil {
-			continue
-		}
-		s.updateTrace(traces.namespace, traces.service, traceStruct)
-		entityKeyString := traceStruct.requestKey.entityKey.AsString()
-
-		// Get the traceStruct queue for the entity and request
-		perService, _ := s.topTracesByService.LoadOrStore(entityKeyString, newServiceQueues(s.config))
-		request := traceStruct.requestKey.request
-		requestState := perService.(*serviceQueues).getRequestState(request)
-		if requestState == nil {
-			s.logger.Warn("Too many requests in Entity. Dropping",
-				zap.String("Entity", entityKeyString),
-				zap.String("Request", request))
-			return
-		}
-
-		item := Item{
-			trace:   traceStruct,
-			ctx:     &ctx,
-			latency: traceStruct.latency,
-		}
-		sampledTraceCountLabels := map[string]string{
-			envLabel:       s.config.Env,
-			siteLabel:      s.config.Site,
-			namespaceLabel: traces.namespace,
-			serviceLabel:   traces.service,
-		}
-		s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
-		if traceStruct.hasError() {
-			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
-
-			s.logger.Debug("Capturing error trace",
-				zap.String("traceId", traceStruct.getMainSpan().TraceID().String()),
-				zap.String("service", entityKeyString),
-				zap.String("request", traceStruct.requestKey.request),
-				zap.Float64("latency", traceStruct.latency))
-			requestState.errorQueue.push(&item)
-			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeError
-		} else if s.isSlow(traces.namespace, traces.service, traceStruct) {
-			traceStruct.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
-			requestState.slowQueue.push(&item)
-			sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeSlow
-		} else {
-			if s.captureNormalSample(&item) {
-				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeNormal
+func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
+	for _, tr := range traces {
+		for _, ts := range tr.segments {
+			if ts.getMainSpan() == nil {
+				continue
 			}
-		}
+			s.updateTrace(ts.namespace, ts.service, ts)
+			entityKeyString := ts.requestKey.entityKey.AsString()
 
-		if sampledTraceCountLabels[traceSampleTypeLabel] != "" {
-			s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
+			// Get the trace queue for the entity and request
+			perService, _ := s.topTracesByService.LoadOrStore(entityKeyString, newServiceQueues(s.config))
+			request := ts.requestKey.request
+			requestState := perService.(*serviceQueues).getRequestState(request)
+			if requestState == nil {
+				s.logger.Warn("Too many requests in Entity. Dropping",
+					zap.String("Entity", entityKeyString),
+					zap.String("Request", request))
+				return
+			}
+
+			item := Item{
+				trace:   tr,
+				ctx:     &ctx,
+				latency: ts.latency,
+			}
+			sampledTraceCountLabels := map[string]string{
+				envLabel:       s.config.Env,
+				siteLabel:      s.config.Site,
+				namespaceLabel: ts.namespace,
+				serviceLabel:   ts.service,
+			}
+			s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
+			if ts.hasError() {
+				ts.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
+
+				s.logger.Debug("Capturing error trace",
+					zap.String("traceId", ts.getMainSpan().TraceID().String()),
+					zap.String("service", entityKeyString),
+					zap.String("request", ts.requestKey.request),
+					zap.Float64("latency", ts.latency))
+				requestState.errorQueue.push(&item)
+				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeError
+			} else if s.isSlow(ts) {
+				ts.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
+				requestState.slowQueue.push(&item)
+				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeSlow
+			} else {
+				if s.captureNormalSample(ts, &item) {
+					sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeNormal
+				}
+			}
+
+			if sampledTraceCountLabels[traceSampleTypeLabel] != "" {
+				s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
+			}
 		}
 	}
 }
 
-func (s *sampler) captureNormalSample(item *Item) bool {
+func (s *sampler) captureNormalSample(ts *traceSegment, item *Item) bool {
 	sampled := false
 	// Capture healthy samples based on configured sampling rate
-	entityKeyString := item.trace.requestKey.entityKey.AsString()
-	request := item.trace.requestKey.request
+	entityKeyString := ts.requestKey.entityKey.AsString()
+	request := ts.requestKey.request
 	entry, _ := s.topTracesByService.LoadOrStore(entityKeyString, newServiceQueues(s.config))
 	perService := entry.(*serviceQueues)
 	requestState := perService.getRequestState(request)
@@ -137,13 +139,13 @@ func (s *sampler) captureNormalSample(item *Item) bool {
 		if samplingState.sample(s.config.NormalSamplingFrequencyMinutes) {
 			sampled = true
 			s.logger.Debug("Capturing normal trace",
-				zap.String("traceId", item.trace.getMainSpan().TraceID().String()),
+				zap.String("traceId", ts.getMainSpan().TraceID().String()),
 				zap.String("entity", entityKeyString),
 				zap.String("request", request),
-				zap.Float64("latency", item.trace.latency))
+				zap.Float64("latency", ts.latency))
 
 			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
-			item.trace.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeNormal)
+			ts.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeNormal)
 			requestState.slowQueue.push(item)
 		}
 	} else {
@@ -155,27 +157,27 @@ func (s *sampler) captureNormalSample(item *Item) bool {
 	return sampled
 }
 
-func (s *sampler) updateTrace(namespace string, service string, trace *traceStruct) {
+func (s *sampler) updateTrace(namespace string, service string, ts *traceSegment) {
 	entityKey := buildEntityKey(s.config, namespace, service)
-	attrValue, _ := trace.getMainSpan().Attributes().Get(AssertsRequestContextAttribute)
+	attrValue, _ := ts.getMainSpan().Attributes().Get(AssertsRequestContextAttribute)
 	request := attrValue.Str()
-	trace.latency = computeLatency(trace.getMainSpan())
-	trace.requestKey = &RequestKey{
+	ts.latency = computeLatency(ts.getMainSpan())
+	ts.requestKey = &RequestKey{
 		entityKey: entityKey,
 		request:   request,
 	}
 }
 
-func (s *sampler) isSlow(namespace string, service string, trace *traceStruct) bool {
-	for _, span := range trace.getSpans() {
+func (s *sampler) isSlow(ts *traceSegment) bool {
+	for _, span := range ts.getSpans() {
 		attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
 		request := attrValue.Str()
-		latencyThreshold := s.thresholdHelper.getThreshold(namespace, service, request)
+		latencyThreshold := s.thresholdHelper.getThreshold(ts.namespace, ts.service, request)
 		latency := computeLatency(span)
 		if latency > latencyThreshold {
 			s.logger.Debug("Capturing slow trace",
-				zap.String("traceId", trace.getMainSpan().TraceID().String()),
-				zap.String("service", trace.requestKey.entityKey.AsString()),
+				zap.String("traceId", ts.getMainSpan().TraceID().String()),
+				zap.String("service", ts.requestKey.entityKey.AsString()),
 				zap.String("request", request),
 				zap.Float64("latencyThreshold", latencyThreshold),
 				zap.Float64("latency", latency))

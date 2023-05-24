@@ -1,7 +1,6 @@
 package assertsprocessor
 
 import (
-	"context"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
 )
@@ -32,54 +31,8 @@ func spanHasError(span *ptrace.Span) bool {
 	return span.Status().Code() == ptrace.StatusCodeError
 }
 
-type resourceTraces struct {
-	traceById *map[string]*traceStruct
-	namespace string
-	service   string
-}
-
-type traceStruct struct {
-	resourceSpan  *ptrace.ResourceSpans
-	requestKey    *RequestKey
-	latency       float64
-	rootSpan      *ptrace.Span
-	internalSpans []*ptrace.Span
-	entrySpans    []*ptrace.Span
-	exitSpans     []*ptrace.Span
-}
-
-func (t *traceStruct) getSpans() []*ptrace.Span {
-	spans := make([]*ptrace.Span, 0, len(t.entrySpans)+len(t.exitSpans))
-	if t.rootSpan != nil {
-		spans = append(spans, t.rootSpan)
-	}
-	spans = append(spans, t.entrySpans...)
-	spans = append(spans, t.exitSpans...)
-	return spans
-}
-
-func (t *traceStruct) getMainSpan() *ptrace.Span {
-	// A distributed trace will have only one root span. Trace fragments that come from a downstream service
-	// will not have a root span. In such a scenario, use the first entry or exit span as the main span
-	for _, span := range t.getSpans() {
-		return span
-	}
-	return nil
-}
-
-func (t *traceStruct) hasError() bool {
-	for _, span := range t.getSpans() {
-		if spanHasError(span) {
-			return true
-		}
-	}
-	return false
-}
-
-func spanIterator(ctx context.Context, traces ptrace.Traces,
-	callback func(context.Context, *resourceTraces) error) error {
-
-	var tracesMap = map[string]resourceTraces{}
+func convertToTraces(traces ptrace.Traces) []*trace {
+	var traceById = map[string]map[string]*traceSegment{}
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		resources := traces.ResourceSpans().At(i)
 		resourceAttributes := resources.Resource().Attributes()
@@ -99,16 +52,6 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 		serviceName := serviceAttr.Str()
 
 		serviceKey := getServiceKey(namespace, serviceName)
-		tracesInResource, exists := tracesMap[serviceKey]
-		if !exists {
-			tracesInResource = resourceTraces{
-				traceById: &map[string]*traceStruct{},
-				namespace: namespace,
-				service:   serviceName,
-			}
-			tracesMap[serviceKey] = tracesInResource
-		}
-
 		scopes := resources.ScopeSpans()
 		for j := 0; j < scopes.Len(); j++ {
 			scope := scopes.At(j)
@@ -116,46 +59,62 @@ func spanIterator(ctx context.Context, traces ptrace.Traces,
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				traceID := span.TraceID().String()
-				t := (*tracesInResource.traceById)[traceID]
-				if t == nil {
-					t = &traceStruct{
-						resourceSpan: &resources,
-					}
-					(*tracesInResource.traceById)[traceID] = t
+
+				tr, exists := traceById[traceID]
+				if !exists {
+					tr = map[string]*traceSegment{}
+					traceById[traceID] = tr
 				}
+
+				ts, exists := tr[serviceKey]
+				if !exists {
+					ts = &traceSegment{
+						resourceSpans: &resources,
+						namespace:     namespace,
+						service:       serviceName,
+					}
+					tr[serviceKey] = ts
+				}
+
 				if isRootSpan(&span) {
-					t.rootSpan = &span
+					ts.rootSpan = &span
 				} else if isEntrySpan(&span) {
-					t.entrySpans = append(t.entrySpans, &span)
+					ts.entrySpans = append(ts.entrySpans, &span)
 				} else if isExitSpan(&span) {
-					t.exitSpans = append(t.exitSpans, &span)
+					ts.exitSpans = append(ts.exitSpans, &span)
 				} else {
-					t.internalSpans = append(t.internalSpans, &span)
+					ts.internalSpans = append(ts.internalSpans, &span)
 				}
 			}
 		}
 	}
 
-	for _, tracesInResource := range tracesMap {
-		if err := callback(ctx, &tracesInResource); err != nil {
-			return err
+	allTraces := make([]*trace, 0)
+	for _, tr := range traceById {
+		aTrace := &trace{}
+		for _, ts := range tr {
+			aTrace.segments = append(aTrace.segments, ts)
 		}
+		allTraces = append(allTraces, aTrace)
 	}
-	return nil
+
+	return allTraces
 }
 
-func buildTrace(trace *traceStruct) *ptrace.Traces {
+func buildTrace(tr *trace) *ptrace.Traces {
 	newTrace := ptrace.NewTraces()
-	rs := newTrace.ResourceSpans().AppendEmpty()
-	trace.resourceSpan.Resource().CopyTo(rs.Resource())
-	ils := rs.ScopeSpans().AppendEmpty()
+	for _, ts := range tr.segments {
+		rs := newTrace.ResourceSpans().AppendEmpty()
+		ts.resourceSpans.Resource().CopyTo(rs.Resource())
+		ils := rs.ScopeSpans().AppendEmpty()
 
-	spans := trace.getSpans()
-	spans = append(spans, trace.internalSpans...)
+		spans := ts.getSpans()
+		spans = append(spans, ts.internalSpans...)
 
-	for _, span := range spans {
-		sp := ils.Spans().AppendEmpty()
-		span.CopyTo(sp)
+		for _, span := range spans {
+			sp := ils.Spans().AppendEmpty()
+			span.CopyTo(sp)
+		}
 	}
 
 	return &newTrace

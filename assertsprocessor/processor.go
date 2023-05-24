@@ -45,18 +45,20 @@ func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 }
 
 // ConsumeTraces implements the consumer.Traces interface.
-// Samples the traceStruct if the latency threshold exceeds for the root spans.
-// Also generates span metrics for the spans of interest
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	return spanIterator(ctx, traces, p.processSpans)
+	return p.consumeTraces(ctx, convertToTraces(traces))
 }
 
-func (p *assertsProcessorImpl) processSpans(ctx context.Context, traces *resourceTraces) error {
-	for _, aTrace := range *traces.traceById {
-		for _, span := range aTrace.getSpans() {
-			p.spanEnricher.enrichSpan(traces.namespace, traces.service, span)
-			if p.captureMetrics() {
-				p.metricBuilder.captureMetrics(traces.namespace, traces.service, span, aTrace.resourceSpan)
+// Samples the trace if the latency threshold exceeds for any of the root, entry or exit spans in the trace
+// Also generates span metrics for the spans of interest
+func (p *assertsProcessorImpl) consumeTraces(ctx context.Context, traces []*trace) error {
+	for _, tr := range traces {
+		for _, ts := range tr.segments {
+			for _, span := range ts.getSpans() {
+				p.spanEnricher.enrichSpan(ts.namespace, ts.service, span)
+				if p.captureMetrics() {
+					p.metricBuilder.captureMetrics(span, ts.namespace, ts.service, ts.resourceSpans)
+				}
 			}
 		}
 	}

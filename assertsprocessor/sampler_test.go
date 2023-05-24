@@ -47,12 +47,12 @@ func TestLatencyIsHighTrue(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 
-	ts := &traceStruct{
+	ts := &traceSegment{
 		rootSpan: &testSpan,
 	}
 	s.updateTrace("platform", "api-server", ts)
 
-	assert.True(t, s.isSlow("platform", "api-server", ts))
+	assert.True(t, s.isSlow(ts))
 }
 
 func TestLatencyIsHighFalse(t *testing.T) {
@@ -67,12 +67,12 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
 
-	ts := &traceStruct{
+	ts := &traceSegment{
 		rootSpan: &testSpan,
 	}
 	s.updateTrace("platform", "api-server", ts)
 
-	assert.False(t, s.isSlow("platform", "api-server", ts))
+	assert.False(t, s.isSlow(ts))
 }
 
 func TestSampleTraceWithError(t *testing.T) {
@@ -108,16 +108,16 @@ func TestSampleTraceWithError(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan:  &rootSpan,
-		exitSpans: []*ptrace.Span{&childSpan},
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+			exitSpans: []*ptrace.Span{&childSpan},
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
@@ -129,9 +129,10 @@ func TestSampleTraceWithError(t *testing.T) {
 		assert.Equal(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").errorQueue.priorityQueue[0]
 		assert.NotNil(t, item.trace)
-		assert.Equal(t, &rootSpan, item.trace.rootSpan)
-		assert.Equal(t, 1, len((*item.trace).exitSpans))
-		assert.NotNil(t, &childSpan, item.trace.exitSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].exitSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].exitSpans[0])
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.7, item.latency)
 		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
@@ -174,16 +175,16 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan:  &rootSpan,
-		exitSpans: []*ptrace.Span{&childSpan},
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+			exitSpans: []*ptrace.Span{&childSpan},
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
@@ -195,9 +196,10 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.NotNil(t, item.trace)
-		assert.Equal(t, &rootSpan, item.trace.rootSpan)
-		assert.Equal(t, 1, len((*item.trace).exitSpans))
-		assert.NotNil(t, &childSpan, item.trace.exitSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].exitSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].exitSpans[0])
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.7, item.latency)
 		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
@@ -238,16 +240,16 @@ func TestSampleNormalTrace(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 2e8)
 	childSpan.SetEndTimestamp(1e9 + 3e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan:      &rootSpan,
-		internalSpans: []*ptrace.Span{&childSpan},
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			rootSpan:      &rootSpan,
+			internalSpans: []*ptrace.Span{&childSpan},
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
@@ -259,9 +261,10 @@ func TestSampleNormalTrace(t *testing.T) {
 		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.NotNil(t, item.trace)
-		assert.Equal(t, &rootSpan, item.trace.rootSpan)
-		assert.Equal(t, 1, len((*item.trace).internalSpans))
-		assert.NotNil(t, &childSpan, item.trace.internalSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].internalSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].internalSpans[0])
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.4, item.latency)
 		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
@@ -276,13 +279,11 @@ func TestWithNoRootTrace(t *testing.T) {
 		metricHelper:       buildMetricHelper(),
 	}
 	ctx := context.Background()
-	traceById := map[string]*traceStruct{}
-	traceById["invalid"] = &traceStruct{}
+	tr := newTrace(
+		&traceSegment{},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		assert.Fail(t, "topTracesByService map should be empty")
@@ -313,32 +314,26 @@ func TestTraceCardinalityLimit(t *testing.T) {
 	rootSpan.SetStartTimestamp(1e9)
 	rootSpan.SetEndTimestamp(1e9 + 7e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan: &rootSpan,
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+		},
+	)
 
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v1/rules")
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 	value, _ := s.topTracesByService.Load("{env=dev, namespace=platform, site=us-west-2}#Service#api-server")
 	serviceQueue := value.(*serviceQueues)
 	assert.Equal(t, 1, serviceQueue.requestCount)
 
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v2/rules")
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 	assert.Equal(t, 2, serviceQueue.requestCount)
 
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v3/rules")
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 	assert.Equal(t, 2, serviceQueue.requestCount)
 }
 
@@ -374,11 +369,14 @@ func TestFlushTraces(t *testing.T) {
 	latencySpan.SetStartTimestamp(1e9)
 	latencySpan.SetEndTimestamp(1e9 + 6e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[latencySpan.TraceID().String()] = &traceStruct{
-		resourceSpan: &resourceSpans,
-		rootSpan:     &latencySpan,
-	}
+	tr1 := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			resourceSpans: &resourceSpans,
+			rootSpan:      &latencySpan,
+		},
+	)
 
 	errorTrace := ptrace.NewTraces()
 	resourceSpans = errorTrace.ResourceSpans().AppendEmpty()
@@ -397,10 +395,14 @@ func TestFlushTraces(t *testing.T) {
 	errorSpan.SetStartTimestamp(1e9)
 	errorSpan.SetEndTimestamp(1e9 + 3e8)
 
-	traceById[errorSpan.TraceID().String()] = &traceStruct{
-		resourceSpan: &resourceSpans,
-		rootSpan:     &errorSpan,
-	}
+	tr2 := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			resourceSpans: &resourceSpans,
+			rootSpan:      &errorSpan,
+		},
+	)
 
 	normalTrace := ptrace.NewTraces()
 	resourceSpans = normalTrace.ResourceSpans().AppendEmpty()
@@ -417,15 +419,16 @@ func TestFlushTraces(t *testing.T) {
 	normalSpan.SetStartTimestamp(1e9)
 	normalSpan.SetEndTimestamp(1e9 + 3e8)
 
-	traceById[normalSpan.TraceID().String()] = &traceStruct{
-		resourceSpan: &resourceSpans,
-		rootSpan:     &normalSpan,
-	}
+	tr3 := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			resourceSpans: &resourceSpans,
+			rootSpan:      &normalSpan,
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr1, tr2, tr3})
 
 	// Check there is one entry for the service
 	serviceNames := make([]string, 0)

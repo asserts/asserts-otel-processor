@@ -137,7 +137,7 @@ func (p *metricHelper) registerLatencyHistogram(captureAttributesInMetric []stri
 	return nil
 }
 
-func (p *metricHelper) captureMetrics(namespace string, service string, span *ptrace.Span,
+func (p *metricHelper) captureMetrics(span *ptrace.Span, namespace string, service string,
 	resourceSpan *ptrace.ResourceSpans) {
 	serviceKey := getServiceKey(namespace, service)
 	attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
