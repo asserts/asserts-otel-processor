@@ -32,7 +32,7 @@ func spanHasError(span *ptrace.Span) bool {
 }
 
 func convertToTraces(traces ptrace.Traces) []*trace {
-	var traceById = map[string]map[string]*traceSegment{}
+	var traceById = map[string]*trace{}
 	for i := 0; i < traces.ResourceSpans().Len(); i++ {
 		resources := traces.ResourceSpans().At(i)
 		resourceAttributes := resources.Resource().Attributes()
@@ -51,7 +51,6 @@ func convertToTraces(traces ptrace.Traces) []*trace {
 		}
 		serviceName := serviceAttr.Str()
 
-		serviceKey := getServiceKey(namespace, serviceName)
 		scopes := resources.ScopeSpans()
 		for j := 0; j < scopes.Len(); j++ {
 			scope := scopes.At(j)
@@ -62,18 +61,18 @@ func convertToTraces(traces ptrace.Traces) []*trace {
 
 				tr, exists := traceById[traceID]
 				if !exists {
-					tr = map[string]*traceSegment{}
+					tr = &trace{}
 					traceById[traceID] = tr
 				}
 
-				ts, exists := tr[serviceKey]
-				if !exists {
+				ts := getSegment(tr, namespace, serviceName)
+				if ts == nil {
 					ts = &traceSegment{
 						resourceSpans: &resources,
 						namespace:     namespace,
 						service:       serviceName,
 					}
-					tr[serviceKey] = ts
+					tr.segments = append(tr.segments, ts)
 				}
 
 				if isRootSpan(&span) {
@@ -91,14 +90,19 @@ func convertToTraces(traces ptrace.Traces) []*trace {
 
 	allTraces := make([]*trace, 0)
 	for _, tr := range traceById {
-		aTrace := &trace{}
-		for _, ts := range tr {
-			aTrace.segments = append(aTrace.segments, ts)
-		}
-		allTraces = append(allTraces, aTrace)
+		allTraces = append(allTraces, tr)
 	}
 
 	return allTraces
+}
+
+func getSegment(tr *trace, namespace string, service string) *traceSegment {
+	for _, ts := range tr.segments {
+		if ts.namespace == namespace && ts.service == service {
+			return ts
+		}
+	}
+	return nil
 }
 
 func buildTrace(tr *trace) *ptrace.Traces {

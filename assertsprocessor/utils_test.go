@@ -36,7 +36,7 @@ func TestSpanHasError(t *testing.T) {
 	assert.True(t, spanHasError(&testSpan))
 }
 
-func TestSpanIterator(t *testing.T) {
+func TestConvertToTraces(t *testing.T) {
 	testTrace := ptrace.NewTraces()
 	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
 	resourceSpans.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
@@ -76,7 +76,7 @@ func TestSpanIterator(t *testing.T) {
 	assert.Equal(t, &nestedSpan, ts.internalSpans[0])
 }
 
-func TestSpansOfATraceSplitAcrossMultipleResourceSpans(t *testing.T) {
+func TestConvertToTracesMultipleResourceSpans2OneSegment(t *testing.T) {
 	testTrace := ptrace.NewTraces()
 	resourceSpans1 := testTrace.ResourceSpans().AppendEmpty()
 	resourceSpans1.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
@@ -124,6 +124,133 @@ func TestSpansOfATraceSplitAcrossMultipleResourceSpans(t *testing.T) {
 	assert.Equal(t, 1, len(ts.internalSpans))
 	assert.Equal(t, &exitSpan, ts.exitSpans[0])
 	assert.Equal(t, &nestedSpan, ts.internalSpans[0])
+}
+
+func TestConvertToTracesOneTraceMultipleSegments(t *testing.T) {
+	testTrace := ptrace.NewTraces()
+	resourceSpans1 := testTrace.ResourceSpans().AppendEmpty()
+	resourceSpans1.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
+	resourceSpans1.Resource().Attributes().PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans1 := resourceSpans1.ScopeSpans().AppendEmpty()
+
+	rootSpan := scopeSpans1.Spans().AppendEmpty()
+	rootSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	exitSpan := scopeSpans1.Spans().AppendEmpty()
+	exitSpan.SetTraceID(rootSpan.TraceID())
+	exitSpan.SetSpanID([8]byte{3, 1, 3, 4, 5, 6, 7, 8})
+	exitSpan.SetKind(ptrace.SpanKindClient)
+	exitSpan.SetParentSpanID(rootSpan.SpanID())
+	exitSpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	resourceSpans2 := testTrace.ResourceSpans().AppendEmpty()
+	resourceSpans2.Resource().Attributes().PutStr(conventions.AttributeServiceName, "model-builder")
+	resourceSpans2.Resource().Attributes().PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans2 := resourceSpans2.ScopeSpans().AppendEmpty()
+
+	entrySpan := scopeSpans2.Spans().AppendEmpty()
+	entrySpan.SetTraceID(rootSpan.TraceID())
+	entrySpan.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
+	entrySpan.SetKind(ptrace.SpanKindServer)
+	entrySpan.SetParentSpanID(exitSpan.SpanID())
+	entrySpan.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	traces := convertToTraces(testTrace)
+	assert.Equal(t, 1, len(traces))
+	assert.Equal(t, 2, len(traces[0].segments))
+
+	ts1 := traces[0].segments[0]
+	assert.Equal(t, rootSpan.TraceID().String(), ts1.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts1.namespace)
+	assert.Equal(t, "api-server", ts1.service)
+	assert.Equal(t, &rootSpan, ts1.rootSpan)
+	assert.Equal(t, 1, len(ts1.exitSpans))
+	assert.Equal(t, &exitSpan, ts1.exitSpans[0])
+
+	ts2 := traces[0].segments[1]
+	assert.Equal(t, rootSpan.TraceID().String(), ts2.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts2.namespace)
+	assert.Equal(t, "model-builder", ts2.service)
+	assert.Equal(t, 1, len(ts2.entrySpans))
+	assert.Equal(t, &entrySpan, ts2.entrySpans[0])
+}
+
+func TestConvertToTracesMultipleTraces(t *testing.T) {
+	testTrace := ptrace.NewTraces()
+	resourceSpans1 := testTrace.ResourceSpans().AppendEmpty()
+	resourceSpans1.Resource().Attributes().PutStr(conventions.AttributeServiceName, "api-server")
+	resourceSpans1.Resource().Attributes().PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans1 := resourceSpans1.ScopeSpans().AppendEmpty()
+
+	rootSpan1 := scopeSpans1.Spans().AppendEmpty()
+	rootSpan1.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan1.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	rootSpan2 := scopeSpans1.Spans().AppendEmpty()
+	rootSpan2.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 9})
+	rootSpan2.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
+	rootSpan2.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	resourceSpans2 := testTrace.ResourceSpans().AppendEmpty()
+	resourceSpans2.Resource().Attributes().PutStr(conventions.AttributeServiceName, "model-builder")
+	resourceSpans2.Resource().Attributes().PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans2 := resourceSpans2.ScopeSpans().AppendEmpty()
+
+	childSpan1 := scopeSpans2.Spans().AppendEmpty()
+	childSpan1.SetTraceID(rootSpan1.TraceID())
+	childSpan1.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 8})
+	childSpan1.SetKind(ptrace.SpanKindServer)
+	childSpan1.SetParentSpanID(rootSpan1.SpanID())
+	childSpan1.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	childSpan2 := scopeSpans2.Spans().AppendEmpty()
+	childSpan2.SetTraceID(rootSpan2.TraceID())
+	childSpan2.SetSpanID([8]byte{2, 1, 3, 4, 5, 6, 7, 9})
+	childSpan2.SetKind(ptrace.SpanKindServer)
+	childSpan2.SetParentSpanID(rootSpan2.SpanID())
+	childSpan2.Attributes().PutStr("http.url", "https://sqs.us-west-2.amazonaws.com/342994379019/NodeJSPerf-WithLayer")
+
+	traces := convertToTraces(testTrace)
+	assert.Equal(t, 2, len(traces))
+	assert.Equal(t, 2, len(traces[0].segments))
+	assert.Equal(t, 2, len(traces[1].segments))
+
+	traceById := map[string]*trace{}
+	for _, tr := range traces {
+		traceById[tr.segments[0].getMainSpan().TraceID().String()] = tr
+	}
+
+	tr1 := traceById[rootSpan1.TraceID().String()]
+	tr2 := traceById[rootSpan2.TraceID().String()]
+
+	ts1 := tr1.segments[0]
+	assert.Equal(t, rootSpan1.TraceID().String(), ts1.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts1.namespace)
+	assert.Equal(t, "api-server", ts1.service)
+	assert.Equal(t, &rootSpan1, ts1.rootSpan)
+
+	ts2 := tr1.segments[1]
+	assert.Equal(t, rootSpan1.TraceID().String(), ts2.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts2.namespace)
+	assert.Equal(t, "model-builder", ts2.service)
+	assert.Equal(t, 1, len(ts2.entrySpans))
+	assert.Equal(t, &childSpan1, ts2.entrySpans[0])
+
+	ts3 := tr2.segments[0]
+	assert.Equal(t, rootSpan2.TraceID().String(), ts3.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts3.namespace)
+	assert.Equal(t, "api-server", ts3.service)
+	assert.Equal(t, &rootSpan2, ts3.rootSpan)
+
+	ts4 := tr2.segments[1]
+	assert.Equal(t, rootSpan2.TraceID().String(), ts4.getMainSpan().TraceID().String())
+	assert.Equal(t, "platform", ts4.namespace)
+	assert.Equal(t, "model-builder", ts4.service)
+	assert.Equal(t, 1, len(ts4.entrySpans))
+	assert.Equal(t, &childSpan2, ts4.entrySpans[0])
 }
 
 func TestBuildTrace(t *testing.T) {
