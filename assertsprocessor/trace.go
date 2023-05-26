@@ -18,38 +18,27 @@ type traceSegment struct {
 	exitSpans     []*ptrace.Span
 }
 
-func (t *traceSegment) getSpans() []*ptrace.Span {
-	spans := make([]*ptrace.Span, 0, len(t.entrySpans)+len(t.exitSpans))
-	if t.rootSpan != nil {
-		spans = append(spans, t.rootSpan)
+func (ts *traceSegment) getSpans() []*ptrace.Span {
+	spans := make([]*ptrace.Span, 0, len(ts.entrySpans)+len(ts.exitSpans))
+	if ts.rootSpan != nil {
+		spans = append(spans, ts.rootSpan)
 	}
-	spans = append(spans, t.entrySpans...)
-	spans = append(spans, t.exitSpans...)
+	spans = append(spans, ts.entrySpans...)
+	spans = append(spans, ts.exitSpans...)
 	return spans
 }
 
-func (t *traceSegment) getMainSpan() *ptrace.Span {
+func (ts *traceSegment) getMainSpan() *ptrace.Span {
 	// A distributed trace will have only one root span. Trace fragments that come from a downstream service
 	// will not have a root span. In such a scenario, use the first entry or exit span as the main span
-	for _, span := range t.getSpans() {
+	for _, span := range ts.getSpans() {
 		return span
 	}
 	return nil
 }
 
-func (t *traceSegment) hasError() bool {
-	for _, span := range t.getSpans() {
-		if spanHasError(span) {
-			return true
-		}
-	}
-	return false
-}
-
-func newTrace(ts *traceSegment) *trace {
+func newTrace(traceSegments ...*traceSegment) *trace {
 	return &trace{
-		segments: []*traceSegment{
-			ts,
-		},
+		segments: traceSegments,
 	}
 }

@@ -3,6 +3,7 @@ package assertsprocessor
 import (
 	"context"
 	"github.com/jellydator/ttlcache/v3"
+	"go.opentelemetry.io/collector/pdata/ptrace"
 	"sync"
 
 	"github.com/tilinna/clock"
@@ -53,6 +54,7 @@ func (s *sampler) stopProcessing() {
 
 func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 	for _, tr := range traces {
+		sampled := false
 		for _, ts := range tr.segments {
 			if ts.getMainSpan() == nil {
 				continue
@@ -76,36 +78,56 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 				ctx:     &ctx,
 				latency: ts.latency,
 			}
-			sampledTraceCountLabels := map[string]string{
-				envLabel:       s.config.Env,
-				siteLabel:      s.config.Site,
-				namespaceLabel: ts.namespace,
-				serviceLabel:   ts.service,
-			}
-			s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
-			if ts.hasError() {
-				ts.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
+			s.incrTotalTraceCount(ts)
+			for _, span := range ts.getSpans() {
+				if spanHasError(span) {
+					s.logger.Debug("Capturing error trace",
+						zap.String("traceId", span.TraceID().String()),
+						zap.String("service", entityKeyString),
+						zap.String("request", request),
+						zap.Float64("latency", ts.latency))
+					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
 
-				s.logger.Debug("Capturing error trace",
-					zap.String("traceId", ts.getMainSpan().TraceID().String()),
-					zap.String("service", entityKeyString),
-					zap.String("request", ts.requestKey.request),
-					zap.Float64("latency", ts.latency))
-				requestState.errorQueue.push(&item)
-				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeError
-			} else if s.isSlow(ts) {
-				ts.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
-				requestState.slowQueue.push(&item)
-				sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeSlow
-			} else {
-				if s.captureNormalSample(ts, &item) {
-					sampledTraceCountLabels[traceSampleTypeLabel] = AssertsTraceSampleTypeNormal
+					if !sampled {
+						s.incrSampledTraceCount(AssertsTraceSampleTypeError, ts)
+						requestState.errorQueue.push(&item)
+						sampled = true
+					}
+				} else if s.spanIsSlow(span, ts) {
+					s.logger.Debug("Capturing slow trace",
+						zap.String("traceId", span.TraceID().String()),
+						zap.String("service", entityKeyString),
+						zap.String("request", request),
+						zap.Float64("latency", ts.latency))
+					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
+
+					if !sampled {
+						s.incrSampledTraceCount(AssertsTraceSampleTypeSlow, ts)
+						requestState.slowQueue.push(&item)
+						sampled = true
+					}
 				}
 			}
+		}
+		if !sampled {
+			s.captureNormalTraceSample(ctx, tr)
+		}
+	}
+}
 
-			if sampledTraceCountLabels[traceSampleTypeLabel] != "" {
-				s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
-			}
+func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) {
+	for _, ts := range tr.segments {
+		if ts.getMainSpan() == nil {
+			continue
+		}
+		item := Item{
+			trace:   tr,
+			ctx:     &ctx,
+			latency: ts.latency,
+		}
+		if s.captureNormalSample(ts, &item) {
+			s.incrSampledTraceCount(AssertsTraceSampleTypeNormal, ts)
+			break
 		}
 	}
 }
@@ -168,23 +190,36 @@ func (s *sampler) updateTrace(namespace string, service string, ts *traceSegment
 	}
 }
 
-func (s *sampler) isSlow(ts *traceSegment) bool {
-	for _, span := range ts.getSpans() {
-		attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
-		request := attrValue.Str()
-		latencyThreshold := s.thresholdHelper.getThreshold(ts.namespace, ts.service, request)
-		latency := computeLatency(span)
-		if latency > latencyThreshold {
-			s.logger.Debug("Capturing slow trace",
-				zap.String("traceId", ts.getMainSpan().TraceID().String()),
-				zap.String("service", ts.requestKey.entityKey.AsString()),
-				zap.String("request", request),
-				zap.Float64("latencyThreshold", latencyThreshold),
-				zap.Float64("latency", latency))
-			return true
-		}
+func (s *sampler) spanIsSlow(span *ptrace.Span, ts *traceSegment) bool {
+	attrValue, _ := span.Attributes().Get(AssertsRequestContextAttribute)
+	request := attrValue.Str()
+	latencyThreshold := s.thresholdHelper.getThreshold(ts.namespace, ts.service, request)
+	latency := computeLatency(span)
+	if latency > latencyThreshold {
+		return true
 	}
 	return false
+}
+
+func (s *sampler) incrTotalTraceCount(ts *traceSegment) {
+	sampledTraceCountLabels := map[string]string{
+		envLabel:       s.config.Env,
+		siteLabel:      s.config.Site,
+		namespaceLabel: ts.namespace,
+		serviceLabel:   ts.service,
+	}
+	s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
+}
+
+func (s *sampler) incrSampledTraceCount(sampleType string, ts *traceSegment) {
+	sampledTraceCountLabels := map[string]string{
+		envLabel:             s.config.Env,
+		siteLabel:            s.config.Site,
+		namespaceLabel:       ts.namespace,
+		serviceLabel:         ts.service,
+		traceSampleTypeLabel: sampleType,
+	}
+	s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
 }
 
 func (s *sampler) stopTraceFlusher() {
