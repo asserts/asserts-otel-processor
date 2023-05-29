@@ -121,7 +121,7 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels["rpc_system"] = "aws-api"
 	expectedLabels["span_kind"] = "Client"
 
-	p.captureMetrics("ride-services", "payment", &testSpan, &resourceSpans)
+	p.captureMetrics(&testSpan, "ride-services", "payment", &resourceSpans)
 }
 
 func TestMetricCardinalityLimit(t *testing.T) {
@@ -144,17 +144,17 @@ func TestMetricCardinalityLimit(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val1")
-	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	p.captureMetrics(&testSpan, "robot-shop", "cart", &resourceSpans)
 	assert.Equal(t, 1, p.requestContextsByService.Size())
 	cache, _ := p.requestContextsByService.Load("robot-shop#cart")
 	assert.Equal(t, 1, cache.Len())
 
 	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val2")
-	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	p.captureMetrics(&testSpan, "robot-shop", "cart", &resourceSpans)
 	assert.Equal(t, 2, cache.Len())
 
 	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val3")
-	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	p.captureMetrics(&testSpan, "robot-shop", "cart", &resourceSpans)
 	assert.Equal(t, 2, cache.Len())
 	assert.NotNil(t, cache.Get("/cart/#val1"))
 	assert.NotNil(t, cache.Get("/cart/#val2"))
@@ -184,7 +184,7 @@ func TestCacheEviction(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val1")
-	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	p.captureMetrics(&testSpan, "robot-shop", "cart", &resourceSpans)
 	assert.Equal(t, 1, p.requestContextsByService.Size())
 	cache, _ := p.requestContextsByService.Load("robot-shop#cart")
 	assert.Equal(t, 1, cache.Len())
@@ -199,7 +199,7 @@ func TestCacheEviction(t *testing.T) {
 	time.Sleep(5 * time.Millisecond)
 
 	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/#val2")
-	p.captureMetrics("robot-shop", "cart", &testSpan, &resourceSpans)
+	p.captureMetrics(&testSpan, "robot-shop", "cart", &resourceSpans)
 	assert.Equal(t, 1, cache.Len())
 }
 

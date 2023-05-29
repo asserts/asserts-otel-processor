@@ -35,7 +35,7 @@ var th = thresholdHelper{
 	rwMutex:    &sync.RWMutex{},
 }
 
-func TestLatencyIsHighTrue(t *testing.T) {
+func TestSpanIsSlowTrue(t *testing.T) {
 	var s = sampler{
 		logger:          logger,
 		config:          &config,
@@ -47,15 +47,15 @@ func TestLatencyIsHighTrue(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 6e8)
 
-	ts := &traceStruct{
+	ts := &traceSegment{
 		rootSpan: &testSpan,
 	}
 	s.updateTrace("platform", "api-server", ts)
 
-	assert.True(t, s.isSlow("platform", "api-server", ts))
+	assert.True(t, s.spanIsSlow(&testSpan, ts))
 }
 
-func TestLatencyIsHighFalse(t *testing.T) {
+func TestSpanIsSlowFalse(t *testing.T) {
 	var s = sampler{
 		logger:          logger,
 		config:          &config,
@@ -67,15 +67,15 @@ func TestLatencyIsHighFalse(t *testing.T) {
 	testSpan.SetStartTimestamp(1e9)
 	testSpan.SetEndTimestamp(1e9 + 4e8)
 
-	ts := &traceStruct{
+	ts := &traceSegment{
 		rootSpan: &testSpan,
 	}
 	s.updateTrace("platform", "api-server", ts)
 
-	assert.False(t, s.isSlow("platform", "api-server", ts))
+	assert.False(t, s.spanIsSlow(&testSpan, ts))
 }
 
-func TestSampleTraceWithError(t *testing.T) {
+func TestSampleTraceWithErrorSpan(t *testing.T) {
 	cache := sync.Map{}
 	var s = sampler{
 		logger:             logger,
@@ -97,27 +97,27 @@ func TestSampleTraceWithError(t *testing.T) {
 	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
 	rootSpan.SetStartTimestamp(1e9)
-	rootSpan.SetEndTimestamp(1e9 + 7e8)
+	rootSpan.SetEndTimestamp(1e9 + 1e8)
 
 	childSpan := scopeSpans.Spans().AppendEmpty()
 	childSpan.SetParentSpanID(rootSpan.SpanID())
 	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
+	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/payment/pay/:id")
 	childSpan.SetKind(ptrace.SpanKindClient)
 	childSpan.Status().SetCode(ptrace.StatusCodeError)
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan:  &rootSpan,
-		exitSpans: []*ptrace.Span{&childSpan},
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+			exitSpans: []*ptrace.Span{&childSpan},
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
@@ -129,18 +129,19 @@ func TestSampleTraceWithError(t *testing.T) {
 		assert.Equal(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").errorQueue.priorityQueue[0]
 		assert.NotNil(t, item.trace)
-		assert.Equal(t, &rootSpan, item.trace.rootSpan)
-		assert.Equal(t, 1, len((*item.trace).exitSpans))
-		assert.NotNil(t, &childSpan, item.trace.exitSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].exitSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].exitSpans[0])
 		assert.Equal(t, ctx, *item.ctx)
-		assert.Equal(t, 0.7, item.latency)
-		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
-		assert.True(t, found)
+		assert.Equal(t, 0.1, item.latency)
+		sampleType, _ := childSpan.Attributes().Get(AssertsTraceSampleTypeAttribute)
+		assert.Equal(t, AssertsTraceSampleTypeError, sampleType.Str())
 		return true
 	})
 }
 
-func TestSampleTraceWithHighLatency(t *testing.T) {
+func TestSampleTraceWithSlowSpan(t *testing.T) {
 	cache := sync.Map{}
 	s := sampler{
 		logger:             logger,
@@ -170,20 +171,20 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 	childSpan.SetParentSpanID(rootSpan.SpanID())
 	childSpan.SetKind(ptrace.SpanKindClient)
 	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
-	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
+	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/payment/pay/:id")
 	childSpan.SetStartTimestamp(1e9 + 1e8)
 	childSpan.SetEndTimestamp(1e9 + 5e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan:  &rootSpan,
-		exitSpans: []*ptrace.Span{&childSpan},
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+			exitSpans: []*ptrace.Span{&childSpan},
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
@@ -195,15 +196,118 @@ func TestSampleTraceWithHighLatency(t *testing.T) {
 		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.NotNil(t, item.trace)
-		assert.Equal(t, &rootSpan, item.trace.rootSpan)
-		assert.Equal(t, 1, len((*item.trace).exitSpans))
-		assert.NotNil(t, &childSpan, item.trace.exitSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].exitSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].exitSpans[0])
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.7, item.latency)
-		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
-		assert.True(t, found)
+		sampleType, _ := rootSpan.Attributes().Get(AssertsTraceSampleTypeAttribute)
+		assert.Equal(t, AssertsTraceSampleTypeSlow, sampleType.Str())
 		return true
 	})
+}
+
+func TestSampleTraceWithTwoSegments(t *testing.T) {
+	cache := sync.Map{}
+	s := sampler{
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
+		metricHelper:       buildMetricHelper(),
+	}
+
+	ctx := context.Background()
+	testTrace := ptrace.NewTraces()
+	paymentResourceSpans := testTrace.ResourceSpans().AppendEmpty()
+	paymentAttributes := paymentResourceSpans.Resource().Attributes()
+	paymentAttributes.PutStr(conventions.AttributeServiceName, "payment")
+	paymentAttributes.PutStr(conventions.AttributeServiceNamespace, "robot-shop")
+	paymentScopeSpans := paymentResourceSpans.ScopeSpans().AppendEmpty()
+
+	paymentRootSpan := paymentScopeSpans.Spans().AppendEmpty()
+	paymentRootSpan.SetTraceID([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8})
+	paymentRootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	paymentRootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/payment/pay/<id>")
+	paymentRootSpan.SetStartTimestamp(1e9)
+	paymentRootSpan.SetEndTimestamp(1e9 + 7e8)
+
+	paymentExitSpan := paymentScopeSpans.Spans().AppendEmpty()
+	paymentExitSpan.SetTraceID(paymentRootSpan.TraceID())
+	paymentExitSpan.SetParentSpanID(paymentRootSpan.SpanID())
+	paymentExitSpan.SetKind(ptrace.SpanKindClient)
+	paymentExitSpan.Status().SetCode(ptrace.StatusCodeError)
+	paymentExitSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
+	paymentExitSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/payment/cart/<id>")
+	paymentExitSpan.SetStartTimestamp(1e9 + 7e8)
+	paymentExitSpan.SetEndTimestamp(1e9 + 8e8)
+
+	cartResourceSpans := testTrace.ResourceSpans().AppendEmpty()
+	cartAttributes := cartResourceSpans.Resource().Attributes()
+	cartAttributes.PutStr(conventions.AttributeServiceName, "cart")
+	cartAttributes.PutStr(conventions.AttributeServiceNamespace, "robot-shop")
+	cartScopeSpans := cartResourceSpans.ScopeSpans().AppendEmpty()
+
+	cartEntrySpan := cartScopeSpans.Spans().AppendEmpty()
+	cartEntrySpan.SetTraceID(paymentRootSpan.TraceID())
+	cartEntrySpan.SetParentSpanID(paymentExitSpan.SpanID())
+	cartEntrySpan.SetKind(ptrace.SpanKindClient)
+	cartEntrySpan.Status().SetCode(ptrace.StatusCodeError)
+	cartEntrySpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 0})
+	cartEntrySpan.Attributes().PutStr(AssertsRequestContextAttribute, "/cart/delete/:id")
+	cartEntrySpan.SetStartTimestamp(1e9 + 8e8)
+	cartEntrySpan.SetEndTimestamp(1e9 + 9e8)
+
+	tr := newTrace(
+		&traceSegment{
+			namespace: "robot-shop",
+			service:   "payment",
+			rootSpan:  &paymentRootSpan,
+			exitSpans: []*ptrace.Span{&paymentExitSpan},
+		},
+		&traceSegment{
+			namespace:  "robot-shop",
+			service:    "cart",
+			entrySpans: []*ptrace.Span{&cartEntrySpan},
+		},
+	)
+
+	s.sampleTraces(ctx, []*trace{tr})
+
+	{
+		value, _ := s.topTracesByService.Load("{env=dev, namespace=robot-shop, site=us-west-2}#Service#payment")
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, 1, serviceQueue.requestCount)
+		assert.NotNil(t, serviceQueue.getRequestState("/payment/pay/<id>"))
+		assert.Equal(t, 1, serviceQueue.getRequestState("/payment/pay/<id>").slowTraceCount())
+		assert.Equal(t, 0, serviceQueue.getRequestState("/payment/pay/<id>").errorTraceCount())
+		item := *serviceQueue.getRequestState("/payment/pay/<id>").slowQueue.priorityQueue[0]
+		assert.NotNil(t, item.trace)
+		assert.Equal(t, 2, len((*item.trace).segments))
+		assert.Equal(t, &paymentRootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].exitSpans))
+		assert.NotNil(t, &paymentExitSpan, item.trace.segments[0].exitSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments[1].entrySpans))
+		assert.NotNil(t, &cartEntrySpan, item.trace.segments[1].entrySpans[0])
+		assert.Equal(t, ctx, *item.ctx)
+		assert.Equal(t, 0.7, item.latency)
+		sampleType, _ := paymentRootSpan.Attributes().Get(AssertsTraceSampleTypeAttribute)
+		assert.Equal(t, AssertsTraceSampleTypeSlow, sampleType.Str())
+		sampleType, _ = paymentExitSpan.Attributes().Get(AssertsTraceSampleTypeAttribute)
+		assert.Equal(t, AssertsTraceSampleTypeError, sampleType.Str())
+	}
+
+	{
+		value, _ := s.topTracesByService.Load("{env=dev, namespace=robot-shop, site=us-west-2}#Service#cart")
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, 1, serviceQueue.requestCount)
+		assert.NotNil(t, serviceQueue.getRequestState("/cart/delete/:id"))
+		assert.Equal(t, 0, serviceQueue.getRequestState("/cart/delete/:id").slowTraceCount())
+		assert.Equal(t, 0, serviceQueue.getRequestState("/cart/delete/:id").errorTraceCount())
+		sampleType, _ := cartEntrySpan.Attributes().Get(AssertsTraceSampleTypeAttribute)
+		assert.Equal(t, AssertsTraceSampleTypeError, sampleType.Str())
+	}
 }
 
 func TestSampleNormalTrace(t *testing.T) {
@@ -238,16 +342,16 @@ func TestSampleNormalTrace(t *testing.T) {
 	childSpan.SetStartTimestamp(1e9 + 2e8)
 	childSpan.SetEndTimestamp(1e9 + 3e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan:      &rootSpan,
-		internalSpans: []*ptrace.Span{&childSpan},
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			rootSpan:      &rootSpan,
+			internalSpans: []*ptrace.Span{&childSpan},
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		stringKey := key.(string)
@@ -259,9 +363,10 @@ func TestSampleNormalTrace(t *testing.T) {
 		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
 		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
 		assert.NotNil(t, item.trace)
-		assert.Equal(t, &rootSpan, item.trace.rootSpan)
-		assert.Equal(t, 1, len((*item.trace).internalSpans))
-		assert.NotNil(t, &childSpan, item.trace.internalSpans[0])
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].internalSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].internalSpans[0])
 		assert.Equal(t, ctx, *item.ctx)
 		assert.Equal(t, 0.4, item.latency)
 		_, found := rootSpan.Attributes().Get(AssertsRequestContextAttribute)
@@ -276,13 +381,11 @@ func TestWithNoRootTrace(t *testing.T) {
 		metricHelper:       buildMetricHelper(),
 	}
 	ctx := context.Background()
-	traceById := map[string]*traceStruct{}
-	traceById["invalid"] = &traceStruct{}
+	tr := newTrace(
+		&traceSegment{},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 
 	s.topTracesByService.Range(func(key any, value any) bool {
 		assert.Fail(t, "topTracesByService map should be empty")
@@ -313,32 +416,26 @@ func TestTraceCardinalityLimit(t *testing.T) {
 	rootSpan.SetStartTimestamp(1e9)
 	rootSpan.SetEndTimestamp(1e9 + 7e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[rootSpan.TraceID().String()] = &traceStruct{
-		rootSpan: &rootSpan,
-	}
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+		},
+	)
 
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v1/rules")
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 	value, _ := s.topTracesByService.Load("{env=dev, namespace=platform, site=us-west-2}#Service#api-server")
 	serviceQueue := value.(*serviceQueues)
 	assert.Equal(t, 1, serviceQueue.requestCount)
 
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v2/rules")
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 	assert.Equal(t, 2, serviceQueue.requestCount)
 
 	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v3/rules")
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr})
 	assert.Equal(t, 2, serviceQueue.requestCount)
 }
 
@@ -374,11 +471,14 @@ func TestFlushTraces(t *testing.T) {
 	latencySpan.SetStartTimestamp(1e9)
 	latencySpan.SetEndTimestamp(1e9 + 6e8)
 
-	traceById := map[string]*traceStruct{}
-	traceById[latencySpan.TraceID().String()] = &traceStruct{
-		resourceSpan: &resourceSpans,
-		rootSpan:     &latencySpan,
-	}
+	tr1 := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			resourceSpans: &resourceSpans,
+			rootSpan:      &latencySpan,
+		},
+	)
 
 	errorTrace := ptrace.NewTraces()
 	resourceSpans = errorTrace.ResourceSpans().AppendEmpty()
@@ -397,10 +497,14 @@ func TestFlushTraces(t *testing.T) {
 	errorSpan.SetStartTimestamp(1e9)
 	errorSpan.SetEndTimestamp(1e9 + 3e8)
 
-	traceById[errorSpan.TraceID().String()] = &traceStruct{
-		resourceSpan: &resourceSpans,
-		rootSpan:     &errorSpan,
-	}
+	tr2 := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			resourceSpans: &resourceSpans,
+			rootSpan:      &errorSpan,
+		},
+	)
 
 	normalTrace := ptrace.NewTraces()
 	resourceSpans = normalTrace.ResourceSpans().AppendEmpty()
@@ -417,15 +521,16 @@ func TestFlushTraces(t *testing.T) {
 	normalSpan.SetStartTimestamp(1e9)
 	normalSpan.SetEndTimestamp(1e9 + 3e8)
 
-	traceById[normalSpan.TraceID().String()] = &traceStruct{
-		resourceSpan: &resourceSpans,
-		rootSpan:     &normalSpan,
-	}
+	tr3 := newTrace(
+		&traceSegment{
+			namespace:     "platform",
+			service:       "api-server",
+			resourceSpans: &resourceSpans,
+			rootSpan:      &normalSpan,
+		},
+	)
 
-	s.sampleTraces(ctx, &resourceTraces{
-		namespace: "platform", service: "api-server",
-		traceById: &traceById,
-	})
+	s.sampleTraces(ctx, []*trace{tr1, tr2, tr3})
 
 	// Check there is one entry for the service
 	serviceNames := make([]string, 0)
