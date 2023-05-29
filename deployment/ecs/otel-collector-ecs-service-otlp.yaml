@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Asserts OTEL Collector Security Group Stack
+Parameters:
+  AssertsEnvironment:
+    Type: String
+    Description: The installation environment name
+  AssertsSite:
+    Type: String
+    Description: The installation site name
+  OTLPExportEndpoint:
+    Type: String
+    Description: OTLP Endpoint to export traces to
+  Cluster:
+    Type: String
+    Description: "Asserts OTEL Cluster"
+    Default: "asserts-otel"
+
+  ECSSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "The IDs of the subnets on which the OTEL Collector ECS Tasks should be installed."
+
+  ECSSecurityGroupId:
+    Type: String
+
+  AssignPublicIPToECSTask:
+    Type: String
+    Description: Determines whether the ECS Task ENIs will be assigned a public IP
+    Default: "ENABLED"
+    AllowedValues: [ "ENABLED", "DISABLED" ]
+
+  AssertsOTELCollectorVersion:
+    Type: String
+    Description: "Asserts OTEL Collector Image version"
+    Default: docker.io/asserts/otel-collector:v0.0.78
+
+  TraceStore:
+    Type: String
+    Description: Backend trace store. One of OTLP, OTLP-HTTP
+    AllowedValues:
+      - OTLP
+      - OTLP-HTTP
+
+  MetricExporterVersion:
+    Type: String
+    Description: "Metric Exporter Sidecar Image version"
+    Default: docker.io/asserts/ecs-dockerstats-exporter:v1.0.0
+
+  AssertsApiServerURL:
+    Type: String
+    Description: Asserts ApiServer Username
+
+  AssertsApiServerUsername:
+    Type: String
+
+  AssertsApiServerPassword:
+    Type: String
+    NoEcho: true
+
+  AssertsRemoteWriteURL:
+    Type: String
+    Default: https://acme.tsdb.asserts.ai
+
+  AssertsTenantName:
+    Type: String
+    Default: Acme
+
+  AssertsTSDBPassword:
+    Type: String
+    NoEcho: true
+
+  NumCollectorInstances:
+    Type: String
+    Description: Number of Collector Instances to install
+
+  LogLevel:
+    Type: String
+    Default: info
+
+  CollectorHTTPTargetGroupARN:
+    Type: String
+Resources:
+  OTELCollectorECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Join [ "-", [ !Ref Cluster, !Ref AssertsEnvironment ] ]
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "Asserts OTEL Collector"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: disabled
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "Asserts OTEL Collector"
+      LogGroupName: !Join ["-", ["asserts-otel-collector" , !Ref AssertsEnvironment]]
+      RetentionInDays: 7
+
+  AssertsOTELCollectorService:
+    Type: AWS::ECS::Service
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "Asserts OTEL Collector"
+      Cluster: !Join [ "-", [ !Ref Cluster, !Ref AssertsEnvironment ] ]
+      ServiceName: !Join [ "-", [ "asserts-otel-collector", !Ref AssertsEnvironment ] ]
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DeploymentController:
+        Type: ECS
+      LaunchType: FARGATE
+      DesiredCount: !Ref NumCollectorInstances
+      LoadBalancers:
+        - ContainerName: asserts-otel-collector
+          ContainerPort: 4318
+          TargetGroupArn: !Ref CollectorHTTPTargetGroupARN
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: !Ref AssignPublicIPToECSTask
+          SecurityGroups:
+            - !Ref ECSSecurityGroupId
+          Subnets: !Ref ECSSubnets
+      PlatformVersion: 1.4.0
+      PropagateTags: SERVICE
+      SchedulingStrategy: REPLICA
+      TaskDefinition:
+        Ref: AssertsOTELCollectorTaskDefinition
+
+  AssertsOTELCollectorTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "Asserts OTEL Collector"
+      Cpu: "2048"
+      ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/AssertsOTELECSExecutionRole-${AssertsEnvironment}"
+      TaskRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/AssertsOTELECSTaskRole-${AssertsEnvironment}"
+      Family: !Sub "asserts-otel-${AssertsEnvironment}"
+      Memory: "4096"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ContainerDefinitions:
+        - Essential: true
+          Image: !Ref AssertsOTELCollectorVersion
+          Name: asserts-otel-collector
+          LinuxParameters: { }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "asserts-otel-collector-${AssertsEnvironment}"
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: asserts-otel-collector
+          PortMappings:
+            - ContainerPort: 4317
+              HostPort: 4317
+              Protocol: tcp
+            - ContainerPort: 4318
+              HostPort: 4318
+              Protocol: tcp
+          DockerLabels:
+            PROMETHEUS_EXPORTER_PORT: 9465
+            PROMETHEUS_EXPORTER_PATH: /metrics
+          Environment:
+            - Name: ASSERTS_SERVER_API_ENDPOINT
+              Value: !Ref AssertsApiServerURL
+            - Name: ASSERTS_ENV
+              Value: !Ref AssertsEnvironment
+            - Name: ASSERTS_SITE
+              Value: !Ref AssertsSite
+            - Name: TRACE_STORE
+              Value: !Ref TraceStore
+            - Name: OTLP_ENDPOINT
+              Value: !Ref OTLPExportEndpoint
+            - Name: ASSERTS_SERVER_USERNAME
+              Value: !Ref AssertsApiServerUsername
+            - Name: ASSERTS_SERVER_PASSWORD
+              Value: !Ref AssertsApiServerPassword
+            - Name: LOG_LEVEL
+              Value: !Ref LogLevel
+        - Essential: true
+          Name: metric-exporter
+          Image: !Ref MetricExporterVersion
+          LinuxParameters: { }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "asserts-otel-collector-${AssertsEnvironment}"
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: metric-exporter
+          PortMappings:
+            - ContainerPort: 8429
+              HostPort: 8429
+              Protocol: tcp
+          DependsOn:
+            - Condition: START
+              ContainerName: asserts-otel-collector
+          Environment:
+            - Name: remoteWrite_basicAuth_username
+              Value: !Ref AssertsTenantName
+            - Name: httpAuth_username
+              Value: !Ref AssertsTenantName
+            - Name: remoteWrite_url
+              Value: !Ref AssertsRemoteWriteURL
+            - Name: remoteWrite_basicAuth_password
+              Value: !Ref AssertsTSDBPassword
+            - Name: httpAuth_password
+              Value: !Ref AssertsTSDBPassword
+          DockerLabels:
+            PROMETHEUS_EXPORTER_PORT: 8014
+            PROMETHEUS_EXPORTER_PATH: /container-stats/actuator/prometheus
