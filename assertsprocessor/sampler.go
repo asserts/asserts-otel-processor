@@ -79,7 +79,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 				latency: ts.latency,
 			}
 			s.incrTotalTraceCount(ts)
-			for _, span := range ts.getSpans() {
+			for _, span := range ts.getNonInternalSpans() {
 				if spanHasError(span) {
 					s.logger.Debug("Capturing error trace",
 						zap.String("traceId", span.TraceID().String()),

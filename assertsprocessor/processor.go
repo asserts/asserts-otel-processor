@@ -54,7 +54,7 @@ func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.
 func (p *assertsProcessorImpl) consumeTraces(ctx context.Context, traces []*trace) error {
 	for _, tr := range traces {
 		for _, ts := range tr.segments {
-			for _, span := range ts.getSpans() {
+			for _, span := range ts.getNonInternalSpans() {
 				p.spanEnricher.enrichSpan(ts.namespace, ts.service, span)
 				if p.captureMetrics() {
 					p.metricBuilder.captureMetrics(span, ts.namespace, ts.service, ts.resourceSpans)

@@ -112,7 +112,7 @@ func buildTrace(tr *trace) *ptrace.Traces {
 		ts.resourceSpans.Resource().CopyTo(rs.Resource())
 		ils := rs.ScopeSpans().AppendEmpty()
 
-		spans := ts.getSpans()
+		spans := ts.getNonInternalSpans()
 		spans = append(spans, ts.internalSpans...)
 
 		for _, span := range spans {

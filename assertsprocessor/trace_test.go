@@ -23,7 +23,7 @@ func TestGetSpans(t *testing.T) {
 		internalSpans: []*ptrace.Span{&internalSpan},
 	}
 
-	assert.Equal(t, []*ptrace.Span{&rootSpan, &entrySpan, &exitSpan}, ts.getSpans())
+	assert.Equal(t, []*ptrace.Span{&rootSpan, &entrySpan, &exitSpan}, ts.getNonInternalSpans())
 }
 
 func TestGetMainSpan(t *testing.T) {
