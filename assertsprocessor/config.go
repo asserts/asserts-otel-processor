@@ -23,6 +23,11 @@ type Config struct {
 // Validate implements the component.ConfigValidator interface.
 // Checks for any invalid regexp
 func (config *Config) Validate() error {
+	if config.Env == "" {
+		return ValidationError{
+			message: fmt.Sprintf("Env property is not set"),
+		}
+	}
 	for targetAtt, byServiceKey := range config.CustomAttributeConfigs {
 		for serviceKey, configs := range byServiceKey {
 			for _, _config := range configs {
