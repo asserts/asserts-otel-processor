@@ -33,8 +33,6 @@ func createDefaultConfig() component.Config {
 		AssertsServer: &map[string]string{
 			"endpoint": "https://chief.app.dev.asserts.ai",
 		},
-		Env:                            "dev",
-		Site:                           "us-west-2",
 		DefaultLatencyThreshold:        3,
 		LimitPerService:                100,
 		LimitPerRequestPerService:      3,

@@ -18,7 +18,7 @@ type dummyConsumer struct {
 	consumer.Traces
 }
 
-func (dC dummyConsumer) ConsumeTraces(ctx context.Context, trace ptrace.Traces) error {
+func (dC dummyConsumer) ConsumeTraces(ctx context.Context, _ ptrace.Traces) error {
 	dC.items = append(dC.items, &Item{
 		ctx: &ctx,
 	})
@@ -34,8 +34,8 @@ func TestDefaultConfig(t *testing.T) {
 	factory := NewFactory()
 	var defaultConfig = factory.CreateDefaultConfig()
 	var pConfig = defaultConfig.(*Config)
-	assert.Equal(t, "dev", pConfig.Env)
-	assert.Equal(t, "us-west-2", pConfig.Site)
+	assert.Equal(t, "", pConfig.Env)
+	assert.Equal(t, "", pConfig.Site)
 	assert.Equal(t, 100, pConfig.LimitPerService)
 	assert.Equal(t, float64(3), pConfig.DefaultLatencyThreshold)
 }

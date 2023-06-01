@@ -8,6 +8,7 @@ import (
 
 func TestValidateNoError(t *testing.T) {
 	dto := Config{
+		Env: "dev",
 		CustomAttributeConfigs: map[string]map[string][]*CustomAttributeConfig{
 			"asserts.request.context": {
 				"default": {
@@ -25,8 +26,29 @@ func TestValidateNoError(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestEnvMissing(t *testing.T) {
+	dto := Config{
+		CustomAttributeConfigs: map[string]map[string][]*CustomAttributeConfig{
+			"asserts.request.context": {
+				"default": {
+					{
+						SourceAttributes: []string{"attribute"},
+						SpanKinds:        []string{"Client"},
+						RegExp:           "(.+)",
+						Replacement:      "$1",
+					},
+				},
+			},
+		},
+	}
+	err := dto.Validate()
+	assert.NotNil(t, err)
+	assert.Equal(t, "Env property is not set", err.Error())
+}
+
 func TestValidateLimits(t *testing.T) {
 	dto := Config{
+		Env: "dev",
 		CustomAttributeConfigs: map[string]map[string][]*CustomAttributeConfig{
 			"asserts.request.context": {
 				"default": {
