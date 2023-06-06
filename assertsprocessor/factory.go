@@ -100,7 +100,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Duration(pConfig.TraceFlushFrequencySeconds) * time.Second),
 		nextConsumer:       nextConsumer,
 		stop:               make(chan bool),
-		metricHelper:       metricsHelper,
+		metrics:            metricsHelper.metrics,
 	}
 
 	p := &assertsProcessorImpl{

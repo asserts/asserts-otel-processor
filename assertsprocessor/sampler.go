@@ -39,7 +39,7 @@ type sampler struct {
 	traceFlushTicker   *clock.Ticker
 	nextConsumer       consumer.Traces
 	stop               chan bool
-	metricHelper       *metricHelper
+	metrics            *metrics
 }
 
 func (s *sampler) startProcessing() {
@@ -110,12 +110,21 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 			}
 		}
 		if !sampled {
-			s.captureNormalTraceSample(ctx, tr)
+			sampled = s.captureNormalTraceSample(ctx, tr)
+		}
+		spanCountLabels := map[string]string{
+			envLabel:  s.config.Env,
+			siteLabel: s.config.Site,
+		}
+		count := float64(tr.getSpanCount())
+		s.metrics.totalSpansCount.With(spanCountLabels).Add(count)
+		if sampled {
+			s.metrics.sampledSpansCount.With(spanCountLabels).Add(count)
 		}
 	}
 }
 
-func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) {
+func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) bool {
 	for _, ts := range tr.segments {
 		if ts.getMainSpan() == nil {
 			continue
@@ -127,9 +136,10 @@ func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) {
 		}
 		if s.captureNormalSample(ts, &item) {
 			s.incrSampledTraceCount(AssertsTraceSampleTypeNormal, ts)
-			break
+			return true
 		}
 	}
+	return false
 }
 
 func (s *sampler) captureNormalSample(ts *traceSegment, item *Item) bool {
@@ -208,7 +218,7 @@ func (s *sampler) incrTotalTraceCount(ts *traceSegment) {
 		namespaceLabel: ts.namespace,
 		serviceLabel:   ts.service,
 	}
-	s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
+	s.metrics.totalTraceCount.With(sampledTraceCountLabels).Inc()
 }
 
 func (s *sampler) incrSampledTraceCount(sampleType string, ts *traceSegment) {
@@ -219,7 +229,7 @@ func (s *sampler) incrSampledTraceCount(sampleType string, ts *traceSegment) {
 		serviceLabel:         ts.service,
 		traceSampleTypeLabel: sampleType,
 	}
-	s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
+	s.metrics.sampledTraceCount.With(sampledTraceCountLabels).Inc()
 }
 
 func (s *sampler) stopTraceFlusher() {
