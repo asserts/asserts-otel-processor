@@ -72,9 +72,8 @@ func TestGetSpanCount(t *testing.T) {
 	}
 	ts4 := &traceSegment{}
 
-	tr := trace{
-		segments: []*traceSegment{ts1, ts2, ts3, ts4},
-	}
-
-	assert.Equal(t, 11, tr.getSpanCount())
+	assert.Equal(t, 4, ts1.getSpanCount())
+	assert.Equal(t, 3, ts2.getSpanCount())
+	assert.Equal(t, 4, ts3.getSpanCount())
+	assert.Equal(t, 0, ts4.getSpanCount())
 }

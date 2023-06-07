@@ -568,29 +568,31 @@ func TestFlushTraces(t *testing.T) {
 }
 
 func buildMetrics() *metrics {
-	reg := &metrics{}
+	reg := &metrics{
+		config: &config,
+	}
 	reg.sampledTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "trace",
 		Name:      "sampled_count_total",
-	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel, traceSampleTypeLabel})
+	}, []string{envLabel, siteLabel, traceSampleTypeLabel})
 
 	reg.totalTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "trace",
 		Name:      "count_total",
-	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
+	}, []string{envLabel, siteLabel})
 
-	reg.totalSpansCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	reg.totalSpanCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "spans",
 		Name:      "count_total",
-	}, []string{envLabel, siteLabel})
+	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
 
-	reg.sampledSpansCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	reg.sampledSpanCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "spans",
 		Name:      "sampled_count_total",
-	}, []string{envLabel, siteLabel})
+	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
 	return reg
 }

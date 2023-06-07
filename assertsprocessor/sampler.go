@@ -78,7 +78,6 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 				ctx:     &ctx,
 				latency: ts.latency,
 			}
-			s.incrTotalTraceCount(ts)
 			for _, span := range ts.getNonInternalSpans() {
 				if spanHasError(span) {
 					s.logger.Debug("Capturing error trace",
@@ -89,7 +88,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
 
 					if !sampled {
-						s.incrSampledTraceCount(AssertsTraceSampleTypeError, ts)
+						s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeError)
 						requestState.errorQueue.push(&item)
 						sampled = true
 					}
@@ -102,7 +101,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
 
 					if !sampled {
-						s.incrSampledTraceCount(AssertsTraceSampleTypeSlow, ts)
+						s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeSlow)
 						requestState.slowQueue.push(&item)
 						sampled = true
 					}
@@ -112,15 +111,8 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 		if !sampled {
 			sampled = s.captureNormalTraceSample(ctx, tr)
 		}
-		spanCountLabels := map[string]string{
-			envLabel:  s.config.Env,
-			siteLabel: s.config.Site,
-		}
-		count := float64(tr.getSpanCount())
-		s.metrics.totalSpansCount.With(spanCountLabels).Add(count)
-		if sampled {
-			s.metrics.sampledSpansCount.With(spanCountLabels).Add(count)
-		}
+		s.metrics.incrTotalTraceCount()
+		s.metrics.incrSpanCount(tr, sampled)
 	}
 }
 
@@ -135,7 +127,7 @@ func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) bool 
 			latency: ts.latency,
 		}
 		if s.captureNormalSample(ts, &item) {
-			s.incrSampledTraceCount(AssertsTraceSampleTypeNormal, ts)
+			s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeNormal)
 			return true
 		}
 	}
@@ -209,27 +201,6 @@ func (s *sampler) spanIsSlow(span *ptrace.Span, ts *traceSegment) bool {
 		return true
 	}
 	return false
-}
-
-func (s *sampler) incrTotalTraceCount(ts *traceSegment) {
-	sampledTraceCountLabels := map[string]string{
-		envLabel:       s.config.Env,
-		siteLabel:      s.config.Site,
-		namespaceLabel: ts.namespace,
-		serviceLabel:   ts.service,
-	}
-	s.metrics.totalTraceCount.With(sampledTraceCountLabels).Inc()
-}
-
-func (s *sampler) incrSampledTraceCount(sampleType string, ts *traceSegment) {
-	sampledTraceCountLabels := map[string]string{
-		envLabel:             s.config.Env,
-		siteLabel:            s.config.Site,
-		namespaceLabel:       ts.namespace,
-		serviceLabel:         ts.service,
-		traceSampleTypeLabel: sampleType,
-	}
-	s.metrics.sampledTraceCount.With(sampledTraceCountLabels).Inc()
 }
 
 func (s *sampler) stopTraceFlusher() {

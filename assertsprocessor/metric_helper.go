@@ -43,6 +43,7 @@ type metricHelper struct {
 func newMetricHelper(logger *zap.Logger, config *Config) *metricHelper {
 	metrics := &metrics{
 		logger:             logger,
+		config:             config,
 		prometheusRegistry: prometheus.NewRegistry(),
 	}
 	exporter := &metricsExporter{

@@ -6,17 +6,6 @@ type trace struct {
 	segments []*traceSegment
 }
 
-func (tr *trace) getSpanCount() int {
-	var count int
-	for _, ts := range tr.segments {
-		count += len(ts.entrySpans) + len(ts.exitSpans) + len(ts.internalSpans)
-		if ts.rootSpan != nil {
-			count += 1
-		}
-	}
-	return count
-}
-
 type traceSegment struct {
 	resourceSpans    *ptrace.ResourceSpans
 	namespace        string
@@ -52,6 +41,14 @@ func (ts *traceSegment) getMainSpan() *ptrace.Span {
 		return span
 	}
 	return nil
+}
+
+func (ts *traceSegment) getSpanCount() int {
+	count := len(ts.entrySpans) + len(ts.exitSpans) + len(ts.internalSpans)
+	if ts.rootSpan != nil {
+		count += 1
+	}
+	return count
 }
 
 func newTrace(traceSegments ...*traceSegment) *trace {

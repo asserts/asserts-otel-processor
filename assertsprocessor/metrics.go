@@ -9,21 +9,22 @@ import (
 
 type metrics struct {
 	logger             *zap.Logger
+	config             *Config
 	prometheusRegistry *prometheus.Registry
 	latencyHistogram   *prometheus.HistogramVec
 	totalTraceCount    *prometheus.CounterVec
 	sampledTraceCount  *prometheus.CounterVec
-	totalSpansCount    *prometheus.CounterVec
-	sampledSpansCount  *prometheus.CounterVec
+	totalSpanCount     *prometheus.CounterVec
+	sampledSpanCount   *prometheus.CounterVec
 }
 
 func (m *metrics) registerMetrics(captureAttributesInMetric []string) error {
 	// Start the prometheus server on port 9465
 	m.prometheusRegistry = prometheus.NewRegistry()
 
-	var traceCountLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel}
-	var sampledTraceCountLabels = []string{envLabel, siteLabel, namespaceLabel, traceSampleTypeLabel, serviceLabel}
-	var spanCountLabels = []string{envLabel, siteLabel}
+	var traceCountLabels = []string{envLabel, siteLabel}
+	var sampledTraceCountLabels = []string{envLabel, siteLabel, traceSampleTypeLabel}
+	var spanCountLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel}
 	var err error
 
 	// Create Counter for total trace count
@@ -37,12 +38,12 @@ func (m *metrics) registerMetrics(captureAttributesInMetric []string) error {
 		return err
 	}
 	// Create Counter for total spans count
-	m.totalSpansCount, err = m.register("spans", "count_total", spanCountLabels, "Total Spans Counter")
+	m.totalSpanCount, err = m.register("span", "count_total", spanCountLabels, "Total Span Counter")
 	if err != nil {
 		return err
 	}
 	// Create Counter for sampled spans count
-	m.sampledSpansCount, err = m.register("spans", "sampled_count_total", spanCountLabels, "Total Spans Counter")
+	m.sampledSpanCount, err = m.register("span", "sampled_count_total", spanCountLabels, "Sampled Span Counter")
 	if err != nil {
 		return err
 	}
@@ -95,12 +96,45 @@ func (m *metrics) unregisterMetrics() {
 	m.latencyHistogram.Reset()
 	m.totalTraceCount.Reset()
 	m.sampledTraceCount.Reset()
-	m.totalSpansCount.Reset()
-	m.sampledSpansCount.Reset()
+	m.totalSpanCount.Reset()
+	m.sampledSpanCount.Reset()
 
 	m.prometheusRegistry.Unregister(m.latencyHistogram)
 	m.prometheusRegistry.Unregister(m.totalTraceCount)
 	m.prometheusRegistry.Unregister(m.sampledTraceCount)
-	m.prometheusRegistry.Unregister(m.totalSpansCount)
-	m.prometheusRegistry.Unregister(m.sampledSpansCount)
+	m.prometheusRegistry.Unregister(m.totalSpanCount)
+	m.prometheusRegistry.Unregister(m.sampledSpanCount)
+}
+
+func (m *metrics) incrTotalTraceCount() {
+	sampledTraceCountLabels := map[string]string{
+		envLabel:  m.config.Env,
+		siteLabel: m.config.Site,
+	}
+	m.totalTraceCount.With(sampledTraceCountLabels).Inc()
+}
+
+func (m *metrics) incrSampledTraceCount(sampleType string) {
+	sampledTraceCountLabels := map[string]string{
+		envLabel:             m.config.Env,
+		siteLabel:            m.config.Site,
+		traceSampleTypeLabel: sampleType,
+	}
+	m.sampledTraceCount.With(sampledTraceCountLabels).Inc()
+}
+
+func (m *metrics) incrSpanCount(tr *trace, sampled bool) {
+	for _, ts := range tr.segments {
+		spanCountLabels := map[string]string{
+			envLabel:       m.config.Env,
+			siteLabel:      m.config.Site,
+			namespaceLabel: ts.namespace,
+			serviceLabel:   ts.service,
+		}
+		count := float64(ts.getSpanCount())
+		m.totalSpanCount.With(spanCountLabels).Add(count)
+		if sampled {
+			m.sampledSpanCount.With(spanCountLabels).Add(count)
+		}
+	}
 }
