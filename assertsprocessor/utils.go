@@ -3,6 +3,7 @@ package assertsprocessor
 import (
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.6.1"
+	"strings"
 )
 
 func getServiceKey(namespace string, service string) string {
@@ -134,4 +135,24 @@ func isExitSpan(span *ptrace.Span) bool {
 
 func isRootSpan(span *ptrace.Span) bool {
 	return span.ParentSpanID().IsEmpty()
+}
+
+func applyPromConventions(text string) string {
+	replacer := strings.NewReplacer(
+		" ", "_",
+		",", "_",
+		"\t", "_",
+		"/", "_",
+		"\\", "_",
+		".", "_",
+		"-", "_",
+		":", "_",
+		"=", "_",
+		"“", "_",
+		"@", "_",
+		"<", "_",
+		">", "_",
+		"%", "_percent",
+	)
+	return strings.ToLower(replacer.Replace(text))
 }

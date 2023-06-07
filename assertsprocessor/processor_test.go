@@ -114,7 +114,7 @@ func TestConsumeTraces(t *testing.T) {
 			stop:               make(chan bool),
 			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
 			thresholdHelper:    &_th,
-			metricHelper:       buildMetricHelper(),
+			metrics:            buildMetrics(),
 		},
 		rwMutex: &sync.RWMutex{},
 	}

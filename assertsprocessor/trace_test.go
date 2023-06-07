@@ -53,3 +53,27 @@ func TestGetMainSpan(t *testing.T) {
 	assert.Equal(t, &exitSpan, ts3.getMainSpan())
 	assert.Nil(t, ts4.getMainSpan())
 }
+
+func TestGetSpanCount(t *testing.T) {
+	span := ptrace.NewSpan()
+
+	ts1 := &traceSegment{
+		rootSpan:   &span,
+		entrySpans: []*ptrace.Span{&span, &span},
+		exitSpans:  []*ptrace.Span{&span},
+	}
+	ts2 := &traceSegment{
+		entrySpans: []*ptrace.Span{&span},
+		exitSpans:  []*ptrace.Span{&span, &span},
+	}
+	ts3 := &traceSegment{
+		exitSpans:     []*ptrace.Span{&span, &span},
+		internalSpans: []*ptrace.Span{&span, &span},
+	}
+	ts4 := &traceSegment{}
+
+	assert.Equal(t, 4, ts1.getSpanCount())
+	assert.Equal(t, 3, ts2.getSpanCount())
+	assert.Equal(t, 4, ts3.getSpanCount())
+	assert.Equal(t, 0, ts4.getSpanCount())
+}

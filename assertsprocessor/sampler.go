@@ -39,7 +39,7 @@ type sampler struct {
 	traceFlushTicker   *clock.Ticker
 	nextConsumer       consumer.Traces
 	stop               chan bool
-	metricHelper       *metricHelper
+	metrics            *metrics
 }
 
 func (s *sampler) startProcessing() {
@@ -78,7 +78,6 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 				ctx:     &ctx,
 				latency: ts.latency,
 			}
-			s.incrTotalTraceCount(ts)
 			for _, span := range ts.getNonInternalSpans() {
 				if spanHasError(span) {
 					s.logger.Debug("Capturing error trace",
@@ -89,7 +88,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
 
 					if !sampled {
-						s.incrSampledTraceCount(AssertsTraceSampleTypeError, ts)
+						s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeError)
 						requestState.errorQueue.push(&item)
 						sampled = true
 					}
@@ -102,7 +101,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
 
 					if !sampled {
-						s.incrSampledTraceCount(AssertsTraceSampleTypeSlow, ts)
+						s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeSlow)
 						requestState.slowQueue.push(&item)
 						sampled = true
 					}
@@ -110,12 +109,14 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 			}
 		}
 		if !sampled {
-			s.captureNormalTraceSample(ctx, tr)
+			sampled = s.captureNormalTraceSample(ctx, tr)
 		}
+		s.metrics.incrTotalTraceCount()
+		s.metrics.incrSpanCount(tr, sampled)
 	}
 }
 
-func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) {
+func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) bool {
 	for _, ts := range tr.segments {
 		if ts.getMainSpan() == nil {
 			continue
@@ -126,10 +127,11 @@ func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) {
 			latency: ts.latency,
 		}
 		if s.captureNormalSample(ts, &item) {
-			s.incrSampledTraceCount(AssertsTraceSampleTypeNormal, ts)
-			break
+			s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeNormal)
+			return true
 		}
 	}
+	return false
 }
 
 func (s *sampler) captureNormalSample(ts *traceSegment, item *Item) bool {
@@ -199,27 +201,6 @@ func (s *sampler) spanIsSlow(span *ptrace.Span, ts *traceSegment) bool {
 		return true
 	}
 	return false
-}
-
-func (s *sampler) incrTotalTraceCount(ts *traceSegment) {
-	sampledTraceCountLabels := map[string]string{
-		envLabel:       s.config.Env,
-		siteLabel:      s.config.Site,
-		namespaceLabel: ts.namespace,
-		serviceLabel:   ts.service,
-	}
-	s.metricHelper.totalTraceCount.With(sampledTraceCountLabels).Inc()
-}
-
-func (s *sampler) incrSampledTraceCount(sampleType string, ts *traceSegment) {
-	sampledTraceCountLabels := map[string]string{
-		envLabel:             s.config.Env,
-		siteLabel:            s.config.Site,
-		namespaceLabel:       ts.namespace,
-		serviceLabel:         ts.service,
-		traceSampleTypeLabel: sampleType,
-	}
-	s.metricHelper.sampledTraceCount.With(sampledTraceCountLabels).Inc()
 }
 
 func (s *sampler) stopTraceFlusher() {

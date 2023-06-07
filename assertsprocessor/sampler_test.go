@@ -40,7 +40,7 @@ func TestSpanIsSlowTrue(t *testing.T) {
 		logger:          logger,
 		config:          &config,
 		thresholdHelper: &th,
-		metricHelper:    buildMetricHelper(),
+		metrics:         buildMetrics(),
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -60,7 +60,7 @@ func TestSpanIsSlowFalse(t *testing.T) {
 		logger:          logger,
 		config:          &config,
 		thresholdHelper: &th,
-		metricHelper:    buildMetricHelper(),
+		metrics:         buildMetrics(),
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -82,7 +82,7 @@ func TestSampleTraceWithErrorSpan(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 
 	ctx := context.Background()
@@ -148,7 +148,7 @@ func TestSampleTraceWithSlowSpan(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 
 	ctx := context.Background()
@@ -215,7 +215,7 @@ func TestSampleTraceWithTwoSegments(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 
 	ctx := context.Background()
@@ -317,7 +317,7 @@ func TestSampleNormalTrace(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 
 	ctx := context.Background()
@@ -377,8 +377,10 @@ func TestSampleNormalTrace(t *testing.T) {
 
 func TestWithNoRootTrace(t *testing.T) {
 	var s = sampler{
+		logger:             logger,
+		config:             &config,
 		topTracesByService: &sync.Map{},
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 	ctx := context.Background()
 	tr := newTrace(
@@ -400,7 +402,7 @@ func TestTraceCardinalityLimit(t *testing.T) {
 		config:             &config,
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 
 	ctx := context.Background()
@@ -453,7 +455,7 @@ func TestFlushTraces(t *testing.T) {
 		traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Millisecond),
 		nextConsumer:       dConsumer,
 		stop:               make(chan bool, 5),
-		metricHelper:       buildMetricHelper(),
+		metrics:            buildMetrics(),
 	}
 
 	latencyTrace := ptrace.NewTraces()
@@ -565,24 +567,32 @@ func TestFlushTraces(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 }
 
-func buildMetricHelper() *metricHelper {
-	m := &metricHelper{
-		sampledTraceCount: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: "asserts",
-			Subsystem: "trace",
-			Name:      "sampled_count_total",
-		}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel, traceSampleTypeLabel}),
+func buildMetrics() *metrics {
+	reg := &metrics{
+		config: &config,
 	}
-	m.sampledTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	reg.sampledTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "trace",
 		Name:      "sampled_count_total",
-	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel, traceSampleTypeLabel})
+	}, []string{envLabel, siteLabel, traceSampleTypeLabel})
 
-	m.totalTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+	reg.totalTraceCount = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
 		Subsystem: "trace",
 		Name:      "count_total",
+	}, []string{envLabel, siteLabel})
+
+	reg.totalSpanCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "spans",
+		Name:      "count_total",
 	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
-	return m
+
+	reg.sampledSpanCount = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "asserts",
+		Subsystem: "spans",
+		Name:      "sampled_count_total",
+	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
+	return reg
 }

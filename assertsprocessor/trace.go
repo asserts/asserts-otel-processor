@@ -43,6 +43,14 @@ func (ts *traceSegment) getMainSpan() *ptrace.Span {
 	return nil
 }
 
+func (ts *traceSegment) getSpanCount() int {
+	count := len(ts.entrySpans) + len(ts.exitSpans) + len(ts.internalSpans)
+	if ts.rootSpan != nil {
+		count += 1
+	}
+	return count
+}
+
 func newTrace(traceSegments ...*traceSegment) *trace {
 	return &trace{
 		segments: traceSegments,
