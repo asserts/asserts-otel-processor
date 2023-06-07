@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ecs
-    image: asserts/otel-collector:v0.0.78
+    image: asserts/otel-collector:v0.0.81-all-exporters
     ports:
       - "8888:8888"
       - "8889:8889"
