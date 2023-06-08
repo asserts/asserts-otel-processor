@@ -112,51 +112,13 @@ Resources:
                 }
               ]
             }
-        - PolicyName: !Sub "AssertsOTELCollectorRolePolicy-${AssertsEnvironment}"
+        - PolicyName: !Sub "AssertsOTELCollectorECSRolePolicy-${AssertsEnvironment}"
           PolicyDocument:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
                 Resource: "*"
                 Action:
-                  - autoscaling:DescribeAutoScalingGroups
-                  - autoscaling:DescribeTags
-                  - autoscaling:DescribeLoadBalancers
-                  - dynamodb:ListTables
-                  - ec2:DescribeVolumes
-                  - ec2:DescribeInstances
                   - ec2:DescribeSubnets
-                  - ecs:DescribeClusters
-                  - ecs:DescribeServices
-                  - ecs:DescribeTaskDefinition
                   - ecs:DescribeTasks
-                  - ecs:ListAccountSettings
-                  - ecs:ListClusters
-                  - ecs:ListServices
-                  - ecs:ListTaskDefinitionFamilies
-                  - ecs:ListTaskDefinitions
-                  - elasticloadbalancing:DescribeListeners
-                  - elasticloadbalancing:DescribeLoadBalancers
-                  - elasticloadbalancing:DescribeRules
-                  - elasticloadbalancing:DescribeTags
-                  - elasticloadbalancing:DescribeTargetGroups
-                  - elasticloadbalancing:DescribeTargetHealth
-                  - firehose:ListDeliveryStreams
-                  - kinesis:ListStreamConsumers
-                  - kinesis:ListStreams
-                  - kinesis:ListTagsForStream
-                  - kinesisanalytics:ListApplications
-                  - lambda:GetAccountSettings
-                  - lambda:ListEventSourceMappings
-                  - lambda:ListFunctions
-                  - redshift:DescribeClusters
-                  - redshift:ListDatabases
-                  - redshift:ListTables
-                  - s3:ListAllMyBuckets
-                  - sns:ListTopics
-                  - sqs:ListQueues
-                  - tag:GetResources
-                  - elasticmapreduce:ListClusters
-                  - cloudwatch:DescribeAlarms
-                  - cloudwatch:GetMetricData
-                  - cloudwatch:ListMetrics
+                  - ecs:DescribeTaskDefinition

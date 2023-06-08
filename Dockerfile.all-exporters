@@ -1,7 +1,6 @@
-FROM amazonlinux:2
+FROM asserts/otel-collector:v0.0.81
 
 WORKDIR /opt/asserts
-COPY asserts-otel-collector /opt/asserts
 COPY start-collector.sh /opt/asserts
 
 WORKDIR /etc/asserts

@@ -4,12 +4,11 @@ Parameters:
   AssertsEnvironment:
     Type: String
     Description: The installation environment name
+
   AssertsSite:
     Type: String
     Description: The installation site name
-  OTLPExportEndpoint:
-    Type: String
-    Description: OTLP Endpoint to export traces to
+
   Cluster:
     Type: String
     Description: "Asserts OTEL Cluster"
@@ -33,6 +32,11 @@ Parameters:
     Description: "Asserts OTEL Collector Image version"
     Default: docker.io/asserts/otel-collector:v0.0.78
 
+  MetricExporterVersion:
+    Type: String
+    Description: "Metric Exporter Sidecar Image version"
+    Default: docker.io/asserts/ecs-dockerstats-exporter:v1.0.0
+
   AssertsApiServerURL:
     Type: String
     Description: Asserts ApiServer Username
@@ -41,6 +45,18 @@ Parameters:
     Type: String
 
   AssertsApiServerPassword:
+    Type: String
+    NoEcho: true
+
+  AssertsRemoteWriteURL:
+    Type: String
+    Default: https://acme.tsdb.asserts.ai
+
+  AssertsTenantName:
+    Type: String
+    Default: Acme
+
+  AssertsTSDBPassword:
     Type: String
     NoEcho: true
 
@@ -151,7 +167,7 @@ Resources:
               HostPort: 4318
               Protocol: tcp
           DockerLabels:
-            PROMETHEUS_EXPORTER_PORT: 8465
+            PROMETHEUS_EXPORTER_PORT: 9465
             PROMETHEUS_EXPORTER_PATH: /metrics
           Environment:
             - Name: ASSERTS_SERVER_API_ENDPOINT
@@ -162,9 +178,41 @@ Resources:
               Value: !Ref AssertsSite
             - Name: TRACE_STORE
               Value: AWS-XRAY
-            - Name: OTLP_ENDPOINT
-              Value: !Ref OTLPExportEndpoint
             - Name: ASSERTS_SERVER_USERNAME
               Value: !Ref AssertsApiServerUsername
             - Name: ASSERTS_SERVER_PASSWORD
               Value: !Ref AssertsApiServerPassword
+            - Name: LOG_LEVEL
+              Value: !Ref LogLevel
+        - Essential: true
+          Name: metric-exporter
+          Image: !Ref MetricExporterVersion
+          LinuxParameters: { }
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Sub "asserts-otel-collector-${AssertsEnvironment}"
+              awslogs-region:
+                Ref: AWS::Region
+              awslogs-stream-prefix: metric-exporter
+          PortMappings:
+            - ContainerPort: 8429
+              HostPort: 8429
+              Protocol: tcp
+          DependsOn:
+            - Condition: START
+              ContainerName: asserts-otel-collector
+          Environment:
+            - Name: remoteWrite_basicAuth_username
+              Value: !Ref AssertsTenantName
+            - Name: httpAuth_username
+              Value: !Ref AssertsTenantName
+            - Name: remoteWrite_url
+              Value: !Ref AssertsRemoteWriteURL
+            - Name: remoteWrite_basicAuth_password
+              Value: !Ref AssertsTSDBPassword
+            - Name: httpAuth_password
+              Value: !Ref AssertsTSDBPassword
+          DockerLabels:
+            PROMETHEUS_EXPORTER_PORT: 8014
+            PROMETHEUS_EXPORTER_PATH: /container-stats/actuator/prometheus

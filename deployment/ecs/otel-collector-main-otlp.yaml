@@ -36,18 +36,23 @@ Parameters:
   AssignPublicIPToECSTask:
     Type: String
     Description: Determines whether the ECS Task ENIs will be assigned a public IP
-    Default: "DISABLED"
+    Default: "ENABLED"
     AllowedValues: [ "ENABLED", "DISABLED" ]
 
   AssertsOTELCollectorVersion:
     Type: String
     Description: "Asserts OTEL Collector Image version"
-    Default: asserts/otel-collector:v0.0.77-ecs
+    Default: asserts/otel-collector:v0.0.81-all-exporters
+
+  MetricExporterVersion:
+    Type: String
+    Description: "Metric Exporter Sidecar Image version"
+    Default: docker.io/asserts/ecs-dockerstats-exporter:v1.0.0
 
   AssertsApiServerURL:
     Type: String
     Description: Asserts ApiServer Username
-    Default: https://chief.dev.app.asserts.ai
+    Default: https://chief.app.dev.asserts.ai/api-server
 
   AssertsApiServerUsername:
     Type: String
@@ -56,14 +61,33 @@ Parameters:
     Type: String
     NoEcho: true
 
+  AssertsRemoteWriteURL:
+    Type: String
+    Default: https://acme.tsdb.asserts.ai
+
+  AssertsTenantName:
+    Type: String
+    Default: Acme
+
+  AssertsTSDBPassword:
+    Type: String
+    NoEcho: true
+
   NumCollectorInstances:
     Type: String
     Description: Number of Collector Instances to install
     Default: 1
 
+  TraceStore:
+    Type: String
+    Description: Backend trace store. One of OTLP, OTLP-HTTP
+    AllowedValues:
+      - OTLP
+      - OTLP-HTTP
+
   OTLPExportEndpoint:
     Type: String
-    Description: OTLP Export Endpoint
+    Description: OTLP Export Endpoint for OTLP over gRPC or HTTP
     Default: jaeger.dev.asserts.ai
 
   LogLevel:
@@ -87,10 +111,14 @@ Metadata:
           - ECSSubnets
           - AssignPublicIPToECSTask
           - AssertsOTELCollectorVersion
+          - MetricExporterVersion
           - AssertsApiServerURL
           - AssertsApiServerUsername
           - AssertsApiServerPassword
           - OTLPExportEndpoint
+          - AssertsTenantName
+          - AssertsRemoteWriteURL
+          - AssertsTSDBPassword
           - NumCollectorInstances
 Resources:
   AssertsOTELIAMStack:
@@ -145,7 +173,7 @@ Resources:
           Value: Asserts
         - Key: "asserts:component"
           Value: "OTEL Collector"
-      TemplateURL: https://s3.us-west-2.amazonaws.com/downloads.asserts.ai/asserts-otel-collector/ecs/v1/otel-collector-ecs-service.yaml
+      TemplateURL: https://s3.us-west-2.amazonaws.com/downloads.asserts.ai/asserts-otel-collector/ecs/v1/otel-collector-ecs-service-otlp.yaml
       TimeoutInMinutes: 30
       Parameters:
         AssertsEnvironment: !Ref AssertsEnvironment
@@ -154,9 +182,14 @@ Resources:
         ECSSubnets: !Join [ ",", !Ref ALBSubnets ]
         AssignPublicIPToECSTask: !Ref AssignPublicIPToECSTask
         AssertsOTELCollectorVersion: !Ref AssertsOTELCollectorVersion
+        TraceStore: !Ref TraceStore
+        MetricExporterVersion: !Ref MetricExporterVersion
         AssertsApiServerURL: !Ref AssertsApiServerURL
         AssertsApiServerUsername: !Ref AssertsApiServerUsername
         AssertsApiServerPassword: !Ref AssertsApiServerPassword
+        AssertsRemoteWriteURL: !Ref AssertsRemoteWriteURL
+        AssertsTenantName: !Ref AssertsTenantName
+        AssertsTSDBPassword: !Ref AssertsTSDBPassword
         NumCollectorInstances: !Ref NumCollectorInstances
         ECSSecurityGroupId: !GetAtt AssertsOTELSecurityGroupStack.Outputs.ECSSecurityGroupId
         CollectorHTTPTargetGroupARN: !GetAtt AssertsOTELALBStack.Outputs.CollectorHTTPTargetGroupARN

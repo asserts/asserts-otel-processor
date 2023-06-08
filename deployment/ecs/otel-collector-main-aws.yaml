@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Asserts OTEL Collector Stack
+Parameters:
+  AssertsEnvironment:
+    Type: String
+    Description: The installation environment name
+    Default: Dev
+
+  AssertsSite:
+    Type: String
+    Description: The installation site. For e.g. us-west-2
+    Default: us-west-2
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: "Id of VPC in which Asserts OTEL Collector is being installed"
+
+  ALBSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "The IDs of the subnets on which the OTEL Collector ALB should be installed."
+
+  ALBIngressSourceCIDR:
+    Type: String
+    Description: "Source IP CIDR for ALB Ingress"
+    Default: 0.0.0.0/0
+
+  Cluster:
+    Type: String
+    Description: "Asserts OTEL Cluster"
+    Default: "asserts-otel"
+
+  ECSSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "The IDs of the subnets on which the OTEL Collector ECS Tasks should be installed."
+
+  AssignPublicIPToECSTask:
+    Type: String
+    Description: Determines whether the ECS Task ENIs will be assigned a public IP
+    Default: "ENABLED"
+    AllowedValues: [ "ENABLED", "DISABLED" ]
+
+  AssertsOTELCollectorVersion:
+    Type: String
+    Description: "Asserts OTEL Collector Image version"
+    Default: asserts/otel-collector:v0.0.81-all-exporters
+
+  MetricExporterVersion:
+    Type: String
+    Description: "Metric Exporter Sidecar Image version"
+    Default: docker.io/asserts/ecs-dockerstats-exporter:v1.0.0
+
+  AssertsApiServerURL:
+    Type: String
+    Description: Asserts ApiServer Username
+    Default: https://chief.app.dev.asserts.ai/api-server
+
+  AssertsApiServerUsername:
+    Type: String
+
+  AssertsApiServerPassword:
+    Type: String
+    NoEcho: true
+
+  AssertsRemoteWriteURL:
+    Type: String
+    Default: https://acme.tsdb.asserts.ai/api/v1/write
+
+  AssertsTenantName:
+    Type: String
+    Default: Acme
+
+  AssertsTSDBPassword:
+    Type: String
+    NoEcho: true
+
+  NumCollectorInstances:
+    Type: String
+    Description: Number of Collector Instances to install
+    Default: 1
+
+  LogLevel:
+    Type: String
+    Default: info
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label: "Common Parameters"
+        Parameters:
+          - AssertsEnvironment
+          - AssertsSite
+          - VpcId
+      - Label: "ALB Parameters"
+        Parameters:
+          - ALBSubnets
+          - ALBIngressSourceCIDR
+      - Label: "ECS Parameters"
+        Parameters:
+          - Cluster
+          - ECSSubnets
+          - AssignPublicIPToECSTask
+          - AssertsOTELCollectorVersion
+          - MetricExporterVersion
+          - AssertsApiServerURL
+          - AssertsApiServerUsername
+          - AssertsApiServerPassword
+          - AssertsTenantName
+          - AssertsRemoteWriteURL
+          - AssertsTSDBPassword
+          - NumCollectorInstances
+Resources:
+  AssertsOTELIAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "OTEL Collector"
+      TemplateURL: https://s3.us-west-2.amazonaws.com/downloads.asserts.ai/asserts-otel-collector/ecs/v1/otel-collector-iam.yaml
+      TimeoutInMinutes: 30
+      Parameters:
+        AssertsEnvironment: !Ref AssertsEnvironment
+
+  AssertsOTELSecurityGroupStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "OTEL Collector"
+      TemplateURL: https://s3.us-west-2.amazonaws.com/downloads.asserts.ai/asserts-otel-collector/ecs/v1/otel-collector-security-groups.yaml
+      TimeoutInMinutes: 30
+      Parameters:
+        AssertsEnvironment: !Ref AssertsEnvironment
+        VpcId: !Ref VpcId
+        ALBIngressSourceCIDR: !Ref ALBIngressSourceCIDR
+
+  AssertsOTELALBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "OTEL Collector"
+      TemplateURL: https://s3.us-west-2.amazonaws.com/downloads.asserts.ai/asserts-otel-collector/ecs/v1/otel-collector-alb.yaml
+      TimeoutInMinutes: 30
+      Parameters:
+        AssertsEnvironment: !Ref AssertsEnvironment
+        VpcId: !Ref VpcId
+        ALBSubnets: !Join [ ",", !Ref ALBSubnets ]
+        ALBSecurityGroupId: !GetAtt AssertsOTELSecurityGroupStack.Outputs.ALBSecurityGroupId
+
+  AssertsOTELECSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Tags:
+        - Key: Vendor
+          Value: Asserts
+        - Key: "asserts:component"
+          Value: "OTEL Collector"
+      TemplateURL: https://s3.us-west-2.amazonaws.com/downloads.asserts.ai/asserts-otel-collector/ecs/v1/otel-collector-ecs-service-aws.yaml
+      TimeoutInMinutes: 30
+      Parameters:
+        AssertsEnvironment: !Ref AssertsEnvironment
+        AssertsSite: !Ref AssertsSite
+        Cluster: !Ref Cluster
+        ECSSubnets: !Join [ ",", !Ref ALBSubnets ]
+        AssignPublicIPToECSTask: !Ref AssignPublicIPToECSTask
+        AssertsOTELCollectorVersion: !Ref AssertsOTELCollectorVersion
+        MetricExporterVersion: !Ref MetricExporterVersion
+        AssertsApiServerURL: !Ref AssertsApiServerURL
+        AssertsApiServerUsername: !Ref AssertsApiServerUsername
+        AssertsApiServerPassword: !Ref AssertsApiServerPassword
+        AssertsRemoteWriteURL: !Ref AssertsRemoteWriteURL
+        AssertsTenantName: !Ref AssertsTenantName
+        AssertsTSDBPassword: !Ref AssertsTSDBPassword
+        NumCollectorInstances: !Ref NumCollectorInstances
+        ECSSecurityGroupId: !GetAtt AssertsOTELSecurityGroupStack.Outputs.ECSSecurityGroupId
+        CollectorHTTPTargetGroupARN: !GetAtt AssertsOTELALBStack.Outputs.CollectorHTTPTargetGroupARN
+        LogLevel: !Ref LogLevel
+Outputs:
+  OTELCollectorALBDNSName:
+    Description: "The DNS name for the load balancer."
+    Value: !GetAtt AssertsOTELALBStack.Outputs.ALBDNSName
