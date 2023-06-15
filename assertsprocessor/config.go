@@ -8,6 +8,7 @@ type Config struct {
 	AssertsServer                  *map[string]string                             `mapstructure:"asserts_server" json:"asserts_server"`
 	Env                            string                                         `mapstructure:"asserts_env" json:"asserts_env"`
 	Site                           string                                         `mapstructure:"asserts_site" json:"asserts_site"`
+	AssertsTenant                  string                                         `mapstructure:"asserts_tenant" json:"asserts_tenant"`
 	CaptureMetrics                 bool                                           `mapstructure:"capture_metrics" json:"capture_metrics"`
 	CustomAttributeConfigs         map[string]map[string][]*CustomAttributeConfig `mapstructure:"custom_attributes" json:"custom_attributes"`
 	CaptureAttributesInMetric      []string                                       `mapstructure:"attributes_as_metric_labels" json:"attributes_as_metric_labels"`
