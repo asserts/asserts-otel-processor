@@ -58,6 +58,9 @@ func (ac *assertsClient) invoke(method string, api string, payload any) ([]byte,
 	if assertsServer["user"] != "" && assertsServer["password"] != "" {
 		req.Header.Add("Authorization", "Basic "+basicAuth(assertsServer["user"], assertsServer["password"]))
 	}
+	if ac.config.AssertsTenant != "" {
+		req.Header.Add("X-Asserts-Tenant", ac.config.AssertsTenant)
+	}
 
 	// Make the call
 	response, err := client.Do(req)

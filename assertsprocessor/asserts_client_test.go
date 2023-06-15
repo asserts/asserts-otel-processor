@@ -59,6 +59,7 @@ func TestInvoke(t *testing.T) {
 				"user":     "asserts",
 				"password": "asserts",
 			},
+			AssertsTenant:           "bootstrap",
 			DefaultLatencyThreshold: 0.5,
 		},
 	}
