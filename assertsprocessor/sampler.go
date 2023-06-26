@@ -88,7 +88,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeError)
 
 					if !sampled {
-						s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeError)
+						item.sampleType = AssertsTraceSampleTypeError
 						requestState.errorQueue.push(&item)
 						sampled = true
 					}
@@ -101,7 +101,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 					span.Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeSlow)
 
 					if !sampled {
-						s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeSlow)
+						item.sampleType = AssertsTraceSampleTypeSlow
 						requestState.slowQueue.push(&item)
 						sampled = true
 					}
@@ -111,8 +111,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 		if !sampled {
 			sampled = s.captureNormalTraceSample(ctx, tr)
 		}
-		s.metrics.incrTotalTraceCount()
-		s.metrics.incrSpanCount(tr, sampled)
+		s.metrics.incrTotalCounts(tr)
 	}
 }
 
@@ -127,7 +126,6 @@ func (s *sampler) captureNormalTraceSample(ctx context.Context, tr *trace) bool 
 			latency: ts.latency,
 		}
 		if s.captureNormalSample(ts, &item) {
-			s.metrics.incrSampledTraceCount(AssertsTraceSampleTypeNormal)
 			return true
 		}
 	}
@@ -170,6 +168,7 @@ func (s *sampler) captureNormalSample(ts *traceSegment, item *Item) bool {
 
 			// Capture request context as attribute and push to the latency queue to prioritize the healthy sample too
 			ts.getMainSpan().Attributes().PutStr(AssertsTraceSampleTypeAttribute, AssertsTraceSampleTypeNormal)
+			item.sampleType = AssertsTraceSampleTypeNormal
 			requestState.slowQueue.push(item)
 		}
 	} else {
@@ -233,6 +232,7 @@ func (s *sampler) startTraceFlusher() {
 								zap.String("Request", requestKey),
 								zap.Int("Count", len(_sampler.errorQueue.priorityQueue)))
 							for _, item := range _sampler.errorQueue.priorityQueue {
+								s.metrics.incrSampledCounts(item.trace, item.sampleType)
 								_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *buildTrace(item.trace))
 							}
 						}
@@ -245,6 +245,7 @@ func (s *sampler) startTraceFlusher() {
 								zap.String("Request", requestKey),
 								zap.Int("Count", len(_sampler.slowQueue.priorityQueue)))
 							for _, item := range _sampler.slowQueue.priorityQueue {
+								s.metrics.incrSampledCounts(item.trace, item.sampleType)
 								_ = (*s).nextConsumer.ConsumeTraces(*item.ctx, *buildTrace(item.trace))
 							}
 						}
