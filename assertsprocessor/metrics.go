@@ -106,6 +106,16 @@ func (m *metrics) unregisterMetrics() {
 	m.prometheusRegistry.Unregister(m.sampledSpanCount)
 }
 
+func (m *metrics) incrTotalCounts(tr *trace) {
+	m.incrTotalTraceCount()
+	m.incrTotalSpanCount(tr)
+}
+
+func (m *metrics) incrSampledCounts(tr *trace, sampleType string) {
+	m.incrSampledTraceCount(sampleType)
+	m.incrSampledSpanCount(tr)
+}
+
 func (m *metrics) incrTotalTraceCount() {
 	sampledTraceCountLabels := map[string]string{
 		envLabel:  m.config.Env,
@@ -123,7 +133,15 @@ func (m *metrics) incrSampledTraceCount(sampleType string) {
 	m.sampledTraceCount.With(sampledTraceCountLabels).Inc()
 }
 
-func (m *metrics) incrSpanCount(tr *trace, sampled bool) {
+func (m *metrics) incrTotalSpanCount(tr *trace) {
+	m.incrSpanCount(tr, m.totalSpanCount)
+}
+
+func (m *metrics) incrSampledSpanCount(tr *trace) {
+	m.incrSpanCount(tr, m.sampledSpanCount)
+}
+
+func (m *metrics) incrSpanCount(tr *trace, spanCounter *prometheus.CounterVec) {
 	for _, ts := range tr.segments {
 		spanCountLabels := map[string]string{
 			envLabel:       m.config.Env,
@@ -132,9 +150,6 @@ func (m *metrics) incrSpanCount(tr *trace, sampled bool) {
 			serviceLabel:   ts.service,
 		}
 		count := float64(ts.getSpanCount())
-		m.totalSpanCount.With(spanCountLabels).Add(count)
-		if sampled {
-			m.sampledSpanCount.With(spanCountLabels).Add(count)
-		}
+		spanCounter.With(spanCountLabels).Add(count)
 	}
 }
