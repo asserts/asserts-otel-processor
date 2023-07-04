@@ -8,7 +8,7 @@ COPY sample-builder-config.yaml .
 
 RUN ./ocb_0.72.0_linux_amd64 --config=sample-builder-config.yaml
 
-FROM amazonlinux:2
+FROM amazonlinux:2023
 
 WORKDIR /opt/asserts
 COPY --from=build /build/asserts-otel-collector /opt/asserts
