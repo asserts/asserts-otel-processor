@@ -101,6 +101,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		nextConsumer:       nextConsumer,
 		stop:               make(chan bool),
 		metrics:            metricsHelper.metrics,
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	p := &assertsProcessorImpl{
