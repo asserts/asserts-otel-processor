@@ -101,6 +101,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		nextConsumer:       nextConsumer,
 		stop:               make(chan bool),
 		metrics:            metricsHelper.metrics,
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	p := &assertsProcessorImpl{
@@ -118,6 +119,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 	listeners = append(listeners, &thresholdsHelper)
 	listeners = append(listeners, metricsHelper)
 	listeners = append(listeners, p)
+	listeners = append(listeners, &traceSampler)
 	configRefresh.configListeners = listeners
 	p.configRefresh = &configRefresh
 

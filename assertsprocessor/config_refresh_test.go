@@ -29,6 +29,7 @@ func TestFetchConfig(t *testing.T) {
 
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
+      "ignore_client_errors": true,
       "capture_metrics": true,
       "custom_attributes": {
         "asserts.request.context": {
@@ -69,6 +70,7 @@ func TestFetchConfig(t *testing.T) {
 	assert.Nil(t, mockClient.expectedPayload)
 
 	assert.NotNil(t, config)
+	assert.True(t, config.IgnoreClientErrors)
 	assert.True(t, config.CaptureMetrics)
 	assert.NotNil(t, config.CustomAttributeConfigs)
 	assert.Equal(t, 1, len(config.CustomAttributeConfigs))
