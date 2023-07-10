@@ -79,7 +79,7 @@ func (s *sampler) sampleTraces(ctx context.Context, traces []*trace) {
 				latency: ts.latency,
 			}
 			for _, span := range ts.getNonInternalSpans() {
-				if spanHasError(span) {
+				if spanHasError(span) && !s.ignoreErrorType(span) {
 					s.logger.Debug("Capturing error trace",
 						zap.String("traceId", span.TraceID().String()),
 						zap.String("service", entityKeyString),
@@ -189,6 +189,11 @@ func (s *sampler) updateTrace(namespace string, service string, ts *traceSegment
 		entityKey: entityKey,
 		request:   request,
 	}
+}
+
+func (s *sampler) ignoreErrorType(span *ptrace.Span) bool {
+	errorType, errorTypePresent := span.Attributes().Get(AssertsErrorTypeAttribute)
+	return s.config.IgnoreClientErrors && errorTypePresent && "client_errors" == errorType.AsString()
 }
 
 func (s *sampler) spanIsSlow(span *ptrace.Span, ts *traceSegment) bool {

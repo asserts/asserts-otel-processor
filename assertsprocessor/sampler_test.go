@@ -141,6 +141,74 @@ func TestSampleTraceWithErrorSpan(t *testing.T) {
 	})
 }
 
+func TestSampleTraceWithIgnorableClientErrorSpan(t *testing.T) {
+	config.IgnoreClientErrors = true
+	cache := sync.Map{}
+	var s = sampler{
+		logger:             logger,
+		config:             &config,
+		thresholdHelper:    &th,
+		topTracesByService: &cache,
+		metrics:            buildMetrics(),
+	}
+
+	ctx := context.Background()
+	testTrace := ptrace.NewTraces()
+	resourceSpans := testTrace.ResourceSpans().AppendEmpty()
+	attributes := resourceSpans.Resource().Attributes()
+	attributes.PutStr(conventions.AttributeServiceName, "api-server")
+	attributes.PutStr(conventions.AttributeServiceNamespace, "platform")
+	scopeSpans := resourceSpans.ScopeSpans().AppendEmpty()
+
+	rootSpan := scopeSpans.Spans().AppendEmpty()
+	rootSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	rootSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/api-server/v4/rules")
+	rootSpan.SetStartTimestamp(1e9)
+	rootSpan.SetEndTimestamp(1e9 + 1e8)
+
+	childSpan := scopeSpans.Spans().AppendEmpty()
+	childSpan.SetParentSpanID(rootSpan.SpanID())
+	childSpan.SetSpanID([8]byte{1, 2, 3, 4, 5, 6, 7, 9})
+	childSpan.Attributes().PutStr(AssertsRequestContextAttribute, "/payment/pay/:id")
+	childSpan.Attributes().PutStr(AssertsErrorTypeAttribute, "client_errors")
+	childSpan.SetKind(ptrace.SpanKindClient)
+	childSpan.Status().SetCode(ptrace.StatusCodeError)
+	childSpan.SetStartTimestamp(1e9 + 1e8)
+	childSpan.SetEndTimestamp(1e9 + 5e8)
+
+	tr := newTrace(
+		&traceSegment{
+			namespace: "platform",
+			service:   "api-server",
+			rootSpan:  &rootSpan,
+			exitSpans: []*ptrace.Span{&childSpan},
+		},
+	)
+
+	s.sampleTraces(ctx, []*trace{tr})
+
+	s.topTracesByService.Range(func(key any, value any) bool {
+		stringKey := key.(string)
+		serviceQueue := *value.(*serviceQueues)
+		assert.Equal(t, "{env=dev, namespace=platform, site=us-west-2}#Service#api-server", stringKey)
+		assert.Equal(t, 1, serviceQueue.requestCount)
+		assert.NotNil(t, serviceQueue.getRequestState("/api-server/v4/rules"))
+		assert.Equal(t, 1, serviceQueue.getRequestState("/api-server/v4/rules").slowTraceCount())
+		assert.Equal(t, 0, serviceQueue.getRequestState("/api-server/v4/rules").errorTraceCount())
+		item := *serviceQueue.getRequestState("/api-server/v4/rules").slowQueue.priorityQueue[0]
+		assert.NotNil(t, item.trace)
+		assert.Equal(t, 1, len((*item.trace).segments))
+		assert.Equal(t, &rootSpan, item.trace.segments[0].rootSpan)
+		assert.Equal(t, 1, len((*item.trace).segments[0].exitSpans))
+		assert.NotNil(t, &childSpan, item.trace.segments[0].exitSpans[0])
+		assert.Equal(t, ctx, *item.ctx)
+		assert.Equal(t, 0.1, item.latency)
+		sampleType, _ := rootSpan.Attributes().Get(AssertsTraceSampleTypeAttribute)
+		assert.Equal(t, AssertsTraceSampleTypeNormal, sampleType.Str())
+		return true
+	})
+}
+
 func TestSampleTraceWithSlowSpan(t *testing.T) {
 	cache := sync.Map{}
 	s := sampler{
