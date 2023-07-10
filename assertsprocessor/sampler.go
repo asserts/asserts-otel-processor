@@ -278,6 +278,7 @@ func (s *sampler) startTraceFlusher() {
 func (s *sampler) ignoreClientErrors() bool {
 	s.rwMutex.RLock()
 	defer s.rwMutex.RUnlock()
+
 	return s.config.IgnoreClientErrors
 }
 
