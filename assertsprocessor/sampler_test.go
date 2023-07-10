@@ -41,6 +41,7 @@ func TestSpanIsSlowTrue(t *testing.T) {
 		config:          &config,
 		thresholdHelper: &th,
 		metrics:         buildMetrics(),
+		rwMutex:         &sync.RWMutex{},
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -61,6 +62,7 @@ func TestSpanIsSlowFalse(t *testing.T) {
 		config:          &config,
 		thresholdHelper: &th,
 		metrics:         buildMetrics(),
+		rwMutex:         &sync.RWMutex{},
 	}
 
 	testSpan := ptrace.NewSpan()
@@ -83,6 +85,7 @@ func TestSampleTraceWithErrorSpan(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	ctx := context.Background()
@@ -150,6 +153,7 @@ func TestSampleTraceWithIgnorableClientErrorSpan(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	ctx := context.Background()
@@ -217,6 +221,7 @@ func TestSampleTraceWithSlowSpan(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	ctx := context.Background()
@@ -284,6 +289,7 @@ func TestSampleTraceWithTwoSegments(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	ctx := context.Background()
@@ -386,6 +392,7 @@ func TestSampleNormalTrace(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	ctx := context.Background()
@@ -471,6 +478,7 @@ func TestTraceCardinalityLimit(t *testing.T) {
 		thresholdHelper:    &th,
 		topTracesByService: &cache,
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	ctx := context.Background()
@@ -524,6 +532,7 @@ func TestFlushTraces(t *testing.T) {
 		nextConsumer:       dConsumer,
 		stop:               make(chan bool, 5),
 		metrics:            buildMetrics(),
+		rwMutex:            &sync.RWMutex{},
 	}
 
 	latencyTrace := ptrace.NewTraces()
@@ -663,4 +672,41 @@ func buildMetrics() *metrics {
 		Name:      "sampled_count_total",
 	}, []string{envLabel, siteLabel, namespaceLabel, serviceLabel})
 	return reg
+}
+
+func TestSamplerIsUpdated(t *testing.T) {
+	currConfig := &Config{
+		IgnoreClientErrors: false,
+	}
+	newConfig := &Config{
+		IgnoreClientErrors: true,
+	}
+
+	var s = sampler{
+		logger:  logger,
+		config:  currConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+	assert.False(t, s.isUpdated(currConfig, currConfig))
+	assert.True(t, s.isUpdated(currConfig, newConfig))
+}
+
+func TestSamplerOnUpdate(t *testing.T) {
+	currConfig := &Config{
+		IgnoreClientErrors: false,
+	}
+	newConfig := &Config{
+		IgnoreClientErrors: true,
+	}
+
+	var s = sampler{
+		logger:  logger,
+		config:  currConfig,
+		rwMutex: &sync.RWMutex{},
+	}
+
+	assert.False(t, s.ignoreClientErrors())
+	err := s.onUpdate(newConfig)
+	assert.Nil(t, err)
+	assert.True(t, s.ignoreClientErrors())
 }

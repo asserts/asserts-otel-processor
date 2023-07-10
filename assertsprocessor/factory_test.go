@@ -101,7 +101,7 @@ func TestCreateProcessorDefaultConfig(t *testing.T) {
 	assert.NotNil(t, _assertsProcessor.configRefresh.stop)
 	assert.NotNil(t, _assertsProcessor.configRefresh.restClient)
 	assert.NotNil(t, _assertsProcessor.configRefresh.configListeners)
-	assert.Equal(t, 4, len(_assertsProcessor.configRefresh.configListeners))
+	assert.Equal(t, 5, len(_assertsProcessor.configRefresh.configListeners))
 
 	_ = _assertsProcessor.metricBuilder.stopExporter()
 }

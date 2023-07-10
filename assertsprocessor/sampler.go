@@ -40,6 +40,7 @@ type sampler struct {
 	nextConsumer       consumer.Traces
 	stop               chan bool
 	metrics            *metrics
+	rwMutex            *sync.RWMutex // guard access to config.IgnoreClientError
 }
 
 func (s *sampler) startProcessing() {
@@ -193,7 +194,7 @@ func (s *sampler) updateTrace(namespace string, service string, ts *traceSegment
 
 func (s *sampler) ignoreErrorType(span *ptrace.Span) bool {
 	errorType, errorTypePresent := span.Attributes().Get(AssertsErrorTypeAttribute)
-	return s.config.IgnoreClientErrors && errorTypePresent && "client_errors" == errorType.AsString()
+	return s.ignoreClientErrors() && errorTypePresent && "client_errors" == errorType.AsString()
 }
 
 func (s *sampler) spanIsSlow(span *ptrace.Span, ts *traceSegment) bool {
@@ -272,4 +273,39 @@ func (s *sampler) startTraceFlusher() {
 			}
 		}
 	}()
+}
+
+func (s *sampler) ignoreClientErrors() bool {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
+
+	return s.config.IgnoreClientErrors
+}
+
+// configListener interface implementation
+func (s *sampler) isUpdated(currConfig *Config, newConfig *Config) bool {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
+
+	updated := currConfig.IgnoreClientErrors != newConfig.IgnoreClientErrors
+	if updated {
+		s.logger.Info("Change detected in config IgnoreClientErrors",
+			zap.Any("Current", currConfig.IgnoreClientErrors),
+			zap.Any("New", newConfig.IgnoreClientErrors),
+		)
+	} else {
+		s.logger.Debug("No change detected in config IgnoreClientErrors")
+	}
+	return updated
+}
+
+func (s *sampler) onUpdate(newConfig *Config) error {
+	s.rwMutex.Lock()
+	defer s.rwMutex.Unlock()
+
+	s.config.IgnoreClientErrors = newConfig.IgnoreClientErrors
+	s.logger.Info("Updated config IgnoreClientErrors",
+		zap.Bool("New", s.config.IgnoreClientErrors),
+	)
+	return nil
 }
