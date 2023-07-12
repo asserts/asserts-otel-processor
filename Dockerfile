@@ -1,4 +1,4 @@
-FROM golang:1.20 as build
+FROM golang:1.20.4 as build
 
 WORKDIR /build
 
@@ -8,7 +8,7 @@ COPY sample-builder-config.yaml .
 
 RUN ./ocb_0.81.0_linux_amd64 --config=sample-builder-config.yaml
 
-FROM amazonlinux:2023
+FROM amazonlinux:2
 
 WORKDIR /opt/asserts
 COPY --from=build /build/asserts-otel-collector /opt/asserts
