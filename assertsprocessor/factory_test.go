@@ -146,7 +146,7 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
         "rpc.service"
       ],
       "sampling_latency_threshold_seconds": 0.51,
-	  "latency_histogram_buckets": [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 90.0, 120.0],
+      "latency_histogram_buckets": [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 90.0, 120.0],
       "ignore_client_errors": true,
       "unknown": "foo"
     }`),
