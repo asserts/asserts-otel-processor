@@ -13,6 +13,7 @@ type Config struct {
 	CustomAttributeConfigs         map[string]map[string][]*CustomAttributeConfig `mapstructure:"custom_attributes" json:"custom_attributes"`
 	CaptureAttributesInMetric      []string                                       `mapstructure:"attributes_as_metric_labels" json:"attributes_as_metric_labels"`
 	DefaultLatencyThreshold        float64                                        `mapstructure:"sampling_latency_threshold_seconds" json:"sampling_latency_threshold_seconds"`
+	LatencyHistogramBuckets        []float64                                      `mapstructure:"latency_histogram_buckets" json:"latency_histogram_buckets"`
 	IgnoreClientErrors             bool                                           `mapstructure:"ignore_client_errors" json:"ignore_client_errors"`
 	LimitPerService                int                                            `mapstructure:"trace_rate_limit_per_service" json:"trace_rate_limit_per_service"`
 	LimitPerRequestPerService      int                                            `mapstructure:"trace_rate_limit_per_service_per_request" json:"trace_rate_limit_per_service_per_request"`

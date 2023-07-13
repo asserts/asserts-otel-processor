@@ -82,6 +82,7 @@ func (m *metrics) registerLatencyHistogram(captureAttributesInMetric []string) e
 		Namespace: "otel",
 		Subsystem: "span",
 		Name:      "latency_seconds",
+		Buckets:   m.config.LatencyHistogramBuckets,
 	}, spanMetricLabels)
 	err := m.prometheusRegistry.Register(m.latencyHistogram)
 	if err != nil {

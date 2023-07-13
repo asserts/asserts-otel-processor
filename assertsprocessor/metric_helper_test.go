@@ -183,7 +183,7 @@ func TestCacheEviction(t *testing.T) {
 	assert.Equal(t, 1, cache.Len())
 }
 
-func TestMetricHelperIsUpdated(t *testing.T) {
+func TestMetricHelperIsCaptureAttributesInMetricUpdated(t *testing.T) {
 	currConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
 	}
@@ -199,13 +199,45 @@ func TestMetricHelperIsUpdated(t *testing.T) {
 	assert.True(t, p.isUpdated(currConfig, newConfig))
 }
 
+func TestMetricHelperIsLatencyHistogramBucketsUpdated(t *testing.T) {
+	currConfig := &Config{
+		LatencyHistogramBuckets: []float64{1, 2.5, 5, 10},
+	}
+	newConfig := &Config{
+		LatencyHistogramBuckets: []float64{1, 2.5, 5, 10, 25},
+	}
+	p := newMetricHelper(
+		logger,
+		currConfig,
+	)
+
+	assert.False(t, p.isUpdated(currConfig, currConfig))
+	assert.True(t, p.isUpdated(currConfig, newConfig))
+}
+
+func TestMetricHelperEmptyLatencyHistogramBuckets(t *testing.T) {
+	currConfig := &Config{
+		LatencyHistogramBuckets: []float64{1, 2.5, 5, 10},
+	}
+	newConfig := &Config{}
+	p := newMetricHelper(
+		logger,
+		currConfig,
+	)
+
+	assert.False(t, p.isUpdated(currConfig, currConfig))
+	assert.False(t, p.isUpdated(currConfig, newConfig))
+}
+
 func TestMetricHelperOnUpdate(t *testing.T) {
 	currConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service"},
+		LatencyHistogramBuckets:   []float64{1, 2.5, 5, 10},
 		PrometheusExporterPort:    9466,
 	}
 	newConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
+		LatencyHistogramBuckets:   []float64{1, 2.5, 5, 10, 25},
 	}
 
 	logger, _ := zap.NewProduction()

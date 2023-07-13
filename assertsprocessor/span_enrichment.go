@@ -84,7 +84,7 @@ func (ep *spanEnrichmentProcessorImpl) isUpdated(currConfig *Config, newConfig *
 func (ep *spanEnrichmentProcessorImpl) onUpdate(newConfig *Config) error {
 	newAttributes, err := buildCompiledConfig(ep.logger, newConfig)
 	if err == nil {
-		ep.logger.Info("Updated config RequestContextExps",
+		ep.logger.Info("Updated config CustomAttributeConfigs",
 			zap.Any("New", newConfig.CustomAttributeConfigs),
 		)
 		ep.configRWMutex.Lock()

@@ -195,6 +195,11 @@ func (p *metricHelper) isUpdated(currConfig *Config, newConfig *Config) bool {
 	p.rwMutex.RLock()
 	defer p.rwMutex.RUnlock()
 
+	return p.isCaptureAttributesInMetricUpdated(currConfig, newConfig) ||
+		p.isLatencyHistogramBucketsUpdated(currConfig, newConfig)
+}
+
+func (p *metricHelper) isCaptureAttributesInMetricUpdated(currConfig *Config, newConfig *Config) bool {
 	updated := !reflect.DeepEqual(currConfig.CaptureAttributesInMetric, newConfig.CaptureAttributesInMetric)
 	if updated {
 		p.logger.Info("Change detected in config CaptureAttributesInMetric",
@@ -203,6 +208,20 @@ func (p *metricHelper) isUpdated(currConfig *Config, newConfig *Config) bool {
 		)
 	} else {
 		p.logger.Debug("No change detected in config CaptureAttributesInMetric")
+	}
+	return updated
+}
+
+func (p *metricHelper) isLatencyHistogramBucketsUpdated(currConfig *Config, newConfig *Config) bool {
+	updated := len(newConfig.LatencyHistogramBuckets) > 0 &&
+		!reflect.DeepEqual(currConfig.LatencyHistogramBuckets, newConfig.LatencyHistogramBuckets)
+	if updated {
+		p.logger.Info("Change detected in config LatencyHistogramBuckets",
+			zap.Any("Current", currConfig.LatencyHistogramBuckets),
+			zap.Any("New", newConfig.LatencyHistogramBuckets),
+		)
+	} else {
+		p.logger.Debug("No change detected in config LatencyHistogramBuckets")
 	}
 	return updated
 }
@@ -217,29 +236,36 @@ func (p *metricHelper) onUpdate(newConfig *Config) error {
 	err := p.stopExporter()
 	if err == nil {
 		currConfigCaptureAttributesInMetric := p.config.CaptureAttributesInMetric
+		currConfigLatencyHistogramBuckets := p.config.LatencyHistogramBuckets
 		// use new config
 		p.config.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
+		if len(newConfig.LatencyHistogramBuckets) > 0 {
+			p.config.LatencyHistogramBuckets = newConfig.LatencyHistogramBuckets
+		}
 
 		// create new prometheus registry and register metrics
 		err = p.registerMetrics()
 		if err == nil {
-			p.logger.Info("Updated config CaptureAttributesInMetric",
-				zap.Any("New", newConfig.CaptureAttributesInMetric),
+			p.logger.Info("Updated config",
+				zap.Any("CaptureAttributesInMetric", newConfig.CaptureAttributesInMetric),
+				zap.Any("LatencyHistogramBuckets", newConfig.LatencyHistogramBuckets),
 			)
 		} else {
-			p.logger.Error("Ignoring config CaptureAttributesInMetric due to error registering new latency histogram",
+			p.logger.Error("Ignoring config CaptureAttributesInMetric and LatencyHistogramBuckets "+
+				"due to error registering new latency histogram",
 				zap.Error(err),
 			)
 			// latency histogram registration failed, reverting to old config
 			// create new prometheus registry and register metrics again
 			p.config.CaptureAttributesInMetric = currConfigCaptureAttributesInMetric
+			p.config.LatencyHistogramBuckets = currConfigLatencyHistogramBuckets
 			_ = p.registerMetrics()
 		}
 
 		p.startExporter()
 	} else {
 		err = errors.New("error stopping http server exporting prometheus metrics")
-		p.logger.Error("Ignoring config CaptureAttributesInMetric", zap.Error(err))
+		p.logger.Error("Ignoring config CaptureAttributesInMetric and LatencyHistogramBuckets", zap.Error(err))
 	}
 	return err
 }
