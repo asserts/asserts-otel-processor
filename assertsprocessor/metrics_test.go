@@ -10,7 +10,10 @@ import (
 func TestRegisterMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	reg := &metrics{
-		logger:             logger,
+		logger: logger,
+		config: &Config{
+			LatencyHistogramBuckets: []float64{1, 2.5, 5, 10},
+		},
 		prometheusRegistry: prometheus.NewRegistry(),
 	}
 	attributes := []string{"rpc.system", "rpc.service", "rpc.method",
@@ -27,6 +30,7 @@ func TestUnregisterMetrics(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	reg := &metrics{
 		logger:             logger,
+		config:             &Config{},
 		prometheusRegistry: prometheus.NewRegistry(),
 	}
 	attributes := []string{"rpc.system", "rpc.service", "rpc.method",

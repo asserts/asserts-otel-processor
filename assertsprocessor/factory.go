@@ -33,6 +33,7 @@ func createDefaultConfig() component.Config {
 		AssertsServer: &map[string]string{
 			"endpoint": "https://chief.app.dev.asserts.ai",
 		},
+		LatencyHistogramBuckets:        []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60, 90, 120},
 		DefaultLatencyThreshold:        3,
 		LimitPerService:                100,
 		LimitPerRequestPerService:      3,
@@ -69,6 +70,10 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		pConfig.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
 		pConfig.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
 		pConfig.CustomAttributeConfigs = newConfig.CustomAttributeConfigs
+		pConfig.IgnoreClientErrors = newConfig.IgnoreClientErrors
+		if len(newConfig.LatencyHistogramBuckets) > 0 {
+			pConfig.LatencyHistogramBuckets = newConfig.LatencyHistogramBuckets
+		}
 	}
 
 	_spanEnrichmentProcessor, err := buildEnrichmentProcessor(logger, pConfig)

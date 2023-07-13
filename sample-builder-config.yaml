@@ -26,6 +26,6 @@ processors:
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.81.0
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.81.0
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.81.0
-  - gomod: github.com/asserts/asserts-otel-processor/assertsprocessor v0.0.88
+  - gomod: github.com/asserts/asserts-otel-processor/assertsprocessor v0.0.89
 connectors:
   - gomod: go.opentelemetry.io/collector/connector/forwardconnector v0.81.0

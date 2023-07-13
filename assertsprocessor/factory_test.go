@@ -146,6 +146,8 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
         "rpc.service"
       ],
       "sampling_latency_threshold_seconds": 0.51,
+	  "latency_histogram_buckets": [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 90.0, 120.0],
+      "ignore_client_errors": true,
       "unknown": "foo"
     }`),
 		expectedErr: nil,
@@ -158,6 +160,8 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 	assert.Nil(t, config.CustomAttributeConfigs)
 	assert.Nil(t, config.CaptureAttributesInMetric)
 	assert.Equal(t, 0.5, config.DefaultLatencyThreshold)
+	assert.Nil(t, config.LatencyHistogramBuckets)
+	assert.False(t, config.IgnoreClientErrors)
 
 	var _processorRef, err = factory.CreateTracesProcessor(ctx, createSettings, &config, nextConsumer)
 
@@ -185,4 +189,6 @@ func TestCreateProcessorMergeFetchedConfig(t *testing.T) {
 	assert.Equal(t, "rpc.system", config.CaptureAttributesInMetric[0])
 	assert.Equal(t, "rpc.service", config.CaptureAttributesInMetric[1])
 	assert.Equal(t, 0.51, config.DefaultLatencyThreshold)
+	assert.Equal(t, []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60, 90, 120}, config.LatencyHistogramBuckets)
+	assert.True(t, config.IgnoreClientErrors)
 }
