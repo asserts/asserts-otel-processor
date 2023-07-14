@@ -3,11 +3,14 @@ package assertsprocessor
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 	"testing"
 	"time"
 )
+
+var buildInfo = component.BuildInfo{}
 
 func TestBuildLabels(t *testing.T) {
 	logger, _ := zap.NewProduction()
@@ -19,10 +22,7 @@ func TestBuildLabels(t *testing.T) {
 		CaptureAttributesInMetric: attributes,
 	}
 	config.CaptureAttributesInMetric = attributes
-	p := newMetricHelper(
-		logger,
-		c,
-	)
+	p := newMetricHelper(logger, c, buildInfo)
 
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 	resourceSpans.Resource().Attributes().PutStr("host.name", "192.168.1.19")
@@ -67,10 +67,7 @@ func TestCaptureMetrics(t *testing.T) {
 		LimitPerService: 100,
 	}
 	config.CaptureAttributesInMetric = attributes
-	p := newMetricHelper(
-		logger,
-		c,
-	)
+	p := newMetricHelper(logger, c, buildInfo)
 	err := p.registerMetrics()
 	assert.Nil(t, err)
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
@@ -113,10 +110,7 @@ func TestMetricCardinalityLimit(t *testing.T) {
 		LimitPerService: 2,
 	}
 	config.CaptureAttributesInMetric = []string{}
-	p := newMetricHelper(
-		logger,
-		c,
-	)
+	p := newMetricHelper(logger, c, buildInfo)
 	_ = p.registerMetrics()
 	resourceSpans := ptrace.NewTraces().ResourceSpans().AppendEmpty()
 
@@ -151,10 +145,7 @@ func TestCacheEviction(t *testing.T) {
 		RequestContextCacheTTL: 1,
 	}
 	config.CaptureAttributesInMetric = []string{}
-	p := newMetricHelper(
-		logger,
-		c,
-	)
+	p := newMetricHelper(logger, c, buildInfo)
 	// overwrite ttl to a smaller value of 5 millis in this unit test
 	p.ttl = time.Millisecond * time.Duration(p.config.RequestContextCacheTTL)
 	_ = p.registerMetrics()
@@ -190,10 +181,7 @@ func TestMetricHelperIsCaptureAttributesInMetricUpdated(t *testing.T) {
 	newConfig := &Config{
 		CaptureAttributesInMetric: []string{"rpc.system", "rpc.service", "rpc.method"},
 	}
-	p := newMetricHelper(
-		logger,
-		currConfig,
-	)
+	p := newMetricHelper(logger, currConfig, buildInfo)
 
 	assert.False(t, p.isUpdated(currConfig, currConfig))
 	assert.True(t, p.isUpdated(currConfig, newConfig))
@@ -206,10 +194,7 @@ func TestMetricHelperIsLatencyHistogramBucketsUpdated(t *testing.T) {
 	newConfig := &Config{
 		LatencyHistogramBuckets: []float64{1, 2.5, 5, 10, 25},
 	}
-	p := newMetricHelper(
-		logger,
-		currConfig,
-	)
+	p := newMetricHelper(logger, currConfig, buildInfo)
 
 	assert.False(t, p.isUpdated(currConfig, currConfig))
 	assert.True(t, p.isUpdated(currConfig, newConfig))
@@ -220,10 +205,7 @@ func TestMetricHelperEmptyLatencyHistogramBuckets(t *testing.T) {
 		LatencyHistogramBuckets: []float64{1, 2.5, 5, 10},
 	}
 	newConfig := &Config{}
-	p := newMetricHelper(
-		logger,
-		currConfig,
-	)
+	p := newMetricHelper(logger, currConfig, buildInfo)
 
 	assert.False(t, p.isUpdated(currConfig, currConfig))
 	assert.False(t, p.isUpdated(currConfig, newConfig))
@@ -241,10 +223,7 @@ func TestMetricHelperOnUpdate(t *testing.T) {
 	}
 
 	logger, _ := zap.NewProduction()
-	p := newMetricHelper(
-		logger,
-		currConfig,
-	)
+	p := newMetricHelper(logger, currConfig, buildInfo)
 	_ = p.registerMetrics()
 	p.startExporter()
 

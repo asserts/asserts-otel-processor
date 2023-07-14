@@ -60,7 +60,7 @@ func TestStartAndShutdown(t *testing.T) {
 		logger:        testLogger,
 		config:        &testConfig,
 		nextConsumer:  dConsumer,
-		metricBuilder: newMetricHelper(testLogger, &testConfig),
+		metricBuilder: newMetricHelper(testLogger, &testConfig, buildInfo),
 		sampler: &sampler{
 			logger:             testLogger,
 			config:             &testConfig,
@@ -98,7 +98,7 @@ func TestConsumeTraces(t *testing.T) {
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		rwMutex:             &sync.RWMutex{},
 	}
-	helper := newMetricHelper(testLogger, &testConfig)
+	helper := newMetricHelper(testLogger, &testConfig, buildInfo)
 	_ = helper.registerMetrics()
 	p := assertsProcessorImpl{
 		logger:        testLogger,

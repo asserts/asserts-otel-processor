@@ -45,10 +45,12 @@ func createDefaultConfig() component.Config {
 }
 
 func createTracesProcessor(ctx context.Context, params processor.CreateSettings, cfg component.Config, nextConsumer consumer.Traces) (processor.Traces, error) {
-	return newProcessor(params.Logger, ctx, cfg, nextConsumer)
+	return newProcessor(params.Logger, params.BuildInfo, ctx, cfg, nextConsumer)
 }
 
-func newProcessor(logger *zap.Logger, ctx context.Context, config component.Config, nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
+func newProcessor(logger *zap.Logger, buildInfo component.BuildInfo, ctx context.Context, config component.Config,
+	nextConsumer consumer.Traces) (*assertsProcessorImpl, error) {
+
 	logger.Info("Creating assertsotelprocessor")
 	pConfig := config.(*Config)
 
@@ -92,7 +94,7 @@ func newProcessor(logger *zap.Logger, ctx context.Context, config component.Conf
 		rwMutex:             &sync.RWMutex{},
 	}
 
-	metricsHelper := newMetricHelper(logger, pConfig)
+	metricsHelper := newMetricHelper(logger, pConfig, buildInfo)
 	err = metricsHelper.registerMetrics()
 	if err != nil {
 		return nil, err

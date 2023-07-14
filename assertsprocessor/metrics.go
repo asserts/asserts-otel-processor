@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/collector/component"
 	"go.uber.org/zap"
 	"sort"
 	"strings"
@@ -10,12 +11,14 @@ import (
 type metrics struct {
 	logger             *zap.Logger
 	config             *Config
+	buildInfo          component.BuildInfo
 	prometheusRegistry *prometheus.Registry
 	latencyHistogram   *prometheus.HistogramVec
 	totalTraceCount    *prometheus.CounterVec
 	sampledTraceCount  *prometheus.CounterVec
 	totalSpanCount     *prometheus.CounterVec
 	sampledSpanCount   *prometheus.CounterVec
+	buildInfoMetric    prometheus.Gauge
 }
 
 func (m *metrics) registerMetrics(captureAttributesInMetric []string) error {
@@ -47,12 +50,18 @@ func (m *metrics) registerMetrics(captureAttributesInMetric []string) error {
 	if err != nil {
 		return err
 	}
+	// Create Build Info Gauge
+	err = m.registerBuildInfo()
+	if err != nil {
+		return err
+	}
+	m.buildInfoMetric.Set(1)
 
 	return m.registerLatencyHistogram(captureAttributesInMetric)
 }
 
 func (m *metrics) register(subsystem string, name string, labels []string, msg string) (*prometheus.CounterVec, error) {
-	m.logger.Info(msg+" with ", zap.String("labels", strings.Join(labels, ", ")))
+	m.logger.Info("Registering "+msg+" with ", zap.String("labels", strings.Join(labels, ", ")))
 
 	counter := prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "asserts",
@@ -93,6 +102,24 @@ func (m *metrics) registerLatencyHistogram(captureAttributesInMetric []string) e
 	return nil
 }
 
+func (m *metrics) registerBuildInfo() error {
+	m.logger.Info("Registering Asserts Otel Collector BuildInfo Gauge")
+
+	m.buildInfoMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace:   "asserts",
+		Subsystem:   "otelcol",
+		Name:        "build_info",
+		ConstLabels: map[string]string{"version": m.buildInfo.Version},
+	})
+	err := m.prometheusRegistry.Register(m.buildInfoMetric)
+	if err != nil {
+		m.logger.Fatal("Error registering Asserts Otel Collector BuildInfo Gauge", zap.Error(err))
+		return err
+	}
+
+	return nil
+}
+
 func (m *metrics) unregisterMetrics() {
 	m.latencyHistogram.Reset()
 	m.totalTraceCount.Reset()
@@ -105,6 +132,7 @@ func (m *metrics) unregisterMetrics() {
 	m.prometheusRegistry.Unregister(m.sampledTraceCount)
 	m.prometheusRegistry.Unregister(m.totalSpanCount)
 	m.prometheusRegistry.Unregister(m.sampledSpanCount)
+	m.prometheusRegistry.Unregister(m.buildInfoMetric)
 }
 
 func (m *metrics) incrTotalCounts(tr *trace) {
