@@ -6,6 +6,7 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/puzpuzpuz/xsync/v2"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
 	"net/http"
@@ -40,10 +41,11 @@ type metricHelper struct {
 	rwMutex *sync.RWMutex
 }
 
-func newMetricHelper(logger *zap.Logger, config *Config) *metricHelper {
+func newMetricHelper(logger *zap.Logger, config *Config, buildInfo component.BuildInfo) *metricHelper {
 	metrics := &metrics{
 		logger:             logger,
 		config:             config,
+		buildInfo:          buildInfo,
 		prometheusRegistry: prometheus.NewRegistry(),
 	}
 	exporter := &metricsExporter{

@@ -24,6 +24,7 @@ func TestRegisterMetrics(t *testing.T) {
 	assert.NotNil(t, reg.latencyHistogram)
 	assert.NotNil(t, reg.sampledTraceCount)
 	assert.NotNil(t, reg.totalTraceCount)
+	assert.NotNil(t, reg.buildInfoMetric)
 }
 
 func TestUnregisterMetrics(t *testing.T) {
