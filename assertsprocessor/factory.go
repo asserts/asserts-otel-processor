@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/puzpuzpuz/xsync/v2"
 	"sync"
 	"time"
 
@@ -87,8 +88,8 @@ func newProcessor(logger *zap.Logger, buildInfo component.BuildInfo, ctx context
 		config:              pConfig,
 		logger:              logger,
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		thresholds:          &sync.Map{},
-		entityKeys:          &sync.Map{},
+		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
 		stop:                make(chan bool),
 		rc:                  restClient,
 		rwMutex:             &sync.RWMutex{},

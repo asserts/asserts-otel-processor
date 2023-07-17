@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/puzpuzpuz/xsync/v2"
 	"go.opentelemetry.io/collector/consumer"
 	"sync"
 	"testing"
@@ -44,8 +45,8 @@ func TestStartAndShutdown(t *testing.T) {
 		logger:              testLogger,
 		config:              &testConfig,
 		stop:                make(chan bool),
-		entityKeys:          &sync.Map{},
-		thresholds:          &sync.Map{},
+		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
+		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		rc:                  &assertsClient{},
 	}
@@ -93,8 +94,8 @@ func TestConsumeTraces(t *testing.T) {
 		logger:              testLogger,
 		config:              &testConfig,
 		stop:                make(chan bool),
-		entityKeys:          &sync.Map{},
-		thresholds:          &sync.Map{},
+		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
+		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
 		rwMutex:             &sync.RWMutex{},
 	}

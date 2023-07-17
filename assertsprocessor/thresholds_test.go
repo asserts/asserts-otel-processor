@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"context"
+	"github.com/puzpuzpuz/xsync/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/tilinna/clock"
 	"go.uber.org/zap"
@@ -20,8 +21,8 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 			AssertsServer:           &map[string]string{"endpoint": "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: &sync.Map{},
-		entityKeys: &sync.Map{},
+		thresholds: xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys: xsync.NewMapOf[EntityKeyDto](),
 		rwMutex:    &sync.RWMutex{},
 	}
 
@@ -31,9 +32,9 @@ func TestGetThresholdDefaultThreshold(t *testing.T) {
 		},
 	}
 	assert.Equal(t, 0.5, th.getThreshold("platform", "api-server", "123"))
-	th.entityKeys.Range(func(key any, value any) bool {
-		assert.Equal(t, dto.AsString(), key.(string))
-		assert.Equal(t, dto, value.(EntityKeyDto))
+	th.entityKeys.Range(func(key string, entityKey EntityKeyDto) bool {
+		assert.Equal(t, dto.AsString(), key)
+		assert.Equal(t, dto, entityKey)
 		return true
 	})
 }
@@ -48,8 +49,8 @@ func TestGetRequestThresholdFound(t *testing.T) {
 			AssertsServer:           &map[string]string{"endpoint": "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: &sync.Map{},
-		entityKeys: &sync.Map{},
+		thresholds: xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys: xsync.NewMapOf[EntityKeyDto](),
 		rwMutex:    &sync.RWMutex{},
 	}
 
@@ -86,8 +87,8 @@ func TestGetServiceDefaultThresholdFound(t *testing.T) {
 			AssertsServer:           &map[string]string{"endpoint": "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: &sync.Map{},
-		entityKeys: &sync.Map{},
+		thresholds: xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys: xsync.NewMapOf[EntityKeyDto](),
 		rwMutex:    &sync.RWMutex{},
 	}
 
@@ -119,8 +120,8 @@ func TestStopUpdates(t *testing.T) {
 			AssertsServer:           &map[string]string{"endpoint": "http://localhost:8030"},
 			DefaultLatencyThreshold: 0.5,
 		},
-		thresholds: &sync.Map{},
-		entityKeys: &sync.Map{},
+		thresholds: xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys: xsync.NewMapOf[EntityKeyDto](),
 		stop:       make(chan bool),
 	}
 	th.stopUpdates()
@@ -140,30 +141,68 @@ func TestUpdateThresholds(t *testing.T) {
 		},
 		DefaultLatencyThreshold: 0.5,
 	}
+	mockClient := mockRestClient{
+		expectedData: []byte(`[
+			{
+				"entityKey": {
+					"type": "Service",
+					"name": "api-server",
+					"scope": {
+						"env": "dev",
+						"site": "us-west-2"
+					}
+				},
+				"latencyThresholds": [
+					{
+						"requestType": "inbound",
+						"requestContext": "/v4/rules",
+						"upperThreshold": 0.25
+					}
+				]
+			},
+			{
+				"entityKey": {
+					"type": "Service",
+					"name": "model-builder",
+					"scope": {
+						"env": "dev",
+						"site": "us-west-2"
+					}
+				},
+				"latencyThresholds": [
+					{
+						"requestType": "method",
+						"requestContext": "run",
+						"upperThreshold": 1.5
+					}
+				]
+			}
+		]`),
+		expectedErr: nil,
+	}
 	var th = thresholdHelper{
 		logger:              logger,
 		config:              config,
-		thresholds:          &sync.Map{},
-		entityKeys:          &sync.Map{},
+		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
 		stop:                make(chan bool),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(10 * time.Millisecond),
-		rc: &mockRestClient{
-			expectedData: []byte(`[{
-				"requestType": "inbound",
-				"requestContext": "/v4/rules",
-				"upperThreshold": 0.25
-			}]`),
-			expectedErr: nil,
-		},
+		rc:                  &mockClient,
 	}
-	entityKey := EntityKeyDto{
+	entityKey1 := EntityKeyDto{
 		Type: "Service", Name: "api-server", Scope: map[string]string{
 			"env": "dev", "site": "us-west-2",
 		},
 	}
-	th.entityKeys.Store(entityKey.AsString(), entityKey)
+	entityKey2 := EntityKeyDto{
+		Type: "Service", Name: "model-builder", Scope: map[string]string{
+			"env": "dev", "site": "us-west-2",
+		},
+	}
+	th.entityKeys.Store(entityKey1.AsString(), entityKey1)
+	th.entityKeys.Store(entityKey2.AsString(), entityKey2)
 
-	value, _ := th.thresholds.Load(entityKey.AsString())
+	value, _ := th.thresholds.Load(entityKey1.AsString())
 	assert.Nil(t, value)
 
 	go func() { th.startUpdates() }()
@@ -171,15 +210,26 @@ func TestUpdateThresholds(t *testing.T) {
 	th.stopUpdates()
 	time.Sleep(10 * time.Millisecond)
 
-	thresholds, _ := th.thresholds.Load(entityKey.AsString())
+	assert.Equal(t, latencyThresholdsApi, mockClient.expectedApi)
+	assert.Equal(t, "POST", mockClient.expectedMethod)
+
+	thresholds, _ := th.thresholds.Load(entityKey1.AsString())
 	assert.NotNil(t, thresholds)
 
-	thresholdsMap := thresholds.(map[string]*ThresholdDto)
-	assert.Equal(t, 1, len(thresholdsMap))
-	assert.NotNil(t, thresholdsMap["/v4/rules"])
-	assert.Equal(t, "inbound", thresholdsMap["/v4/rules"].RequestType)
-	assert.Equal(t, "/v4/rules", thresholdsMap["/v4/rules"].RequestContext)
-	assert.Equal(t, 0.25, thresholdsMap["/v4/rules"].LatencyUpperBound)
+	assert.Equal(t, 1, len(thresholds))
+	assert.NotNil(t, thresholds["/v4/rules"])
+	assert.Equal(t, "inbound", thresholds["/v4/rules"].RequestType)
+	assert.Equal(t, "/v4/rules", thresholds["/v4/rules"].RequestContext)
+	assert.Equal(t, 0.25, thresholds["/v4/rules"].LatencyUpperBound)
+
+	thresholds, _ = th.thresholds.Load(entityKey2.AsString())
+	assert.NotNil(t, thresholds)
+
+	assert.Equal(t, 1, len(thresholds))
+	assert.NotNil(t, thresholds["run"])
+	assert.Equal(t, "method", thresholds["run"].RequestType)
+	assert.Equal(t, "run", thresholds["run"].RequestContext)
+	assert.Equal(t, 1.5, thresholds["run"].LatencyUpperBound)
 }
 
 func TestUpdateThresholdsUnmarshalError(t *testing.T) {
@@ -198,8 +248,8 @@ func TestUpdateThresholdsUnmarshalError(t *testing.T) {
 	var th = thresholdHelper{
 		logger:              logger,
 		config:              config,
-		thresholds:          &sync.Map{},
-		entityKeys:          &sync.Map{},
+		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
+		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
 		stop:                make(chan bool),
 		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(1 * time.Millisecond),
 		rc: &mockRestClient{

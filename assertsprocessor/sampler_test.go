@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/puzpuzpuz/xsync/v2"
 	"sync"
 	"testing"
 	"time"
@@ -30,8 +31,8 @@ var config = Config{
 var th = thresholdHelper{
 	logger:     logger,
 	config:     &config,
-	entityKeys: &sync.Map{},
-	thresholds: &sync.Map{},
+	entityKeys: xsync.NewMapOf[EntityKeyDto](),
+	thresholds: xsync.NewMapOf[map[string]*ThresholdDto](),
 	rwMutex:    &sync.RWMutex{},
 }
 

@@ -2,6 +2,7 @@ package assertsprocessor
 
 import (
 	"encoding/json"
+	"github.com/puzpuzpuz/xsync/v2"
 	"github.com/tilinna/clock"
 	"go.uber.org/zap"
 	"net/http"
@@ -14,12 +15,17 @@ type ThresholdDto struct {
 	LatencyUpperBound float64 `json:"upperThreshold"`
 }
 
+type ThresholdsDto struct {
+	EntityKey         EntityKeyDto   `json:"entityKey"`
+	LatencyThresholds []ThresholdDto `json:"latencyThresholds"`
+}
+
 type thresholdHelper struct {
 	config              *Config
 	logger              *zap.Logger
-	thresholds          *sync.Map
+	thresholds          *xsync.MapOf[string, map[string]*ThresholdDto]
 	thresholdSyncTicker *clock.Ticker
-	entityKeys          *sync.Map
+	entityKeys          *xsync.MapOf[string, EntityKeyDto]
 	stop                chan bool
 	rc                  restClient
 	rwMutex             *sync.RWMutex // guard access to config.DefaultLatencyThreshold
@@ -32,12 +38,10 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 
 	thresholdFound := th.getDefaultThreshold()
 	if thresholds != nil {
-		thresholdMap := thresholds.(map[string]*ThresholdDto)
-
-		if thresholdMap[request] != nil {
-			thresholdFound = (*thresholdMap[request]).LatencyUpperBound
-		} else if thresholdMap[""] != nil {
-			thresholdFound = (*thresholdMap[""]).LatencyUpperBound
+		if thresholds[request] != nil {
+			thresholdFound = (*thresholds[request]).LatencyUpperBound
+		} else if thresholds[""] != nil {
+			thresholdFound = (*thresholds[""]).LatencyUpperBound
 		}
 	}
 	return thresholdFound
@@ -64,17 +68,16 @@ func (th *thresholdHelper) startUpdates() {
 					th.logger.Info("Stopping threshold updates")
 					return
 				case <-th.thresholdSyncTicker.C:
-					keys := make([]string, 0)
-					th.entityKeys.Range(func(key any, value any) bool {
-						entityKey := value.(EntityKeyDto)
-						keys = append(keys, entityKey.AsString())
-						th.updateThresholdsAsync(entityKey)
+					entityKeys := make([]EntityKeyDto, 0)
+					th.entityKeys.Range(func(key string, entityKey EntityKeyDto) bool {
+						entityKeys = append(entityKeys, entityKey)
 						return true
 					})
-					if len(keys) > 0 {
+					if len(entityKeys) > 0 {
 						th.logger.Info("Fetching thresholds for",
-							zap.Strings("Services", keys),
+							zap.Any("Services", entityKeys),
 						)
+						th.updateThresholdsAsync(entityKeys)
 					} else {
 						th.logger.Info("Skip fetching thresholds as no service has reported a Trace")
 					}
@@ -84,44 +87,38 @@ func (th *thresholdHelper) startUpdates() {
 	}
 }
 
-func (th *thresholdHelper) updateThresholdsAsync(entityKey EntityKeyDto) bool {
-	th.logger.Debug("updateThresholdsAsync(...) called for",
-		zap.String("Entity Key", entityKey.AsString()))
+func (th *thresholdHelper) updateThresholdsAsync(entityKeys []EntityKeyDto) bool {
 	go func() {
-		thresholds, err := th.getThresholds(entityKey)
+		thresholdsDtos, err := th.getThresholds(entityKeys)
 		if err == nil {
-			var latestThresholds = map[string]*ThresholdDto{}
-			for i, threshold := range thresholds {
-				latestThresholds[threshold.RequestContext] = &thresholds[i]
+			for _, thresholdsDto := range thresholdsDtos {
+				var entityKey = thresholdsDto.EntityKey.AsString()
+				var thresholds = map[string]*ThresholdDto{}
+				for _, threshold := range thresholdsDto.LatencyThresholds {
+					thresholds[threshold.RequestContext] = &threshold
+				}
+				th.thresholds.Store(entityKey, thresholds)
 			}
-			th.thresholds.Store(entityKey.AsString(), latestThresholds)
 		}
 	}()
 	return true
 }
 
-func (th *thresholdHelper) getThresholds(entityKey EntityKeyDto) ([]ThresholdDto, error) {
-	var thresholds []ThresholdDto
-	body, err := th.rc.invoke(http.MethodPost, latencyThresholdsApi, entityKey)
+func (th *thresholdHelper) getThresholds(entityKeys []EntityKeyDto) ([]ThresholdsDto, error) {
+	var thresholds []ThresholdsDto
+	body, err := th.rc.invoke(http.MethodPost, latencyThresholdsApi, entityKeys)
 	if err == nil {
 		err = json.Unmarshal(body, &thresholds)
 		if err == nil {
-			th.logThresholds(entityKey, thresholds)
+			th.logger.Debug("",
+				zap.Any("Got thresholds", thresholds),
+			)
 		} else {
 			th.logger.Error("Error unmarshalling thresholds", zap.Error(err))
 		}
 	}
 
 	return thresholds, err
-}
-
-func (th *thresholdHelper) logThresholds(entityKey EntityKeyDto, thresholds []ThresholdDto) {
-	var fields = make([]zap.Field, 0)
-	fields = append(fields, zap.String("Entity", entityKey.AsString()))
-	for i := range thresholds {
-		fields = append(fields, zap.Float64(thresholds[i].RequestContext, thresholds[i].LatencyUpperBound))
-	}
-	th.logger.Debug("Got thresholds ", fields...)
 }
 
 // configListener interface implementation
