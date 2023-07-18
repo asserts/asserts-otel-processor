@@ -13,7 +13,7 @@ import (
 
 const (
 	configApi            = "/v1/config/otel-collector"
-	latencyThresholdsApi = "/v1/latency-thresholds"
+	latencyThresholdsApi = "/v2/latency-thresholds"
 )
 
 type restClient interface {
