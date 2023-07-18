@@ -39,9 +39,9 @@ func (th *thresholdHelper) getThreshold(ns string, service string, request strin
 	thresholdFound := th.getDefaultThreshold()
 	if thresholds != nil {
 		if thresholds[request] != nil {
-			thresholdFound = (*thresholds[request]).LatencyUpperBound
+			thresholdFound = thresholds[request].LatencyUpperBound
 		} else if thresholds[""] != nil {
-			thresholdFound = (*thresholds[""]).LatencyUpperBound
+			thresholdFound = thresholds[""].LatencyUpperBound
 		}
 	}
 	return thresholdFound
@@ -94,8 +94,8 @@ func (th *thresholdHelper) updateThresholdsAsync(entityKeys []EntityKeyDto) bool
 			for _, thresholdsDto := range thresholdsDtos {
 				var entityKey = thresholdsDto.EntityKey.AsString()
 				var thresholds = map[string]*ThresholdDto{}
-				for _, threshold := range thresholdsDto.LatencyThresholds {
-					thresholds[threshold.RequestContext] = &threshold
+				for i, threshold := range thresholdsDto.LatencyThresholds {
+					thresholds[threshold.RequestContext] = &thresholdsDto.LatencyThresholds[i]
 				}
 				th.thresholds.Store(entityKey, thresholds)
 			}

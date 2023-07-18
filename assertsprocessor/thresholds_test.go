@@ -157,6 +157,11 @@ func TestUpdateThresholds(t *testing.T) {
 						"requestType": "inbound",
 						"requestContext": "/v4/rules",
 						"upperThreshold": 0.25
+					},
+					{
+						"requestType": "inbound",
+						"requestContext": "/v1/assertions",
+						"upperThreshold": 0.5
 					}
 				]
 			},
@@ -216,11 +221,15 @@ func TestUpdateThresholds(t *testing.T) {
 	thresholds, _ := th.thresholds.Load(entityKey1.AsString())
 	assert.NotNil(t, thresholds)
 
-	assert.Equal(t, 1, len(thresholds))
+	assert.Equal(t, 2, len(thresholds))
 	assert.NotNil(t, thresholds["/v4/rules"])
 	assert.Equal(t, "inbound", thresholds["/v4/rules"].RequestType)
 	assert.Equal(t, "/v4/rules", thresholds["/v4/rules"].RequestContext)
 	assert.Equal(t, 0.25, thresholds["/v4/rules"].LatencyUpperBound)
+	assert.NotNil(t, thresholds["/v1/assertions"])
+	assert.Equal(t, "inbound", thresholds["/v1/assertions"].RequestType)
+	assert.Equal(t, "/v1/assertions", thresholds["/v1/assertions"].RequestContext)
+	assert.Equal(t, 0.5, thresholds["/v1/assertions"].LatencyUpperBound)
 
 	thresholds, _ = th.thresholds.Load(entityKey2.AsString())
 	assert.NotNil(t, thresholds)
