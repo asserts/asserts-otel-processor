@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"io"
+	"math"
 	"net/http"
 	"testing"
 )
@@ -52,15 +53,50 @@ func TestInvoke(t *testing.T) {
 	ac := assertsClient{
 		logger: logger,
 		config: &Config{
-			Env:  "dev",
-			Site: "us-west-2",
 			AssertsServer: &map[string]string{
 				"endpoint": "http://localhost:8031",
 				"user":     "asserts",
 				"password": "asserts",
 			},
-			AssertsTenant:           "bootstrap",
-			DefaultLatencyThreshold: 0.5,
+			AssertsTenant: "bootstrap",
+		},
+	}
+
+	invoke, err := ac.invoke(http.MethodPost, latencyThresholdsApi, "junit")
+	assert.NotNil(t, err)
+	assert.Nil(t, invoke)
+}
+
+func TestInvokeEncodingError(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	ac := assertsClient{
+		logger: logger,
+		config: &Config{
+			AssertsServer: &map[string]string{
+				"endpoint": "http://localhost:8031",
+				"user":     "asserts",
+				"password": "asserts",
+			},
+			AssertsTenant: "bootstrap",
+		},
+	}
+
+	invoke, err := ac.invoke(http.MethodPost, latencyThresholdsApi, math.NaN())
+	assert.NotNil(t, err)
+	assert.Nil(t, invoke)
+}
+
+func TestInvokeInvalidSchema(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	ac := assertsClient{
+		logger: logger,
+		config: &Config{
+			AssertsServer: &map[string]string{
+				"endpoint": "ht  tp://localhost:8031",
+				"user":     "asserts",
+				"password": "asserts",
+			},
+			AssertsTenant: "bootstrap",
 		},
 	}
 

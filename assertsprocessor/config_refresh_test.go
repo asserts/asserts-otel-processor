@@ -1,10 +1,13 @@
 package assertsprocessor
 
 import (
+	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/tilinna/clock"
 	"net/http"
 	"testing"
+	"time"
 )
 
 type (
@@ -25,8 +28,6 @@ func (mcl *mockConfigListener) onUpdate(newConfig *Config) error {
 }
 
 func TestFetchConfig(t *testing.T) {
-	cr := configRefresh{logger: logger}
-
 	mockClient := &mockRestClient{
 		expectedData: []byte(`{
       "ignore_client_errors": true,
@@ -63,26 +64,37 @@ func TestFetchConfig(t *testing.T) {
     }`),
 		expectedErr: nil,
 	}
-	config, err := cr.fetchConfig(mockClient)
+
+	ctx := context.Background()
+	cr := configRefresh{
+		logger:           logger,
+		config:           &config,
+		configSyncTicker: clock.FromContext(ctx).NewTicker(10 * time.Millisecond),
+		restClient:       mockClient,
+	}
+
+	go func() { cr.startUpdates() }()
+	time.Sleep(20 * time.Millisecond)
+	cr.stopUpdates()
+	time.Sleep(10 * time.Millisecond)
 
 	assert.Equal(t, http.MethodGet, mockClient.expectedMethod)
 	assert.Equal(t, configApi, mockClient.expectedApi)
 	assert.Nil(t, mockClient.expectedPayload)
 
-	assert.NotNil(t, config)
-	assert.True(t, config.IgnoreClientErrors)
-	assert.True(t, config.CaptureMetrics)
-	assert.NotNil(t, config.CustomAttributeConfigs)
-	assert.Equal(t, 1, len(config.CustomAttributeConfigs))
-	assert.Equal(t, 2, len(config.CustomAttributeConfigs["asserts.request.context"]))
-	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["default"]))
-	assert.Equal(t, 1, len(config.CustomAttributeConfigs["asserts.request.context"]["asserts#api-server"]))
-	assert.NotNil(t, config.CaptureAttributesInMetric)
-	assert.Equal(t, 2, len(config.CaptureAttributesInMetric))
-	assert.Equal(t, "rpc.system", config.CaptureAttributesInMetric[0])
-	assert.Equal(t, "rpc.service", config.CaptureAttributesInMetric[1])
-	assert.Equal(t, 0.51, config.DefaultLatencyThreshold)
-	assert.Nil(t, err)
+	assert.NotNil(t, cr.config)
+	assert.True(t, cr.config.IgnoreClientErrors)
+	assert.True(t, cr.config.CaptureMetrics)
+	assert.NotNil(t, cr.config.CustomAttributeConfigs)
+	assert.Equal(t, 1, len(cr.config.CustomAttributeConfigs))
+	assert.Equal(t, 2, len(cr.config.CustomAttributeConfigs["asserts.request.context"]))
+	assert.Equal(t, 1, len(cr.config.CustomAttributeConfigs["asserts.request.context"]["default"]))
+	assert.Equal(t, 1, len(cr.config.CustomAttributeConfigs["asserts.request.context"]["asserts#api-server"]))
+	assert.NotNil(t, cr.config.CaptureAttributesInMetric)
+	assert.Equal(t, 2, len(cr.config.CaptureAttributesInMetric))
+	assert.Equal(t, "rpc.system", cr.config.CaptureAttributesInMetric[0])
+	assert.Equal(t, "rpc.service", cr.config.CaptureAttributesInMetric[1])
+	assert.Equal(t, 0.51, cr.config.DefaultLatencyThreshold)
 }
 
 func TestFetchConfigUnmarshalError(t *testing.T) {
