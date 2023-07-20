@@ -22,6 +22,7 @@ processors:
       password: $ASSERTS_SERVER_PASSWORD
     asserts_env: $ASSERTS_ENV
     asserts_site: $ASSERTS_SITE
+    asserts_tenant: $ASSERTS_TENANT
     capture_metrics: true
     custom_attributes:
       "asserts.error.type":
