@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "Starting collector for Asserts tenant: ${ASSERTS_TENANT}"
+
 if [ "$TRACE_STORE" == "OTLP-HTTP" ]; then
     /opt/asserts/asserts-otel-collector --config /etc/asserts/collector-config-otlphttp.yaml
 elif [ "$TRACE_STORE" == "AWS-XRAY" ]; then

@@ -180,6 +180,8 @@ Resources:
               Value: !Ref AssertsApiServerUsername
             - Name: ASSERTS_SERVER_PASSWORD
               Value: !Ref AssertsApiServerPassword
+            - Name: ASSERTS_TENANT
+              Value: !Ref AssertsTenantName
             - Name: LOG_LEVEL
               Value: !Ref LogLevel
         - Essential: true
