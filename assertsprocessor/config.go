@@ -4,6 +4,17 @@ import (
 	"fmt"
 )
 
+type SpanAttribute struct {
+	AttributeName    string                 `mapstructure:"attr_name" json:"attr_name"`
+	AttributeConfigs []*SpanAttributeConfig `mapstructure:"attr_configs" json:"attr_configs"`
+}
+
+type SpanAttributeConfig struct {
+	Namespace string                   `mapstructure:"namespace" json:"namespace"`
+	Service   string                   `mapstructure:"service" json:"service"`
+	Rules     []*CustomAttributeConfig `mapstructure:"rules" json:"rules"`
+}
+
 type Config struct {
 	AssertsServer                  *map[string]string                             `mapstructure:"asserts_server" json:"asserts_server"`
 	Env                            string                                         `mapstructure:"asserts_env" json:"asserts_env"`
@@ -11,6 +22,7 @@ type Config struct {
 	AssertsTenant                  string                                         `mapstructure:"asserts_tenant" json:"asserts_tenant"`
 	CaptureMetrics                 bool                                           `mapstructure:"capture_metrics" json:"capture_metrics"`
 	CustomAttributeConfigs         map[string]map[string][]*CustomAttributeConfig `mapstructure:"custom_attributes" json:"custom_attributes"`
+	SpanAttributes                 []*SpanAttribute                               `mapstructure:"span_attributes" json:"span_attributes"`
 	CaptureAttributesInMetric      []string                                       `mapstructure:"attributes_as_metric_labels" json:"attributes_as_metric_labels"`
 	DefaultLatencyThreshold        float64                                        `mapstructure:"sampling_latency_threshold_seconds" json:"sampling_latency_threshold_seconds"`
 	LatencyHistogramBuckets        []float64                                      `mapstructure:"latency_histogram_buckets" json:"latency_histogram_buckets"`
@@ -35,6 +47,18 @@ func (config *Config) Validate() error {
 		for serviceKey, configs := range byServiceKey {
 			for _, _config := range configs {
 				err := _config.validate(targetAtt, serviceKey)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	for _, spanAttribute := range config.SpanAttributes {
+		attrName := spanAttribute.AttributeName
+		for _, attrConfig := range spanAttribute.AttributeConfigs {
+			serviceKey := getKey(attrConfig)
+			for _, rule := range attrConfig.Rules {
+				err := rule.validate(attrName, serviceKey)
 				if err != nil {
 					return err
 				}

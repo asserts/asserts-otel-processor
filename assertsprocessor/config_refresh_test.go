@@ -55,6 +55,36 @@ func TestFetchConfig(t *testing.T) {
           ]
         }
       },
+      "span_attributes": [{
+        "attr_name": "asserts.request.context",
+        "attr_configs": [
+          {
+            "namespace": "asserts",
+            "service": "api-server",
+            "rules": [
+              {
+                "source_attributes": [
+                  "attr1",
+                  "attr2"
+                ],
+                "regex": "(.+?);(.+)",
+                "replacement": "$1:$2"
+              }
+            ]
+          },
+          {
+            "rules": [
+              {
+                "source_attributes": [
+                  "attr1"
+                ],
+                "regex": "(.+)",
+                "replacement": "$1"
+              }
+            ]
+          }
+        ]
+      }],
       "attributes_as_metric_labels": [
         "rpc.system",
         "rpc.service"
@@ -90,6 +120,15 @@ func TestFetchConfig(t *testing.T) {
 	assert.Equal(t, 2, len(cr.config.CustomAttributeConfigs["asserts.request.context"]))
 	assert.Equal(t, 1, len(cr.config.CustomAttributeConfigs["asserts.request.context"]["default"]))
 	assert.Equal(t, 1, len(cr.config.CustomAttributeConfigs["asserts.request.context"]["asserts#api-server"]))
+	assert.Equal(t, 1, len(cr.config.SpanAttributes))
+	assert.Equal(t, "asserts.request.context", cr.config.SpanAttributes[0].AttributeName)
+	assert.Equal(t, 2, len(cr.config.SpanAttributes[0].AttributeConfigs))
+	assert.Equal(t, "asserts", cr.config.SpanAttributes[0].AttributeConfigs[0].Namespace)
+	assert.Equal(t, "api-server", cr.config.SpanAttributes[0].AttributeConfigs[0].Service)
+	assert.Equal(t, 1, len(cr.config.SpanAttributes[0].AttributeConfigs[0].Rules))
+	assert.Equal(t, "", cr.config.SpanAttributes[0].AttributeConfigs[1].Namespace)
+	assert.Equal(t, "", cr.config.SpanAttributes[0].AttributeConfigs[1].Service)
+	assert.Equal(t, 1, len(cr.config.SpanAttributes[0].AttributeConfigs[1].Rules))
 	assert.NotNil(t, cr.config.CaptureAttributesInMetric)
 	assert.Equal(t, 2, len(cr.config.CaptureAttributesInMetric))
 	assert.Equal(t, "rpc.system", cr.config.CaptureAttributesInMetric[0])

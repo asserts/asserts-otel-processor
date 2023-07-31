@@ -73,6 +73,7 @@ func newProcessor(logger *zap.Logger, buildInfo component.BuildInfo, ctx context
 		pConfig.CaptureAttributesInMetric = newConfig.CaptureAttributesInMetric
 		pConfig.DefaultLatencyThreshold = newConfig.DefaultLatencyThreshold
 		pConfig.CustomAttributeConfigs = newConfig.CustomAttributeConfigs
+		pConfig.SpanAttributes = newConfig.SpanAttributes
 		pConfig.IgnoreClientErrors = newConfig.IgnoreClientErrors
 		if len(newConfig.LatencyHistogramBuckets) > 0 {
 			pConfig.LatencyHistogramBuckets = newConfig.LatencyHistogramBuckets
