@@ -25,7 +25,7 @@ Parameters:
   AssignPublicIPToECSTask:
     Type: String
     Description: Determines whether the ECS Task ENIs will be assigned a public IP
-    Default: "ENABLED"
+    Default: "DISABLED"
     AllowedValues: [ "ENABLED", "DISABLED" ]
 
   AssertsOTELCollectorVersion:
