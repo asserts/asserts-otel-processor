@@ -13,7 +13,6 @@ exporters:
     log:
       default_log_name: opentelemetry.io/collector-exported-log
   prometheus:
-    namespace: default
     endpoint: 0.0.0.0:8889
 
 processors:
