@@ -1,4 +1,4 @@
-FROM asserts/otel-collector:v0.0.92
+FROM asserts/otel-collector:v0.0.93
 
 WORKDIR /opt/asserts
 COPY start-collector.sh /opt/asserts
