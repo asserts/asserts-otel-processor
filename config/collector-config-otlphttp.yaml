@@ -12,7 +12,6 @@ exporters:
     tls:
       insecure: true
   prometheus:
-    namespace: default
     endpoint: 0.0.0.0:8889
 
 processors:
