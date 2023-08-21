@@ -28,25 +28,27 @@ processors:
     asserts_site: $ASSERTS_SITE
     asserts_tenant: $ASSERTS_TENANT
     capture_metrics: true
-    custom_attributes:
-      "asserts.error.type":
-        "default":
-          - value_expr: client_errors
-            regex: 4..
-            source_attributes: ["http.status_code"]
-            span_kinds: ["Client", "Server"]
-          - value_expr: server_errors
-            regex: 5..
-            source_attributes: ["http.status_code"]
-            span_kinds: ["Client", "Server"]
-      "asserts.request.context":
-        default:
-          - source_attributes: ["http.route"]
-            regex: "(.+)"
-            span_kinds: ["Server"]
-          - source_attributes: ["http.url"]
-            span_kinds: ["Server", "Client"]
-            regex: "https?://.+?((/[^/?]+){1,2}).*"
+    span_attributes:
+      - attr_name: asserts.error.type
+        attr_configs:
+          - rules:
+              - value_expr: client_errors
+                regex: 4..
+                source_attributes: ["http.status_code"]
+                span_kinds: ["Client", "Server"]
+              - value_expr: server_errors
+                regex: 5..
+                source_attributes: ["http.status_code"]
+                span_kinds: ["Client", "Server"]
+      - attr_name: asserts.request.context
+        attr_configs:
+          - rules:
+              - source_attributes: ["http.route"]
+                regex: "(.+)"
+                span_kinds: ["Server"]
+              - source_attributes: ["http.url"]
+                span_kinds: ["Server", "Client"]
+                regex: "https?://.+?((/[^/?]+){1,2}).*"
     attributes_as_metric_labels:
       - "rpc.system"
       - "rpc.service"
