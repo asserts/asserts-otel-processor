@@ -21,10 +21,8 @@ const (
 	siteLabel            = "asserts_site"
 	namespaceLabel       = "namespace"
 	serviceLabel         = "service"
-	requestTypeLabel     = "asserts_request_type"
-	errorTypeLabel       = "asserts_error_type"
-	requestContextLabel  = "asserts_request_context"
 	spanKind             = "span_kind"
+	statusCode           = "status_code"
 	traceSampleTypeLabel = "sample_type"
 )
 
@@ -174,6 +172,7 @@ func (p *metricHelper) buildLabels(namespace string, service string, span *ptrac
 		}
 	}
 	labels[spanKind] = span.Kind().String()
+	labels[statusCode] = span.Status().Code().String()
 	p.logger.Debug("Captured Metric labels",
 		zap.String("traceId", span.TraceID().String()),
 		zap.String("spanId", span.SpanID().String()),
