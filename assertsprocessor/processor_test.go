@@ -19,6 +19,7 @@ var testConfig = Config{
 	Env:                            "dev",
 	Site:                           "us-west-2",
 	AssertsServer:                  &map[string]string{"endpoint": "http://localhost:8030"},
+	SampleTraces:                   true,
 	CaptureMetrics:                 true,
 	CaptureAttributesInMetric:      []string{"attribute"},
 	DefaultLatencyThreshold:        0.5,
@@ -37,42 +38,16 @@ func TestCapabilities(t *testing.T) {
 
 func TestStartAndShutdown(t *testing.T) {
 	ctx := context.Background()
-	dConsumer := dummyConsumer{
-		items: make([]*Item, 0),
-	}
-	testLogger, _ := zap.NewProduction()
-	_th := thresholdHelper{
-		logger:              testLogger,
-		config:              &testConfig,
-		stop:                make(chan bool),
-		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
-		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
-		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		rc:                  &assertsClient{},
-	}
-	configRefresh := configRefresh{
-		config:           &testConfig,
-		logger:           logger,
-		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
-		stop:             make(chan bool),
-		restClient:       &assertsClient{},
-	}
-	p := assertsProcessorImpl{
-		logger:        testLogger,
-		config:        &testConfig,
-		nextConsumer:  dConsumer,
-		metricBuilder: newMetricHelper(testLogger, &testConfig, buildInfo),
-		sampler: &sampler{
-			logger:             testLogger,
-			config:             &testConfig,
-			nextConsumer:       dConsumer,
-			topTracesByService: &sync.Map{},
-			stop:               make(chan bool),
-			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
-			thresholdHelper:    &_th,
-		},
-		configRefresh: &configRefresh,
-	}
+	p := createProcessor(testConfig)
+	assert.Nil(t, p.Start(ctx, nil))
+	assert.Nil(t, p.Shutdown(ctx))
+}
+
+func TestStartAndShutdownWithSamplingDisabled(t *testing.T) {
+	ctx := context.Background()
+	samplingDisabled := testConfig
+	samplingDisabled.SampleTraces = false
+	p := createProcessor(samplingDisabled)
 	assert.Nil(t, p.Start(ctx, nil))
 	assert.Nil(t, p.Shutdown(ctx))
 }
@@ -199,4 +174,44 @@ func TestProcessorOnUpdate(t *testing.T) {
 	err := p.onUpdate(newConfig)
 	assert.Nil(t, err)
 	assert.True(t, p.captureMetrics())
+}
+
+func createProcessor(cfg Config) assertsProcessorImpl {
+	ctx := context.Background()
+	dConsumer := dummyConsumer{
+		items: make([]*Item, 0),
+	}
+	testLogger, _ := zap.NewProduction()
+	_th := thresholdHelper{
+		logger:              testLogger,
+		config:              &cfg,
+		stop:                make(chan bool),
+		entityKeys:          xsync.NewMapOf[EntityKeyDto](),
+		thresholds:          xsync.NewMapOf[map[string]*ThresholdDto](),
+		thresholdSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		rc:                  &assertsClient{},
+	}
+	configRefresh := configRefresh{
+		config:           &cfg,
+		logger:           logger,
+		configSyncTicker: clock.FromContext(ctx).NewTicker(time.Minute),
+		stop:             make(chan bool),
+		restClient:       &assertsClient{},
+	}
+	return assertsProcessorImpl{
+		logger:        testLogger,
+		config:        &cfg,
+		nextConsumer:  dConsumer,
+		metricBuilder: newMetricHelper(testLogger, &cfg, buildInfo),
+		sampler: &sampler{
+			logger:             testLogger,
+			config:             &cfg,
+			nextConsumer:       dConsumer,
+			topTracesByService: &sync.Map{},
+			stop:               make(chan bool),
+			traceFlushTicker:   clock.FromContext(ctx).NewTicker(time.Minute),
+			thresholdHelper:    &_th,
+		},
+		configRefresh: &configRefresh,
+	}
 }
