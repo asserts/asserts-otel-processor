@@ -94,11 +94,13 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels[namespaceLabel] = "ride-services"
 	expectedLabels[serviceLabel] = "payment"
 	expectedLabels[spanKind] = "Client"
-	expectedLabels["asserts_request_context"] = "GetItem"
-	expectedLabels["rpc_service"] = "DynamoDb"
-	expectedLabels["rpc_method"] = "GetItem"
-	expectedLabels["aws_table_name"] = "ride-bookings"
-	expectedLabels["rpc_system"] = "aws-api"
+	expectedLabels[statusCode] = "Unset"
+	expectedLabels["asserts_error_type"] = "client_errors"
+	expectedLabels["asserts_request_context"] = "/request"
+	expectedLabels["asserts_request_type"] = "inbound"
+
+	actualLabels := p.buildLabels("ride-services", "payment", &testSpan, &resourceSpans)
+	assert.Equal(t, expectedLabels, actualLabels)
 
 	p.captureMetrics(&testSpan, "ride-services", "payment", &resourceSpans)
 }
