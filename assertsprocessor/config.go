@@ -27,6 +27,7 @@ type Config struct {
 	DefaultLatencyThreshold        float64                                        `mapstructure:"sampling_latency_threshold_seconds" json:"sampling_latency_threshold_seconds"`
 	LatencyHistogramBuckets        []float64                                      `mapstructure:"latency_histogram_buckets" json:"latency_histogram_buckets"`
 	IgnoreClientErrors             bool                                           `mapstructure:"ignore_client_errors" json:"ignore_client_errors"`
+	SampleTraces                   bool                                           `mapstructure:"sample_traces" json:"sample_traces"`
 	LimitPerService                int                                            `mapstructure:"trace_rate_limit_per_service" json:"trace_rate_limit_per_service"`
 	LimitPerRequestPerService      int                                            `mapstructure:"trace_rate_limit_per_service_per_request" json:"trace_rate_limit_per_service_per_request"`
 	RequestContextCacheTTL         int                                            `mapstructure:"request_context_cache_ttl_minutes" json:"request_context_cache_ttl_minutes"`

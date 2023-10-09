@@ -31,7 +31,9 @@ func (p *assertsProcessorImpl) Capabilities() consumer.Capabilities {
 // Start implements the component.Component interface.
 func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) error {
 	p.logger.Info("consumer.Start callback")
-	p.sampler.startProcessing()
+	if p.config.SampleTraces {
+		p.sampler.startProcessing()
+	}
 	p.configRefresh.startUpdates()
 	return nil
 }
@@ -39,20 +41,23 @@ func (p *assertsProcessorImpl) Start(ctx context.Context, host component.Host) e
 // Shutdown implements the component.Component interface
 func (p *assertsProcessorImpl) Shutdown(context.Context) error {
 	p.logger.Info("consumer.Shutdown")
-	p.sampler.stopProcessing()
+	if p.config.SampleTraces {
+		p.sampler.stopProcessing()
+	}
 	p.configRefresh.stopUpdates()
 	return nil
 }
 
 // ConsumeTraces implements the consumer.Traces interface.
 func (p *assertsProcessorImpl) ConsumeTraces(ctx context.Context, traces ptrace.Traces) error {
-	return p.consumeTraces(ctx, convertToTraces(traces))
+	return p.consumeTraces(ctx, traces)
 }
 
 // Samples the trace if the latency threshold exceeds for any of the root, entry or exit spans in the trace
 // Also generates span metrics for the spans of interest
-func (p *assertsProcessorImpl) consumeTraces(ctx context.Context, traces []*trace) error {
-	for _, tr := range traces {
+func (p *assertsProcessorImpl) consumeTraces(ctx context.Context, traces ptrace.Traces) error {
+	traceArray := convertToTraces(traces)
+	for _, tr := range traceArray {
 		for _, ts := range tr.segments {
 			for _, span := range ts.getNonInternalSpans() {
 				p.spanEnricher.enrichSpan(ts.namespace, ts.service, span)
@@ -62,7 +67,11 @@ func (p *assertsProcessorImpl) consumeTraces(ctx context.Context, traces []*trac
 			}
 		}
 	}
-	p.sampler.sampleTraces(ctx, traces)
+	if p.config.SampleTraces {
+		p.sampler.sampleTraces(ctx, traceArray)
+	} else {
+		_ = p.nextConsumer.ConsumeTraces(ctx, traces)
+	}
 	return nil
 }
 

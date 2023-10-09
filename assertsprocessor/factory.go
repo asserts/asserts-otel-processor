@@ -34,6 +34,7 @@ func createDefaultConfig() component.Config {
 		AssertsServer: &map[string]string{
 			"endpoint": "https://chief.app.dev.asserts.ai",
 		},
+		SampleTraces:                   true,
 		LatencyHistogramBuckets:        []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60, 90, 120},
 		DefaultLatencyThreshold:        3,
 		LimitPerService:                100,
