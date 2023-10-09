@@ -29,6 +29,7 @@ func TestBuildLabels(t *testing.T) {
 
 	testSpan := ptrace.NewSpan()
 	testSpan.SetKind(ptrace.SpanKindClient)
+	testSpan.Status().SetCode(ptrace.StatusCodeOk)
 	testSpan.Attributes().PutStr(AssertsRequestTypeAttribute, "outbound")
 	testSpan.Attributes().PutStr(AssertsRequestContextAttribute, "GetItem")
 	testSpan.Attributes().PutStr("rpc.system", "aws-api")
@@ -41,15 +42,16 @@ func TestBuildLabels(t *testing.T) {
 	expectedLabels[siteLabel] = "us-west-2"
 	expectedLabels[namespaceLabel] = "ride-services"
 	expectedLabels[serviceLabel] = "payment"
-	expectedLabels[requestContextLabel] = "GetItem"
-	expectedLabels[requestTypeLabel] = "outbound"
-	expectedLabels[errorTypeLabel] = ""
+	expectedLabels[spanKind] = "Client"
+	expectedLabels[statusCode] = "Ok"
+	expectedLabels["asserts_error_type"] = ""
+	expectedLabels["asserts_request_context"] = "GetItem"
+	expectedLabels["asserts_request_type"] = "outbound"
 	expectedLabels["rpc_service"] = "DynamoDb"
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
 	expectedLabels["rpc_system"] = "aws-api"
 	expectedLabels["host_name"] = "192.168.1.19"
-	expectedLabels["span_kind"] = "Client"
 	expectedLabels["aws_queue_url"] = ""
 
 	actualLabels := p.buildLabels("ride-services", "payment", &testSpan, &resourceSpans)
@@ -91,12 +93,12 @@ func TestCaptureMetrics(t *testing.T) {
 	expectedLabels[siteLabel] = "us-west-2"
 	expectedLabels[namespaceLabel] = "ride-services"
 	expectedLabels[serviceLabel] = "payment"
-	expectedLabels[requestContextLabel] = "GetItem"
+	expectedLabels[spanKind] = "Client"
+	expectedLabels["asserts_request_context"] = "GetItem"
 	expectedLabels["rpc_service"] = "DynamoDb"
 	expectedLabels["rpc_method"] = "GetItem"
 	expectedLabels["aws_table_name"] = "ride-bookings"
 	expectedLabels["rpc_system"] = "aws-api"
-	expectedLabels["span_kind"] = "Client"
 
 	p.captureMetrics(&testSpan, "ride-services", "payment", &resourceSpans)
 }

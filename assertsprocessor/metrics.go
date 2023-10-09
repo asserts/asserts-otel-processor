@@ -77,7 +77,7 @@ func (m *metrics) register(subsystem string, name string, labels []string, msg s
 }
 
 func (m *metrics) registerLatencyHistogram(captureAttributesInMetric []string) error {
-	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, spanKind}
+	var spanMetricLabels = []string{envLabel, siteLabel, namespaceLabel, serviceLabel, spanKind, statusCode}
 
 	if captureAttributesInMetric != nil {
 		for _, label := range captureAttributesInMetric {
